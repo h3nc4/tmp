@@ -23,7 +23,7 @@ Este documento apresenta a documentação da API responsável pela automatizaç�
 
 - **executorId**
 	- **Local:** Body Param
-	- **Tipo:** String
+	- **Tipo:** `String`
 	- **Descrição:** Id do policial que o cartão programa é atribuído.
 
 ---
@@ -64,7 +64,7 @@ Este documento apresenta a documentação da API responsável pela automatizaç�
 
 - **executorId**
 	- **Local:** Body Param
-	- **Tipo:** String
+	- **Tipo:** `String`
 	- **Descrição:** Id do policial que o cartão programa é atribuído.
 
 ---
