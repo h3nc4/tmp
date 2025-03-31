@@ -1,4 +1,4 @@
-# Memorial Descritivo da Graduação em Engenharia de Software na PUC Minas (2022 - Presente)
+# Memorial Descritivo da Graduação em Engenharia de Software na PUC Minas (Jan 2022 - Dez 2025)
 
 Henrique Almeida
 16 de fevereiro de 2025

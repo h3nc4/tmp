@@ -1,4 +1,4 @@
-# Memorial Descritivo da Graduação em Engenharia de Software
+# Memorial Descritivo da Graduação em Engenharia de Software (Jan 2022 - Dez 2025)
 
 
 
