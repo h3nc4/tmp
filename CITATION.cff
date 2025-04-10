@@ -2,18 +2,10 @@ cff-version: 1.0.1
 message: Please cite this software using these metadata.
 title: 
 authors:
-  - family-names: 
-    given-names: 
-  - family-names: 
-    given-names: 
-  - family-names: 
-    given-names: 
-  - family-names: 
-    given-names: 
-  - family-names: 
-    given-names: 
-  - family-names: 
-    given-names:
+  - family-names: Dolablea
+    given-names: Gabriel
+  - family-names: Almeida
+    given-names: Henrique
   - name-suffix: Professor
     affiliation: PUC Minas
     family-names: 
