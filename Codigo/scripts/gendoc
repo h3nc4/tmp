@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+
+cd "$(dirname "$(readlink -f "$0")")/../.."
+
+java -jar /opt/plantuml.jar $(find Artefatos -type f -name "*.wsd")
