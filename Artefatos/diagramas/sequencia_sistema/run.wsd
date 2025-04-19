@@ -1,0 +1,17 @@
+@startuml run
+!theme _none_
+skinparam sequenceMessageAlign center
+hide footbox
+
+actor "Desenvolvedor" as User
+participant "Sistema" as Sys
+
+User -> Sys : hookci run <params>
+activate Sys
+alt //Step// falhou com //Debug// on
+	Sys --> User : Depuração
+end
+Sys -> User : Exibe resultados e //logs//
+deactivate Sys
+
+@enduml

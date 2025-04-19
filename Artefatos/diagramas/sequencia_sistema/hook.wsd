@@ -1,0 +1,31 @@
+@startuml hook
+!theme _none_
+skinparam defaultFontName SansSerif
+hide footbox
+
+actor "Git" as GitSystem
+participant "Sistema" as Sys
+
+GitSystem -> Sys : run hook
+activate Sys
+
+alt Configuração válida
+	opt Dockerfile especificado
+		alt Falha no build
+			Sys --> GitSystem : Aborta operação Git
+		end
+	end
+
+	loop Para cada //Step//
+		alt //Step// falhou e é crítico
+			Sys --> GitSystem : Aborta operação Git
+		end
+	end
+
+	Sys --> GitSystem : Permite operação Git
+else
+	Sys --> GitSystem : Aborta operação Git
+	deactivate Sys
+end
+
+@enduml

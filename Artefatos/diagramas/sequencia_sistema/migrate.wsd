@@ -1,0 +1,13 @@
+@startuml migrate
+!theme _none_
+skinparam sequenceMessageAlign center
+hide footbox
+
+actor "Administrador" as User
+participant "Sistema" as Sys
+
+User -> Sys : hookci migrate
+activate Sys
+Sys --> User : Exibe resultado da migração
+deactivate Sys
+@enduml
