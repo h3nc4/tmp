@@ -1,0 +1,50 @@
+@startuml init
+!theme _none_
+skinparam sequenceMessageAlign center
+hide footbox
+
+actor "Administrador" as User
+participant "<<Layer>>\nPresentation (CLI)" as CLI
+participant "<<Layer>>\nApplication" as App
+participant "<<Layer>>\nInfrastructure" as Infra
+boundary "config" as ConfigFile
+boundary "Git" as GitSystem
+
+User -> CLI : hookci init
+activate CLI
+CLI -> App : run()
+activate App
+App -> Infra : find_git_root()
+activate Infra
+Infra -> GitSystem : locate .git
+GitSystem --> Infra : git_root_path
+Infra --> App : git_root_path
+deactivate Infra
+
+alt Projeto ainda não inicializado
+	App -> Infra : write_def_conf()
+	activate Infra
+	Infra -> ConfigFile : write default config
+	activate ConfigFile
+	ConfigFile --> Infra : success
+	deactivate ConfigFile
+	Infra --> App : success
+	deactivate Infra
+
+	App -> Infra : install_hooks()
+	activate Infra
+	Infra -> GitSystem : create/write hook files
+	activate GitSystem
+	GitSystem --> Infra : success
+	deactivate GitSystem
+	Infra --> App : success
+	deactivate Infra
+	App --> CLI : success
+else Projeto já inicializado
+	App --> CLI : warning
+	deactivate App
+end
+
+CLI --> User : Exibe sucesso ou aviso
+deactivate CLI
+@enduml

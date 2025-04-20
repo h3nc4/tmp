@@ -1,0 +1,13 @@
+@startuml help
+!theme _none_
+skinparam sequenceMessageAlign center
+hide footbox
+
+actor "Usuário" as User
+participant "<<Layer>>\nPresentation (CLI)" as CLI
+
+User -> CLI : hookci help
+activate CLI
+CLI --> User : Exibe texto de ajuda
+deactivate CLI
+@enduml

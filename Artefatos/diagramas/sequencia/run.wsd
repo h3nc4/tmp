@@ -1,0 +1,75 @@
+@startuml run
+!theme _none_
+skinparam sequenceMessageAlign center
+hide footbox
+
+actor "Desenvolvedor" as User
+participant "<<Layer>>\nPresentation (CLI)" as CLI
+participant "<<Layer>>\nApplication" as App
+participant "<<Layer>>\nDomain" as Domain
+participant "<<Layer>>\nInfrastructure" as Infra
+boundary "config" as ConfigFile
+boundary "Docker" as DockerSystem
+
+User -> CLI : hookci run <params>
+activate CLI
+CLI -> App : run()
+activate App
+App -> Infra : load_conf()
+activate Infra
+Infra -> ConfigFile : read config
+activate ConfigFile
+ConfigFile --> Infra : config_data
+deactivate ConfigFile
+Infra --> App : config_data
+deactivate Infra
+
+App -> Domain : validate()
+activate Domain
+Domain --> App : validation_status
+deactivate Domain
+
+App -> Domain : get_image_info()
+activate Domain
+Domain --> App : docker_info
+deactivate Domain
+
+opt docker_info refere-se a um Dockerfile
+	App -> Infra : build_dockerfile()
+	activate Infra
+	Infra -> DockerSystem : build image
+	activate DockerSystem
+	DockerSystem --> Infra : image ready
+	deactivate DockerSystem
+	Infra --> App : build_success
+	deactivate Infra
+end
+
+App -> Domain : get_test_steps()
+activate Domain
+Domain --> App : test_steps_list
+deactivate Domain
+
+loop Para cada //Step//
+	App -> Infra : run_container()
+	activate Infra
+	Infra -> DockerSystem : run container
+	activate DockerSystem
+	DockerSystem --> Infra : logs, exit_code
+	deactivate DockerSystem
+	Infra --> App : step_result
+	deactivate Infra
+	alt //Step// falhou
+		App --> CLI : execution_failed, logs
+		alt //Debug// on
+			CLI --> User : Depuração
+		end
+	end
+end
+
+App --> CLI : overall_result, logs
+deactivate App
+CLI -> User : Exibe resultados e //logs//
+deactivate CLI
+
+@enduml
