@@ -1,0 +1,21 @@
+@startuml migrate
+!theme _none_
+skinparam linestyle ortho
+hide footbox
+
+actor ":Administrador" as Admin
+rectangle ":HookciCli" as CLI
+rectangle ":MigrationService" as App
+rectangle ":YamlConfigurationHandler" as CfgHandler
+boundary "config" as ConfigFile
+
+Admin -down-> CLI: 1: hookci migrate
+CLI -down-> App: 2: run()
+App -down-> CfgHandler: 3: load_conf()
+CfgHandler -down-> ConfigFile: 3.1: read config
+App -> App: 4: process_migration()
+App -down-> CfgHandler: 5: write_conf()
+CfgHandler -down-> ConfigFile: 5.1: write updated config
+CLI -[hidden]down- CfgHandler
+CfgHandler -[hidden]down- ConfigFile
+@enduml
