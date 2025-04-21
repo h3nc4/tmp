@@ -31,7 +31,9 @@ deactivate Domain
 
 alt Configuração Válida
 	App -> Domain : get_image_info()
+	activate Domain
 	Domain --> App : docker_info
+	deactivate Domain
 
 	opt Dockerfile especificado
 		App -> Infra : build_dockerfile()

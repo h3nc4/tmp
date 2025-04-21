@@ -17,7 +17,9 @@ activate App
 App -> Infra : find_git_root()
 activate Infra
 Infra -> GitSystem : locate .git
+activate GitSystem
 GitSystem --> Infra : git_root_path
+deactivate GitSystem
 Infra --> App : git_root_path
 deactivate Infra
 
