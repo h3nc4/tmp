@@ -1,9 +1,8 @@
-@startuml run
+@startuml hook
 !theme _none_
-skinparam linestyle ortho
 hide footbox
 
-actor ":Desenvolvedor" as Dev
+actor "Git" as GitSystem
 rectangle ":HookciCli" as CLI
 rectangle ":CiExecutionService" as App
 rectangle ":YamlConfigurationHandler" as CfgHandler
@@ -12,7 +11,7 @@ rectangle ":DockerService" as DockerSvc
 boundary "config" as ConfigFile
 boundary "Docker" as DockerSystem
 
-Dev -down-> CLI: 1: hookci run <params>
+GitSystem -down-> CLI: 1: run hook
 CLI -down-> App: 2: run()
 App -right-> CfgHandler: 3: load_conf()
 CfgHandler -right-> ConfigFile: 3.1: read config

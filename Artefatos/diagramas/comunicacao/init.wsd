@@ -1,6 +1,5 @@
 @startuml init
 !theme _none_
-skinparam linestyle ortho
 hide footbox
 
 actor ":Administrador" as Admin
