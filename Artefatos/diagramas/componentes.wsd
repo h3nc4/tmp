@@ -1,0 +1,48 @@
+@startuml componentes
+!theme _none_
+
+interface Http
+interface FileSystem
+interface CLI
+
+component "Docker Engine" as DockerEngine <<External>> {
+	DockerEngine -up- Http
+}
+component "OS" as OS <<External>> {
+	component "File System" as FS
+	FS -up- FileSystem
+}
+component "Git SCM" as GitSystem <<External>> {
+	GitSystem -up- CLI
+}
+
+package "HookCI System" {
+	component "Presentation" as _CLI {
+	}
+	component "Application Services" as App {
+	}
+	component "Domain Model" as Domain {
+	}
+	package "Infrastructure Adapters" {
+		component "YAML/File Handler" as ConfigAdapter {
+		}
+		component "Git Adapter" as GitAdapter {
+		}
+		component "Docker Adapter" as DockerAdapter {
+		}
+	}
+
+	_CLI ..> App
+	App ..> Domain
+	App ..> ConfigAdapter
+	App ..> GitAdapter
+	App ..> DockerAdapter
+
+}
+
+ConfigAdapter --( FileSystem
+GitAdapter --( CLI
+GitAdapter --( FileSystem
+DockerAdapter --( Http
+
+@enduml

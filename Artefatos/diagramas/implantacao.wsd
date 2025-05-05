@@ -1,0 +1,25 @@
+@startuml implantacao
+!theme _none_
+hide footbox
+
+node "Developer Workstation" as WS {
+	artifact "HookCI CLI" as HookCIApp
+	artifact "Git SCM" as Git
+	artifact "Git Hook Scripts" as Hooks
+	artifact "config.yaml" as Config
+	artifact "Project Source Code" as Src
+
+	node "Docker Engine" as DE {
+		node "Test Container" as TestContainer {
+			artifact "Test Runner" as TestCode
+		}
+	}
+
+	Git .left.> Hooks : <<invoke>>
+	Hooks ..> HookCIApp : <<invoke>>
+	HookCIApp ..> Config : <<access>>
+	HookCIApp ..> DE : <<HTTP>>
+	TestContainer ..> Src : <<access>>
+}
+
+@enduml

@@ -1,0 +1,32 @@
+@startuml estados
+!theme _none_
+
+state "Aguardando" as Aguardando : Gatilho pendente
+state "Inicializando" as Init : Carrega Cfg / Prepara Docker
+state "Executando" as Exec : Executa Etapas Teste
+state "Depurando" as Debug : Sessão Depuração
+state "FimExecucao" as Fim <<choice>>
+
+state "Sucesso" as Success <<end>>
+state "ComAvisos" as Warned <<end>>
+state "Falha" as Failed <<end>>
+
+[*] --> Aguardando
+
+Aguardando --> Init : Gatilho Disparado
+
+Init --> Exec : Inicialização OK
+Init --> Failed : Falha Inicializ
+
+Exec --> Exec : Etapa OK\n[mais etapas]
+Exec --> Fim : Última Etapa OK
+
+Exec --> Debug : Etapa Falhou\n[debug ativo]
+Debug --> Failed : Fim Depuração
+
+Exec --> Failed : Etapa Crítica Falhou
+
+Fim --> Success : [OK sem Avisos]
+Fim --> Warned : [OK com Avisos]
+
+@enduml

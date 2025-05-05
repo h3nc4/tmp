@@ -1,0 +1,50 @@
+@startuml pacotes
+!theme _none_
+
+package "pkg" {
+	package "presentation" as PresentationLayer {
+		package "cli_handler" as CLI {
+		}
+	}
+	package "application" as ApplicationLayer {
+		package "use_case_services" as Services {
+		}
+		package "configuration_management" as AppConfig {
+		}
+	}
+	package "domain" as DomainLayer {
+		package "configuration_model" as DomainConfig {
+		}
+		package "ci_process_model" as DomainCI {
+		}
+	}
+	package "infrastructure" as InfrastructureLayer {
+		package "git_integration" as InfraGit {
+		}
+		package "docker_integration" as InfraDocker {
+		}
+		package "file_system_access" as InfraFS {
+		}
+		package "yaml_parser" as InfraYAML {
+		}
+	}
+}
+
+PresentationLayer ..> ApplicationLayer
+ApplicationLayer .left.> DomainLayer
+ApplicationLayer ..> InfrastructureLayer
+
+' CLI ..> Services
+
+' Services .left.> DomainConfig
+' Services .left.> DomainCI
+' Services ..> AppConfig
+
+' Services ..> InfraGit
+' Services ..> InfraDocker
+
+' AppConfig .left.> DomainConfig
+' AppConfig ..> InfraFS
+' AppConfig ..> InfraYAML
+
+@enduml
