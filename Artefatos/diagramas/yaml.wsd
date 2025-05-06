@@ -1,0 +1,18 @@
+@startyaml yaml
+version: string
+log_level: string
+docker:
+  image: string | null
+  dockerfile: string | null
+hooks:
+  pre-commit: boolean
+  pre-push: boolean
+steps:
+  name: string
+  command: string
+  critical: boolean | null
+  env:
+    VAR_1: string
+    VAR_2: string
+    VAR_n: string
+@endyaml
