@@ -1,5 +1,4 @@
 @startuml componentes
-!theme _none_
 
 interface Http
 interface FileSystem

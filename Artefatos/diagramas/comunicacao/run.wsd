@@ -1,6 +1,4 @@
 @startuml run
-!theme _none_
-hide footbox
 
 actor ":Desenvolvedor" as Dev
 rectangle ":HookciCli" as CLI

@@ -1,6 +1,4 @@
 @startuml init
-!theme _none_
-hide footbox
 
 actor ":Administrador" as Admin
 rectangle ":HookciCli" as CLI

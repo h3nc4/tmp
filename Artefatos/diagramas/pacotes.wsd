@@ -1,5 +1,4 @@
 @startuml pacotes
-!theme _none_
 
 package "pkg" {
 	package "presentation" as PresentationLayer {

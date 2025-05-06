@@ -1,6 +1,4 @@
 @startuml help
-!theme _none_
-hide footbox
 
 actor ":Usuário" as User
 rectangle ":HookciCli" as CLI

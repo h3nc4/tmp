@@ -1,5 +1,4 @@
 @startuml estados
-!theme _none_
 
 state "Aguardando" as Aguardando : Gatilho pendente
 state "Inicializando" as Init : Carrega Cfg / Prepara Docker

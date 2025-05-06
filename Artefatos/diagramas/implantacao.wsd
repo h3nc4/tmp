@@ -1,6 +1,4 @@
 @startuml implantacao
-!theme _none_
-hide footbox
 
 node "Developer Workstation" as WS {
 	artifact "HookCI CLI" as HookCIApp

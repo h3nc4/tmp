@@ -1,6 +1,4 @@
 @startuml hook
-!theme _none_
-hide footbox
 
 actor "Git" as GitSystem
 rectangle ":HookciCli" as CLI

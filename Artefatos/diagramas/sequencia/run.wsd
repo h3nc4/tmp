@@ -1,7 +1,5 @@
 @startuml run
-!theme _none_
 skinparam sequenceMessageAlign center
-hide footbox
 
 actor "Desenvolvedor" as User
 participant "<<Layer>>\nPresentation (CLI)" as CLI

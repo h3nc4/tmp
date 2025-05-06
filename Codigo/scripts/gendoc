@@ -1,4 +1,5 @@
 #!/bin/sh
 set -e
 
-find "$(dirname "$0")/../../Artefatos" -type f -name "*.wsd" -exec plantuml {} +
+cd "$(dirname "$0")/../../Artefatos"
+find . -type f -name "*.wsd" -exec plantuml -config ./config.plantuml {} +

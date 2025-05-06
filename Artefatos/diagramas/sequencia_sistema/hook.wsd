@@ -1,7 +1,5 @@
 @startuml hook
-!theme _none_
 skinparam defaultFontName SansSerif
-hide footbox
 
 actor "Git" as GitSystem
 participant "Sistema" as Sys

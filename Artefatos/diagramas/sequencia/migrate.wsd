@@ -1,7 +1,5 @@
 @startuml migrate
-!theme _none_
 skinparam sequenceMessageAlign center
-hide footbox
 
 actor "Administrador" as User
 participant "<<Layer>>\nPresentation (CLI)" as CLI

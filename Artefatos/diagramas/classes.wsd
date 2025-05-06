@@ -1,5 +1,4 @@
 @startuml classes
-!theme _none_
 skinparam packageStyle rectangle
 
 package "Presentation (CLI)" <<Layer>> {
