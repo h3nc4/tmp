@@ -1,7 +1,7 @@
 @startuml hook
 skinparam defaultFontName SansSerif
 
-actor "Git" as GitSystem
+boundary "Git" as GitSystem
 participant "<<Layer>>\nPresentation (CLI)" as CLI
 participant "<<Layer>>\nApplication" as App
 participant "<<Layer>>\nDomain" as Domain
