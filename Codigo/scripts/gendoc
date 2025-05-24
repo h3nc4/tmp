@@ -2,4 +2,4 @@
 set -e
 
 cd "$(dirname "$0")/../../Artefatos"
-find . -type f -name "*.wsd" -exec plantuml -config ./config.plantuml {} +
+make "$@"
