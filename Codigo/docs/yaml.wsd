@@ -7,6 +7,9 @@ docker:
 hooks:
   pre-commit: boolean
   pre-push: boolean
+filters:
+  branches: string
+  commits: string
 steps:
   name: string
   command: string
