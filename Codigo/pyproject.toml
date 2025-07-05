@@ -1,0 +1,29 @@
+[project]
+name = "hookci"
+version = "0.1.0"
+description = "Run CI locally with docker and git hooks"
+authors = [
+    {name = "Henrique Almeida", email = "me@h3nc4.com"},
+    {name = "Gabriel Dolabela", email = "dolabelag@gmail.com"},
+    {name = "PUC Minas"}
+]
+license = {text = "AGPL-3.0-or-later"}
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "rich (>=14.0.0,<15.0.0)",
+    "pyinstaller (>=6.13.0,<7.0.0)",
+    "docker (>=7.1.0,<8.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+ipdb = "^0.13.13"
+mypy = "^1.16.0"
+pytest = "^8.3.5"
+

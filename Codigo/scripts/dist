@@ -1,0 +1,44 @@
+#!/bin/sh
+# Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
+# This file is part of HookCI.
+
+# HookCI is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# HookCI is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+set -e
+
+cd "$(dirname "$0")/../"
+
+while getopts "b" opt; do
+	case "${opt}" in
+	b)
+		rebuild=1
+		shift
+		;;
+	*)
+		echo "Usage: $0 [-b]"
+		exit 1
+		;;
+	esac
+done
+
+# defaults to pip-based build
+container_name="${1:-"pip"}"
+dockerfile="${1:-"pip"}"
+
+# check if the image needs to be (re)built
+if [ -n "${rebuild}" ] || ! docker image inspect "hookci-${container_name}" >/dev/null 2>&1; then
+	DOCKER_BUILDKIT=1 docker build -t "hookci-${container_name}" -f "docker/${dockerfile}.Dockerfile" .
+fi
+
+docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}/../:/workdir" --workdir /workdir/Codigo/ -it "hookci-${container_name}" make "$@"

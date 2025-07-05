@@ -1,0 +1,76 @@
+#!/bin/sh
+# Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
+# This file is part of HookCI.
+
+# HookCI is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# HookCI is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+set -e
+
+cd "$(dirname "$0")/../"
+
+container_name="hookci"
+
+while getopts "bg" opt; do
+	case "${opt}" in
+	b) rebuild=1 ;;
+	g) gendoc=1 ;;
+	*)
+		echo "Usage: $0 [-b] [-g]"
+		exit 1
+		;;
+	esac
+done
+
+# if the container is already running, exec into it and exit
+if [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" = "true" ]; then
+	docker exec -it "$container_name" bash
+	exit $?
+fi
+
+# check if the image needs to be (re)built
+if [ -n "${rebuild}" ] || ! docker image inspect "${container_name}" >/dev/null 2>&1; then
+	DOCKER_BUILDKIT=1 docker build --build-arg "USER=${container_name}" --build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)" -t "${container_name}" .
+fi
+
+# generate docs and exit
+if [ -n "${gendoc}" ]; then
+	docker run -v "${PWD}/../:/${container_name}" --workdir "/${container_name}/Codigo/" --rm -it "${container_name}" make docs
+	exit $?
+fi
+
+if [ -n "$SSH_AUTH_SOCK" ]; then # check for a running ssh agent
+	ssh_flags="-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK=${SSH_AUTH_SOCK}"
+fi
+
+GNUPGHOME="${GNUPGHOME:-"${HOME}/.gnupg"}"
+gnupg_flags="-v ${GNUPGHOME}:$(echo "${GNUPGHOME}" | sed "s|${USER}|${container_name}|")"
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "${tmpdir}"' EXIT INT TERM HUP QUIT
+
+docker run \
+	-v "${PWD}/../:/${container_name}" \
+	-v "${HOME}/:/home/${container_name}" \
+	-v "${tmpdir}/:/home/${container_name}/.java" \
+	-v "${tmpdir}/:/home/${container_name}/.cache/fontconfig" \
+	-v "/etc/profile:/etc/profile:ro" \
+	-v "/etc/bash.bashrc:/etc/bash.bashrc:ro" \
+	${ssh_flags} \
+	${gnupg_flags} \
+	-e "TMUX=${TMUX}" \
+	-e "TERM=${TERM}" \
+	--workdir "/${container_name}/Codigo/" \
+	--name "${container_name}" \
+	--hostname "${container_name}" \
+	--rm -it "${container_name}" bash
