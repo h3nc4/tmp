@@ -15,5 +15,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
-import rich
-import docker
+"""
+Main entry point script for the HookCI application.
+"""
+
+from hookci.presentation import cli
+
+
+def main() -> None:
+    """
+    Application's main entry point. This function initializes and runs the CLI.
+    """
+    cli.main()
+
+
+if __name__ == "__main__":
+    main()
