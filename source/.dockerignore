@@ -1,0 +1,6 @@
+target
+.git
+.gitignore
+.idea
+.gradle
+**/.DS_Store

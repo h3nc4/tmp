@@ -1,0 +1,38 @@
+source/backend/api-central/HELP.md
+source/backend/api-central/target/
+source/backend/api-central/.mvn/wrapper/maven-wrapper.jar
+source/backend/api-central/!**/src/main/**/target/
+source/backend/api-central/!**/src/test/**/target/
+
+### STS ###
+source/backend/api-central/.apt_generated
+source/backend/api-central/.classpath
+source/backend/api-central/.factorypath
+source/backend/api-central/.project
+source/backend/api-central/.settings
+source/backend/api-central/.springBeans
+source/backend/api-central/.sts4-cache
+
+### IntelliJ IDEA ###
+source/backend/api-central/.idea
+source/backend/api-central/*.iws
+source/backend/api-central/*.iml
+source/backend/api-central/*.ipr
+
+### NetBeans ###
+source/backend/api-central/nbproject/private/
+source/backend/api-central/nbbuild/
+source/backend/api-central/dist/
+source/backend/api-central/nbdist/
+source/backend/api-central/.nb-gradle/
+source/backend/api-central/build/
+source/backend/api-central/!**/src/main/**/build/
+source/backend/api-central/!**/src/test/**/build/
+
+### VS Code ###
+source/backend/api-central/.vscode/
+
+### Maven ###
+source/backend/api-central/.mvn/*
+source/backend/api-central/mvnw
+source/backend/api-central/mvnw.cmd
