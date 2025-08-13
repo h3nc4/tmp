@@ -23,6 +23,12 @@ handling all command-line interface interactions.
 import typer
 from rich.console import Console
 from rich.table import Table
+from pathlib import Path
+from hookci.application.errors import ProjectAlreadyInitializedError
+from hookci.application.services import ProjectInitializationService
+from hookci.infrastructure.errors import NotInGitRepositoryError
+from hookci.infrastructure.fs import GitService, LocalFileSystem
+from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
 
 # Create a Typer app instance.
 # add_completion=False disables shell completion installation commands.
@@ -69,10 +75,32 @@ def help_command() -> None:
 @app.command()
 def init() -> None:
     """
-
     Initializes HookCI in the current repository.
+    This creates a `hookci.yaml` file with default settings
+    and prepares the repository to use HookCI hooks.
     """
-    console.print("[yellow]Notice:[/yellow] The 'init' command is not yet implemented.")
+    console.print("🚀 Initializing HookCI...")
+    try:
+        # Dependency Injection setup
+        fs = LocalFileSystem()
+        git_service = GitService()
+        config_handler = YamlConfigurationHandler(fs)
+        service = ProjectInitializationService(git_service, fs, config_handler)
+
+        config_path = service.run()
+
+        console.print(f"✅ [green]Success![/green] Configuration file created at: {config_path}")
+        console.print("👉 Next steps: customize `hookci.yaml` to fit your project's needs.")
+
+    except NotInGitRepositoryError:
+        console.print("❌ [bold red]Error:[/bold red] This is not a Git repository. Please run `git init` first.")
+        raise typer.Exit(code=1)
+    except ProjectAlreadyInitializedError as e:
+        console.print(f"👋 [yellow]Notice:[/yellow] {e}")
+        raise typer.Exit(code=0)
+    except Exception as e:
+        console.print(f"🔥 [bold red]An unexpected error occurred:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
 @app.command()
