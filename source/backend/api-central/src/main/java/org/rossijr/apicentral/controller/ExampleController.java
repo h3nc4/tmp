@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.List;
 
+
 @RestController
 @RequestMapping("/v1/example")
 @Tag(name = "Example", description = "Example controller for demonstration purposes - Use this base to create further controllers")
@@ -22,6 +23,7 @@ import java.util.List;
 public class ExampleController {
 
     private final ExampleService service;
+    private final ProgramCardService programCardService;
 
     @GetMapping("/users")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
@@ -33,5 +35,14 @@ public class ExampleController {
         UserDTO createdUser = service.createUser(user);
         return ResponseEntity.created(URI.create(String.format("/v1/example/users/%s", createdUser.getId())))
                 .body(createdUser);
+    }
+
+    @GetMapping("/cartao-programa/{executorId}/visualizacao")
+    public ResponseEntity<Page<ProgramCardResumoDTO>> listarCartoes(
+            @PathVariable UUID executorId,
+            Pageable pageable,
+            Authentication auth
+    ) {
+        return ResponseEntity.ok(programCardService.listarPorExecutor(executorId, pageable, auth));
     }
 }
