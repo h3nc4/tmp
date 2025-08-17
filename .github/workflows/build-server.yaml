@@ -24,11 +24,11 @@ jobs:
         run: |
           cd source/backend/api-central/ && \
           mvn clean package -Dmaven.test.skip=true && \
-          mv target/*.jar ../../../api-central-v0.0.0-dev.jar
+          mv target/*.jar ../api-central-v0.0.0-dev.jar
       # - name: Upload JAR
       #   uses: actions/upload-artifact@v4
       #   with:
       #     name: api-central-v0.0.0-dev
-      #     path: api-central-v0.0.0-dev.jar
+      #     path: source/backend/api-central-v0.0.0-dev.jar
       #     compression-level: 0
       #     retention-days: 1
