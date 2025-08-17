@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ProgramCardServiceAuthTest {
@@ -41,25 +42,9 @@ class ProgramCardServiceAuthTest {
         return auth;
     }
 
+    // (a) Executor obtém sua lista (e somente os seus)
     @Test
-    void managerPodeVerQualquerExecutor() {
-
-        UserDTO principal = new UserDTO();
-        principal.setManager(true);
-        principal.setId(UUID.randomUUID().toString());
-
-        Authentication auth = authWithPrincipal(principal, principal.getId());
-
-        UUID outroExecutor = UUID.randomUUID();
-        when(repository.findByUserAssigned_Id(eq(outroExecutor), any(Pageable.class)))
-                .thenReturn(Page.empty());
-
-        assertDoesNotThrow(() -> service.listarPorExecutor(outroExecutor, pageable, auth));
-        verify(repository, times(1)).findByUserAssigned_Id(eq(outroExecutor), any(Pageable.class));
-    }
-
-    @Test
-    void naoManagerPodeVerSomenteSeForEleMesmo() {
+    void executorObtendoSeusPropriosCartoes() {
         UUID executor = UUID.randomUUID();
 
         UserDTO principal = new UserDTO();
@@ -75,8 +60,26 @@ class ProgramCardServiceAuthTest {
         verify(repository, times(1)).findByUserAssigned_Id(eq(executor), any(Pageable.class));
     }
 
+    // (b) Gestor consegue obter a lista de um dado executor
     @Test
-    void naoManagerAcessandoOutroExecutorDeveLancar403() {
+    void gestorPodeAcessarQualquerExecutor() {
+        UserDTO principal = new UserDTO();
+        principal.setManager(true); // isManager = true
+        principal.setId(UUID.randomUUID().toString());
+
+        Authentication auth = authWithPrincipal(principal, principal.getId());
+
+        UUID outroExecutor = UUID.randomUUID();
+        when(repository.findByUserAssigned_Id(eq(outroExecutor), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        assertDoesNotThrow(() -> service.listarPorExecutor(outroExecutor, pageable, auth));
+        verify(repository, times(1)).findByUserAssigned_Id(eq(outroExecutor), any(Pageable.class));
+    }
+
+    // (c) Executor tentando acessar dados de outro -> 403
+    @Test
+    void executorAcessandoOutroExecutorDeveDar403() {
         UUID executorSolicitado = UUID.randomUUID();
         UUID principalId = UUID.randomUUID();
 
@@ -90,5 +93,28 @@ class ProgramCardServiceAuthTest {
                 () -> service.listarPorExecutor(executorSolicitado, pageable, auth));
 
         verify(repository, never()).findByUserAssigned_Id(any(UUID.class), any(Pageable.class));
+    }
+
+    // (d) Sem cartões para um executor -> retorna apropriadamente (aqui: lista vazia/200)
+    @Test
+    void retornoVazioQuandoSemCartoesParaExecutor() {
+        UUID executor = UUID.randomUUID();
+
+        UserDTO principal = new UserDTO();
+        principal.setManager(false);
+        principal.setId(executor.toString());
+
+        Authentication auth = authWithPrincipal(principal, principal.getId());
+
+        when(repository.findByUserAssigned_Id(eq(executor), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        Page<?> page = service.listarPorExecutor(executor, pageable, auth);
+
+        assertNotNull(page);
+        assertTrue(page.isEmpty());
+        assertEquals(0, page.getTotalElements());
+
+        verify(repository, times(1)).findByUserAssigned_Id(eq(executor), any(Pageable.class));
     }
 }
