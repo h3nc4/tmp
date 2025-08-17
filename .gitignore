@@ -36,3 +36,4 @@ source/backend/api-central/.vscode/
 source/backend/api-central/.mvn/*
 source/backend/api-central/mvnw
 source/backend/api-central/mvnw.cmd
+*.idea

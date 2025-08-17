@@ -1,6 +1,7 @@
 package org.rossijr.apicentral.service;
 
 import org.rossijr.apicentral.dto.ProgramCardResumoDTO;
+import org.rossijr.apicentral.dto.UserDTO;
 import org.rossijr.apicentral.repository.ProgramCardRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,17 +33,51 @@ public class ProgramCardService {
                 ));
     }
 
-    private boolean podeVerExecutor(UUID requested, Authentication auth) {
+    /**
+     * Regra:
+     *  - Se for manager (isManager == true) -> pode ver qualquer executor.
+     *  - Caso contrário -> só pode ver se o principal == executor solicitado.
+     */
+    private boolean podeVerExecutor(UUID requestedExecutorId, Authentication auth) {
         if (auth == null) return false;
-        var isGestor = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR"));
-        if (isGestor) return true;
-        var isExecutor = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_EXECUTOR"));
-        if (!isExecutor) return false;
+
+
+        if (isManager(auth)) return true;
+
+
         try {
-            var principalId = UUID.fromString(auth.getName());
-            return principalId.equals(requested);
+            UUID principalId = UUID.fromString(auth.getName());
+            return principalId.equals(requestedExecutorId);
         } catch (IllegalArgumentException e) {
             return false;
         }
+    }
+
+    /**
+     * Detecta se o usuário autenticado é manager com base no campo booleano isManager.
+     * Se o principal for UserDTO, usa diretamente. Caso contrário, tenta via reflexão
+     * métodos isManager() / getIsManager().
+     */
+    private boolean isManager(Authentication auth) {
+        Object principal = auth.getPrincipal();
+        if (principal == null) return false;
+
+        if (principal instanceof UserDTO dto) {
+            return dto.isManager();
+        }
+
+        try {
+            var m = principal.getClass().getMethod("isManager");
+            var v = m.invoke(principal);
+            if (v instanceof Boolean b) return b;
+        } catch (Exception ignored) { }
+
+        try {
+            var m = principal.getClass().getMethod("getIsManager");
+            var v = m.invoke(principal);
+            if (v instanceof Boolean b) return b;
+        } catch (Exception ignored) { }
+
+        return false;
     }
 }
