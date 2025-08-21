@@ -31,7 +31,7 @@ jobs:
           files: |
             source/backend/api-central-${{ github.ref_name }}.jar
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
