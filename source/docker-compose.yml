@@ -18,10 +18,8 @@ services:
     restart: unless-stopped
 
   app:
-    build:
-      context: ./backend/api-central
-      dockerfile: Dockerfile
-    container_name: pmmg-api_central
+    image: ghcr.io/agencia-experimental-de-software/pmmg:latest
+    container_name: pmmg-api-central
     depends_on:
       db:
         condition: service_healthy
