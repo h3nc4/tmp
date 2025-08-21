@@ -6,5 +6,4 @@ FROM scratch
 
 COPY --from=base / /
 
-WORKDIR /app
 ENTRYPOINT ["java", "-jar", "/app/api-central.jar"]
