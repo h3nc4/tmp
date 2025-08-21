@@ -6,20 +6,13 @@ on:
     branches:
 
 jobs:
-  build:
+  build-server:
     runs-on: ubuntu-latest
     container:
-      image: debian:trixie
+      image: maven:3.9-eclipse-temurin-21
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - name: Install dependencies
-        run: |
-          apt-get update && \
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            curl \
-            maven \
-            openjdk-21-jdk-headless
       - name: Build JAR
         run: |
           cd source/backend/api-central/ && \

@@ -7,10 +7,10 @@ on:
       - main
 
 jobs:
-  test:
+  test-server:
     runs-on: ubuntu-latest
     container:
-      image: debian:trixie
+      image: maven:3.9-eclipse-temurin-21
     continue-on-error: true 
     steps:
       - name: Checkout code
@@ -18,11 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update && \
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            curl \
-            maven \
-            openjdk-21-jdk-headless \
-            postgresql
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql
       - name: Initialize PostgreSQL
         run: |
           service postgresql start && \
