@@ -14,158 +14,159 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
-###################################################### RUNTIME IMAGE
+################################## FROM ARGUMENTS
+# The below variable skips squashing the image layers
+# Devcontainers do not support squashing
+ARG DEVCONTAINER
 
-FROM debian:bookworm AS runtime
+################################## POETRY BUILDER
+FROM debian:trixie AS poetry-builder
+ENV PIPX_HOME=/opt/pipx
+ENV PIPX_BIN_DIR=/opt/pipx/bin
+ENV POETRY_VIRTUALENVS_PATH=/opt/poetry
+ENV PYTHONPATH="${POETRY_VIRTUALENVS_PATH}/lib/site-packages"
 
-########################### ENV VARS
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -qq pipx
 
+RUN pipx install poetry
+
+# Install python dependencies via poetry
+COPY pyproject.toml poetry.lock /tmp/
+RUN cd /tmp && /opt/pipx/bin/poetry install --no-interaction --no-ansi --no-root && \
+    ln -s "${POETRY_VIRTUALENVS_PATH}"/*/bin "${POETRY_VIRTUALENVS_PATH}/bin" && \
+    ln -s "${POETRY_VIRTUALENVS_PATH}"/*/lib/* "${POETRY_VIRTUALENVS_PATH}/lib"
+
+# Clear cache
+RUN rm -rf /opt/pipx/.cache /opt/pipx/logs && \
+    find /opt -type d -name '__pycache__' -exec rm -r {} +
+
+################################## PLANTUML BUILDER
+FROM alpine:3.22 AS plantuml-builder
+
+ADD https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar /opt/plantuml.jar
+ADD https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar.asc /opt/plantuml.jar.asc
+
+RUN apk add --no-cache gnupg
+
+# Check signatures and setup plantuml
+RUN chmod 0644 /opt/plantuml.jar && \
+    gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 019586D44BD80213 && \
+    gpg --verify /opt/plantuml.jar.asc /opt/plantuml.jar
+
+################################## RUNTIME IMAGE
+FROM debian:trixie AS base
+
+############### ENV VARS
 # APT
 ENV DEBIAN_FRONTEND=noninteractive
 # Locale
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
-# Python
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-# Pip
-ENV PIPX_HOME=/opt/pipx
-ENV PIPX_BIN_DIR=/usr/local/bin
-ENV PIPX_MAN_DIR=/usr/local/share/man
-# Poetry
-ENV POETRY_VIRTUALENVS_PATH=/opt/poetry
-# Expose poetry packages to pyhton
-ENV PYTHONPATH="${POETRY_VIRTUALENVS_PATH}/lib/site-packages"
-# Add pipx and poetry executables to path
-ENV PATH="${POETRY_VIRTUALENVS_PATH}/bin:${PIPX_BIN_DIR}:${PATH}"
 
 # Runtime user
 ARG USER=hookci
 ARG UID=1000
 ARG GID=1000
 
-########################### APT DEPENDENCIES
+############### APT DEPENDENCIES
 
 # Update apt lists
 RUN apt-get update -qq
 
 # Gen locale
 RUN apt-get install --no-install-recommends -y -qq locales && \
-	echo "en_US.UTF-8 UTF-8" >/etc/locale.gen && \
-	locale-gen en_US.UTF-8 && \
-	update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+    echo "en_US.UTF-8 UTF-8" >/etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # Install generic tools
 RUN apt-get install --no-install-recommends -y -qq \
-	bash-completion \
-	ca-certificates \
-	curl \
-	git \
-	gnupg \
-	less \
-	man-db \
-	nano \
-	opendoas \
-	procps \
-	tree \
-	wget
+    bash-completion \
+    ca-certificates \
+    curl \
+    git \
+    gnupg \
+    less \
+    man-db \
+    nano \
+    opendoas \
+    openssh-client \
+    procps \
+    tree \
+    wget
 
 # Install development dependencies
 RUN apt-get install --no-install-recommends -y -qq \
-	binutils \
-	gcc \
-	libc-dev \
-	make \
-	pipx \
-	python3-dev
+    binutils \
+    gcc \
+    libc-dev \
+    make \
+    pipx \
+    python3-dev
 
 # Install project dependencies
 RUN apt-get install --no-install-recommends -y -qq \
-	graphviz \
-	groff \
-	lsof \
-	make \
-	plantuml \
-	shellcheck \
-	shfmt \
-	strace \
-	tmux
+    graphviz \
+    groff \
+    lsof \
+    make \
+    plantuml \
+    shellcheck \
+    shfmt \
+    strace \
+    tmux
 
-########################### POETRY INSTALL
-
-# Install poetry via pipx
-RUN pipx install poetry
-
-# Install python dependencies via poetry
-RUN --mount=type=bind,target=/tmp/pyproject.toml,source=pyproject.toml \
-	cd /tmp && poetry install --no-interaction --no-ansi --no-root && \
-	ln -s "${POETRY_VIRTUALENVS_PATH}"/*/bin "${POETRY_VIRTUALENVS_PATH}/bin" && \
-	ln -s "${POETRY_VIRTUALENVS_PATH}"/*/lib/* "${POETRY_VIRTUALENVS_PATH}/lib"
-
-########################### PLANTUML INSTALL
-
-# Download plantuml and its signature
-ADD https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar /opt/plantuml.jar
-ADD https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar.asc /opt/plantuml.jar.asc
-
-# Check signatures and setup plantuml
-RUN chmod 0644 /opt/plantuml.jar && \
-	gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 019586D44BD80213 && \
-	gpg --verify /opt/plantuml.jar.asc /opt/plantuml.jar && \
-	printf "%s\nset -e\n%s\n" "#!/bin/sh" "java -jar /opt/plantuml.jar \$@">/usr/local/bin/plantuml && \
-	chmod a+rx /usr/local/bin/plantuml
-
-########################### USER CREATION
-
+############### USER CREATION
 # Create user based on current user
 RUN groupadd --gid "${GID}" "${USER}" && \
-	useradd --uid "${UID}" --gid "${GID}" --home-dir "/home/${USER}" --shell /bin/bash --create-home "${USER}"
+    useradd --uid "${UID}" --gid "${GID}" --home-dir "/home/${USER}" --shell /bin/bash --create-home "${USER}"
 
 # Configure doas and "alias" it to sudo
 RUN printf "permit nopass nolog keepenv %s as root\n" "${USER}" >/etc/doas.conf && \
-	chmod 400 /etc/doas.conf && \
-	printf "%s\nset -e\n%s\n" "#!/bin/sh" "doas \$@">/usr/local/bin/sudo && \
-	chmod a+rx /usr/local/bin/sudo
+    chmod 400 /etc/doas.conf && \
+    printf "%s\nset -e\n%s\n" "#!/bin/sh" "doas \$@">/usr/local/bin/sudo && \
+    chmod a+rx /usr/local/bin/sudo
 
-########################### CACHE CLEANING
+# Configure doas and "alias" it to sudo
+RUN printf "permit nopass nolog keepenv %s as root\n" "${USER}" >/etc/doas.conf && \
+    chmod 400 /etc/doas.conf && \
+    printf "%s\nset -e\n%s\n" "#!/bin/sh" "doas \$@">/usr/local/bin/sudo && \
+    chmod a+rx /usr/local/bin/sudo
 
-# Clean gpg keys
-RUN rm -f /opt/plantuml.jar.asc
-# Clean python cache
-RUN rm -rf "${HOME}/.cache" "${HOME}/.local" "${PIPX_HOME}/.cache" "${PIPX_HOME}/logs" && \
-	find /usr/lib /usr/share /opt -type d -name '__pycache__' -exec rm -r {} +
+############### PLANTUML
+RUN printf "%s\nset -e\n%s\n" "#!/bin/sh" "java -jar /opt/plantuml.jar \$@" >/usr/local/bin/plantuml && \
+    chmod a+rx /usr/local/bin/plantuml
+COPY --from=plantuml-builder --chown="${UID}:${GID}" /opt/plantuml.jar /opt/plantuml.jar
+
+############### PYTHON ENVIRONMENT
+COPY --from=poetry-builder --chown="${UID}:${GID}" /opt/poetry /opt/poetry
+COPY --from=poetry-builder --chown="${UID}:${GID}" /opt/pipx /opt/pipx
+
+############### CACHE CLEANING
 # Clean apt cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* 
-# Clean gnupg cache
-RUN rm -rf "${HOME}/.gnupg"
 # Clean generic cache
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
+################################## LAYER SQUASHING
+FROM scratch AS squash
+COPY --from=base / /
 
-###################################################### LAYER SQUASHING
+FROM ${DEVCONTAINER:-squash}
 
-FROM scratch
-COPY --from=runtime / /
-
-########################### ENV VARS
-
-# Locale
+############### ENV VARS
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
-# Python
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-# Pip
-ENV PIPX_HOME=/opt/pipx
-ENV PIPX_BIN_DIR=/usr/local/bin
-ENV PIPX_MAN_DIR=/usr/local/share/man
-# Poetry
+
 ENV POETRY_VIRTUALENVS_PATH=/opt/poetry
-# Expose poetry packages to pyhton
+
 ENV PYTHONPATH="${POETRY_VIRTUALENVS_PATH}/lib/site-packages"
-# Add pipx and poetry executables to path
-ENV PATH="${POETRY_VIRTUALENVS_PATH}/bin:${PIPX_BIN_DIR}:${PATH}"
+ENV PATH="${POETRY_VIRTUALENVS_PATH}/bin:/opt/pipx/bin:${PATH}"
 
 # Change into runtime user
 ARG USER=hookci
-USER "${USER}"
 ENV USER="${USER}"
+USER "${USER}"
