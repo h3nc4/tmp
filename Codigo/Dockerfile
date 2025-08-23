@@ -87,9 +87,12 @@ RUN apt-get install --no-install-recommends -y -qq \
     curl \
     git \
     gnupg \
+    iputils-ping \
+    iproute2 \
     less \
     man-db \
     nano \
+    net-tools \
     opendoas \
     openssh-client \
     procps \
