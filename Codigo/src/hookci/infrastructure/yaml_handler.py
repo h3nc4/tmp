@@ -47,11 +47,12 @@ class YamlConfigurationHandler:
         # Convert the entire dataclass structure to a dictionary, filtering out None values
         config_dict = dataclasses.asdict(config, dict_factory=_clean_dict_factory)
 
-        with open(path, "w") as f:
+        self._fs.write_file(
+            path,
             yaml.dump(
                 config_dict,
-                f,
                 default_flow_style=False,
                 sort_keys=False,
                 indent=2,
-            )
+            ),
+        )
