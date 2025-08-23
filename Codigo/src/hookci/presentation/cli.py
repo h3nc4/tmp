@@ -22,8 +22,6 @@ handling all command-line interface interactions.
 
 import typer
 from rich.console import Console
-from rich.table import Table
-from pathlib import Path
 from hookci.application.errors import ProjectAlreadyInitializedError
 from hookci.application.services import ProjectInitializationService
 from hookci.infrastructure.errors import NotInGitRepositoryError
@@ -43,32 +41,15 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command(name="help")
-def help_command() -> None:
+@app.command(name="help", help="Shows this help message and exits.")
+def help_command(ctx: typer.Context) -> None:
     """
-    Displays a detailed list of available commands.
+    Shows the help message for the main command and exits.
     """
-    table = Table(
-        title="HookCI Commands", show_header=True, header_style="bold magenta"
-    )
-    table.add_column("Command", style="dim", width=12)
-    table.add_column("Description")
-
-    table.add_row(
-        "init",
-        "Initializes HookCI in the current Git repository, creating a config file and installing hooks.",
-    )
-    table.add_row(
-        "run",
-        "Manually triggers the CI pipeline execution based on the current configuration.",
-    )
-    table.add_row(
-        "migrate",
-        "Migrates an existing HookCI configuration file to the latest version.",
-    )
-    table.add_row("help", "Shows this help message with a detailed command list.")
-
-    console.print(table)
+    parent_ctx = ctx.parent
+    if parent_ctx:
+        console.print(parent_ctx.get_help())
+    raise typer.Exit()
 
 
 @app.command()
