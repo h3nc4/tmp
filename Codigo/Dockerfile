@@ -117,10 +117,25 @@ RUN apt-get install --no-install-recommends -y -qq \
     strace \
     tmux
 
+########################################
+# Install Docker
+
+RUN wget -qO- https://download.docker.com/linux/debian/gpg | gpg --dearmor | tee /etc/apt/keyrings/docker.asc >/dev/null && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable" \
+    | tee /etc/apt/sources.list.d/docker.list >/dev/null && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-ce \
+    docker-ce-cli \
+    docker-compose-plugin
+
 ############### USER CREATION
 # Create user based on current user
 RUN groupadd --gid "${GID}" "${USER}" && \
-    useradd --uid "${UID}" --gid "${GID}" --home-dir "/home/${USER}" --shell /bin/bash --create-home "${USER}"
+    useradd --uid "${UID}" --gid "${GID}" --home-dir "/home/${USER}" --shell /bin/bash --create-home "${USER}" && \
+    usermod -aG docker "${USER}"
 
 # Configure doas and "alias" it to sudo
 RUN printf "permit nopass nolog keepenv %s as root\n" "${USER}" >/etc/doas.conf && \

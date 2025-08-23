@@ -18,6 +18,16 @@
         "TERM": "${env:TERM}",
         "TMUX": "${env:TMUX}"
     },
+    "userEnvProbe": "interactiveShell",
+    "runArgs": [
+        "--privileged",
+        "-p=127.0.0.1:6080:6080",
+        "-p=127.0.0.1:50000:50000",
+        "-v",
+        "/var/lib/hookci-docker:/var/lib/docker"
+    ],
+    "overrideCommand": true,
+    "postStartCommand": "sudo dockerd",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -25,7 +35,13 @@
                 "ms-python.vscode-pylance",
                 "njpwerner.autodocstring",
                 "timonwong.shellcheck",
-                "DavidAnson.vscode-markdownlint"
+                "DavidAnson.vscode-markdownlint",
+                "ms-vscode-remote.vscode-remote-extensionpack",
+                "ms-azuretools.vscode-docker",
+                "donjayamanne.githistory",
+                "eamodio.gitlens",
+                "foxundermoon.shell-format",
+                "docker.docker"
             ]
         }
     }
