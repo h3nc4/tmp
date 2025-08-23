@@ -37,7 +37,7 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help="HookCI: A tool for running Continuous Integration locally with Git hooks and Docker.",
-    rich_markup_mode="markdown"
+    rich_markup_mode="markdown",
 )
 
 console = Console()
@@ -48,26 +48,25 @@ def help_command() -> None:
     """
     Displays a detailed list of available commands.
     """
-    table = Table(title="HookCI Commands", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="HookCI Commands", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Command", style="dim", width=12)
     table.add_column("Description")
 
     table.add_row(
         "init",
-        "Initializes HookCI in the current Git repository, creating a config file and installing hooks."
+        "Initializes HookCI in the current Git repository, creating a config file and installing hooks.",
     )
     table.add_row(
         "run",
-        "Manually triggers the CI pipeline execution based on the current configuration."
+        "Manually triggers the CI pipeline execution based on the current configuration.",
     )
     table.add_row(
         "migrate",
-        "Migrates an existing HookCI configuration file to the latest version."
+        "Migrates an existing HookCI configuration file to the latest version.",
     )
-    table.add_row(
-        "help",
-        "Shows this help message with a detailed command list."
-    )
+    table.add_row("help", "Shows this help message with a detailed command list.")
 
     console.print(table)
 
@@ -89,11 +88,17 @@ def init() -> None:
 
         config_path = service.run()
 
-        console.print(f"✅ [green]Success![/green] Configuration file created at: {config_path}")
-        console.print("👉 Next steps: customize `hookci.yaml` to fit your project's needs.")
+        console.print(
+            f"✅ [green]Success![/green] Configuration file created at: {config_path}"
+        )
+        console.print(
+            "👉 Next steps: customize `hookci.yaml` to fit your project's needs."
+        )
 
     except NotInGitRepositoryError:
-        console.print("❌ [bold red]Error:[/bold red] This is not a Git repository. Please run `git init` first.")
+        console.print(
+            "❌ [bold red]Error:[/bold red] This is not a Git repository. Please run `git init` first."
+        )
         raise typer.Exit(code=1)
     except ProjectAlreadyInitializedError as e:
         console.print(f"👋 [yellow]Notice:[/yellow] {e}")
@@ -116,7 +121,9 @@ def migrate() -> None:
     """
     Migrates the configuration file to the latest version.
     """
-    console.print("[yellow]Notice:[/yellow] The 'migrate' command is not yet implemented.")
+    console.print(
+        "[yellow]Notice:[/yellow] The 'migrate' command is not yet implemented."
+    )
 
 
 def main() -> None:

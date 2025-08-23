@@ -1,6 +1,6 @@
 # Artefatos do projeto
 
-Este diretório mantém os artefatos do projeto. 
+Este diretório mantém os artefatos do projeto.
 
 ```console
 ├── diagramas/

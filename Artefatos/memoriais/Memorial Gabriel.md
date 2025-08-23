@@ -1,50 +1,25 @@
 # Memorial Descritivo da Graduação em Engenharia de Software (Jan 2022 - Dez 2025)
 
-
-
 Gabriel Dolabela Marques
 
 16 de fevereiro de 2025
 
-
-
 Desde cedo, o interesse por tecnologia e desenvolvimento de jogos esteve presente, motivando a busca por conhecimento em diferentes áreas da computação. A formação regular no ensino médio ocorreu em 2014 e, posteriormente, em 2018, foi concluído o curso de Tecnologia em Jogos Digitais na FUMEC de maneira irregular. Durante essa primeira graduação, houve contato com diversas disciplinas voltadas para desenvolvimento, design e otimização de jogos, o que permitiu a construção de um repertório técnico relevante. No entanto, identificou-se a necessidade de aprofundamento na área de desenvolvimento de software além do escopo dos jogos, com o intuito de ampliar as possibilidades profissionais e ter um entendimento mais abrangente do setor de tecnologia. Dessa forma, em 2022, iniciou-se a trajetória no curso de Bacharelado em Engenharia de Software na Pontifícia Universidade Católica de Minas Gerais (PUC Minas), visando uma abordagem mais técnica e estrutural.
-
-
 
 Ao longo do curso, a afinidade com disciplinas relacionadas a cálculo destacou-se, devido ao apreço pelo raciocínio lógico exigido por elas. Algumas disciplinas, no entanto, apresentaram desafios adicionais, especialmente aquelas em que a abordagem didática não favorecia o aprendizado, como foi o caso de Medição e Experimentação de Software. Entre as disciplinas mais relevantes para a formação, destacam-se \*\*Programação Modular\*\* e \*\*Fundamentos de Projeto e Análise de Algoritmos\*\*, cujos conteúdos foram aplicados imediatamente no ambiente de estágio, tornando-as de grande relevância. O professor João Caram teve um impacto marcante, pois demonstrava amplo conhecimento e abordava os temas de maneira única e complexa, enriquecendo o aprendizado. Além disso, professores como João, de \*\*Algoritmos e Estruturas de Dados (AEDS) 1\*\*, e Neila, de \*\*Cálculo\*\*, possuíam uma abordagem extremamente cuidadosa e gentil, tornando o aprendizado mais acessível e motivador.
 
-
-
 Dentre os projetos desenvolvidos durante a graduação, uma atividade na disciplina de \*\*Teste de Software\*\* teve grande impacto. O objetivo era construir uma calculadora para aplicação de testes, contudo, a implementação foi aprimorada com a introdução de verificação por meio de \*\*Expressões Regulares (\*REGEX\*)\*\*, prevenindo erros de entrada do usuário. Esse desafio técnico resultou em uma intensa pesquisa e prática, consolidando o aprendizado. Outro projeto relevante foi o \*\*Trabalho Interdisciplinar do 4º período\*\*, com enfoque em sustentabilidade. O trabalho em equipe foi particularmente gratificante, pois a equipe era formada por amigos leais, possibilitando um ambiente de colaboração e entendimento mútuo, o que facilitou a realização do projeto. Embora os resultados obtidos não tenham sido os esperados, o projeto influenciou a trajetória profissional, despertando interesse por empresas voltadas para a sustentabilidade. Atualmente, há grande satisfação em atuar em uma organização que compartilha esses valores.
-
-
 
 A experiência no mercado de trabalho tem sido enriquecedora. O estágio na área de Engenharia de Software proporciona aprendizado contínuo, sendo realizado em um ambiente colaborativo, onde a equipe se destaca pelo espírito de cooperação. Entre as habilidades desenvolvidas, destacam-se a capacidade de enfrentar desafios técnicos com autonomia e o senso de responsabilidade na execução de tarefas. Essa primeira experiência profissional na área tem sido essencial para o crescimento e a consolidação das competências adquiridas ao longo da graduação. Além disso, o estágio tem possibilitado contato com tecnologias emergentes e melhores práticas do setor, proporcionando um aprendizado que vai além da teoria apresentada em sala de aula.
 
-
-
 Durante o estágio, houve desafios significativos, entre eles a necessidade de aprender a utilizar a plataforma \*\*Foundry\*\*, um sistema robusto e amplamente empregado para gerenciamento de dados e processos empresariais. Além disso, o trabalho tem exigido um uso intensivo de \*\*TypeScript (\*TS\*)\*\* e \*\*Python\*\*, bem como uma familiarização constante com a integração de \*\*Interfaces de Programação de Aplicações (\*APIs\*)\*\*, habilidades essenciais para a construção de soluções eficientes e escaláveis. O aprendizado contínuo na área de desenvolvimento tem proporcionado uma visão ampla das necessidades do mercado e das melhores estratégias para solucionar problemas reais.
-
-
 
 Além do aprendizado técnico, o estágio tem sido uma oportunidade para desenvolver habilidades interpessoais e de comunicação. A necessidade de apresentar soluções para desafios específicos, propor melhorias e interagir com profissionais de diferentes áreas contribui para o desenvolvimento de uma visão sistêmica e estratégica. O ambiente de trabalho incentiva a inovação, permitindo a experimentação de novas abordagens e técnicas para aprimorar processos e produtos.
 
-
-
 Até o momento, não houve participação em projetos de \*\*iniciação científica\*\* ou laboratórios de pesquisa. No entanto, o interesse pela busca de oportunidades de aprendizado permanece constante. Embora não tenha havido envolvimento direto em atividades extracurriculares formais, a experiência prévia e a prática autodidata permitiram o desenvolvimento de habilidades técnicas e conceituais que complementam a formação acadêmica. Além disso, a participação em \*\*eventos e conferências da área\*\* tem sido uma alternativa para manter-se atualizado e aprofundar conhecimentos específicos, como \*\*inteligência artificial, segurança da informação\*\* e \*\*engenharia de requisitos\*\*. A presença em palestras, workshops e \*\*hackathons\*\* também tem sido uma estratégia para compreender as tendências do setor e expandir a rede de contatos profissionais.
-
-
 
 Com relação às perspectivas futuras, o objetivo principal é crescer dentro da empresa onde o estágio é realizado e, possivelmente, ingressar em uma \*\*pós-graduação\*\* na área. A consolidação do conhecimento em Engenharia de Software e a exploração de diferentes segmentos dentro do campo são prioridades. Para isso, a busca por atualização constante e aprimoramento técnico é contínua, sendo reconhecida a necessidade de organização para obtenção de \*\*certificações\*\* e desenvolvimento de \*\*projetos paralelos\*\*. Embora todas as áreas da Engenharia de Software despertem interesse, há disposição para explorar novas oportunidades e desafios ao longo da trajetória profissional. Além disso, a possibilidade de atuação em \*\*projetos inovadores\*\*, como desenvolvimento de \*\*software sustentável\*\* e soluções voltadas para \*\*impacto social\*\*, também figura entre os interesses futuros.
 
-
-
 Outro aspecto relevante para o futuro é o desejo de aprofundar conhecimentos na área de \*\*arquitetura de software\*\* e \*\*otimização de sistemas\*\*. A escalabilidade de aplicações, a implementação de soluções eficientes para grandes volumes de dados e a aplicação de \*\*inteligência artificial\*\* em sistemas complexos são temas de grande interesse. Para isso, há a intenção de explorar \*\*certificações específicas\*\* e \*\*cursos avançados\*\* que permitam aprimorar habilidades nessas áreas.
 
-
-
 A longo prazo, a possibilidade de atuar em \*\*projetos internacionais\*\* ou em empresas com um forte viés inovador também é considerada. O aprendizado contínuo e a busca por desafios cada vez maiores fazem parte da motivação para seguir evoluindo profissionalmente. O objetivo final é contribuir para a construção de soluções tecnológicas que impactem positivamente a sociedade, promovendo melhorias significativas em diferentes setores e impulsionando o avanço da Engenharia de Software como um campo fundamental para a inovação.
-
-
-

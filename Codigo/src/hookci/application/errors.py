@@ -19,10 +19,14 @@
 Custom exceptions for the application layer.
 """
 
+
 class ApplicationError(Exception):
     """Base class for application-related errors."""
+
     pass
+
 
 class ProjectAlreadyInitializedError(ApplicationError):
     """Raised when trying to initialize an already initialized project."""
+
     pass

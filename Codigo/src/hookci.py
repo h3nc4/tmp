@@ -21,13 +21,4 @@ Main entry point script for the HookCI application.
 
 from hookci.presentation import cli
 
-
-def main() -> None:
-    """
-    Application's main entry point. This function initializes and runs the CLI.
-    """
-    cli.main()
-
-
-if __name__ == "__main__":
-    main()
+cli.main()

@@ -47,9 +47,9 @@ RUN pipx install poetry
 
 # Install python dependencies via poetry
 RUN --mount=type=bind,target=/tmp/pyproject.toml,source=pyproject.toml \
-	cd /tmp && poetry install --no-interaction --no-ansi --only main --no-root && \
-	ln -s "${POETRY_VIRTUALENVS_PATH}"/*/bin "${POETRY_VIRTUALENVS_PATH}/bin" && \
-	ln -s "${POETRY_VIRTUALENVS_PATH}"/*/lib/* "${POETRY_VIRTUALENVS_PATH}/lib"
+    cd /tmp && poetry install --no-interaction --no-ansi --only main --no-root && \
+    ln -s "${POETRY_VIRTUALENVS_PATH}"/*/bin "${POETRY_VIRTUALENVS_PATH}/bin" && \
+    ln -s "${POETRY_VIRTUALENVS_PATH}"/*/lib/* "${POETRY_VIRTUALENVS_PATH}/lib"
 
 ###################################################### RUNTIME IMAGE
 
@@ -74,9 +74,9 @@ RUN apt-get update -qq
 
 # Install build dependencies via apt
 RUN DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -qq \
-	binutils \
-	make \
-	python3-dev
+    binutils \
+    make \
+    python3-dev
 
 ########################### POETRY INSTALL
 
@@ -87,7 +87,7 @@ COPY --from=poetry-builder ${POETRY_VIRTUALENVS_PATH} ${POETRY_VIRTUALENVS_PATH}
 
 # Clean python cache
 RUN rm -rf "${HOME}/.cache" "${PIPX_HOME}/.cache" "${PIPX_HOME}/logs" "${PIPX_MAN_DIR}" && \
-	find /usr/lib /usr/share /opt -type d -name '__pycache__' -exec rm -r {} +
+    find /usr/lib /usr/share /opt -type d -name '__pycache__' -exec rm -r {} +
 # Clean apt cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* 
 # Clean generic cache

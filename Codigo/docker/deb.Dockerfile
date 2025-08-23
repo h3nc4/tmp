@@ -26,8 +26,8 @@ RUN apt-get update -qq
 # Install .deb build dependencies via apt
 RUN DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -qq \
     build-essential \
-	debhelper \
-	fakeroot
+    debhelper \
+    fakeroot
 
 # Clear apt cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/* /var/log/* /usr/share/doc*/* /tmp/*

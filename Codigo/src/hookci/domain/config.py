@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 @dataclass
 class Step:
     """Represents a single step in the CI process."""
+
     name: str
     command: str
     critical: bool = True
@@ -34,6 +35,7 @@ class Step:
 @dataclass
 class Docker:
     """Docker configuration."""
+
     image: Optional[str] = None
     dockerfile: Optional[str] = "Dockerfile"
 
@@ -41,6 +43,7 @@ class Docker:
 @dataclass
 class Hooks:
     """Git hooks configuration."""
+
     pre_commit: bool = True
     pre_push: bool = True
 
@@ -48,6 +51,7 @@ class Hooks:
 @dataclass
 class Filters:
     """Filters for git events."""
+
     branches: Optional[str] = None
     commits: Optional[str] = None
 
@@ -55,6 +59,7 @@ class Filters:
 @dataclass
 class Configuration:
     """Main configuration model for HookCI."""
+
     version: str
     log_level: str = "INFO"
     docker: Docker = field(default_factory=Docker)
@@ -75,5 +80,5 @@ def create_default_config() -> Configuration:
         steps=[
             Step(name="Linting", command="echo 'Linting...'"),
             Step(name="Testing", command="echo 'Testing...'"),
-        ]
+        ],
     )

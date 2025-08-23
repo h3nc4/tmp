@@ -26,21 +26,21 @@ from hookci.infrastructure.errors import NotInGitRepositoryError
 
 class IFileSystem(Protocol):
     """Interface for filesystem operations."""
-    def file_exists(self, path: Path) -> bool:
-        ...
 
-    def write_file(self, path: Path, content: str) -> None:
-        ...
+    def file_exists(self, path: Path) -> bool: ...
+
+    def write_file(self, path: Path, content: str) -> None: ...
 
 
 class IGitService(Protocol):
     """Interface for Git-related operations."""
-    def find_git_root(self) -> Path:
-        ...
+
+    def find_git_root(self) -> Path: ...
 
 
 class LocalFileSystem(IFileSystem):
     """Concrete implementation of IFileSystem using local disk."""
+
     def file_exists(self, path: Path) -> bool:
         return path.exists()
 
@@ -50,6 +50,7 @@ class LocalFileSystem(IFileSystem):
 
 class GitService(IGitService):
     """Service for interacting with Git repositories."""
+
     def find_git_root(self) -> Path:
         """
         Finds the root directory of the Git repository.

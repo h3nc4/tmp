@@ -19,10 +19,14 @@
 Custom exceptions for the infrastructure layer.
 """
 
+
 class InfrastructureError(Exception):
     """Base class for infrastructure-related errors."""
+
     pass
+
 
 class NotInGitRepositoryError(InfrastructureError):
     """Raised when an operation is attempted outside of a Git repository."""
+
     pass

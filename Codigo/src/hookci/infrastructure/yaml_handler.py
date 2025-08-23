@@ -45,9 +45,7 @@ class YamlConfigurationHandler:
         Serializes a Configuration object to YAML and writes it to a file.
         """
         # Convert the entire dataclass structure to a dictionary, filtering out None values
-        config_dict = dataclasses.asdict(
-            config, dict_factory=_clean_dict_factory
-        )
+        config_dict = dataclasses.asdict(config, dict_factory=_clean_dict_factory)
 
         with open(path, "w") as f:
             yaml.dump(

@@ -27,6 +27,7 @@ from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
 
 class ProjectInitializationService:
     """Service to handle the project initialization use case."""
+
     CONFIG_FILENAME = "hookci.yaml"
 
     def __init__(
