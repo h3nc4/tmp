@@ -29,3 +29,7 @@ ipdb = "^0.13.13"
 mypy = "^1.16.0"
 pytest = "^8.3.5"
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
