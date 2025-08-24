@@ -28,6 +28,7 @@ black = "^25.1.0"
 ipdb = "^0.13.13"
 mypy = "^1.16.0"
 pytest = "^8.3.5"
+types-pyyaml = "^6.0.12.20250822"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
