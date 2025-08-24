@@ -42,7 +42,10 @@
                 "eamodio.gitlens",
                 "foxundermoon.shell-format",
                 "docker.docker"
-            ]
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python3"
+            }
         }
     }
 }
