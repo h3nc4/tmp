@@ -20,14 +20,14 @@ Handles serialization and deserialization of YAML configuration files.
 """
 import dataclasses
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Dict
 
 import yaml
 from hookci.domain.config import Configuration
 from hookci.infrastructure.fs import IFileSystem
 
 
-def _clean_dict_factory(data: List[Tuple[str, Any]]) -> dict:
+def _clean_dict_factory(data: List[Tuple[str, Any]]) -> Dict[str, Any]:
     """
     A dict_factory for dataclasses.asdict that filters out fields with a value of None.
     """
