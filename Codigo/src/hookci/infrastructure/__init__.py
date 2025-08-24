@@ -13,3 +13,11 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+The infrastructure layer package.
+
+This package contains the concrete implementations for external-facing
+concerns, such as interacting with the file system, Git repositories,
+Docker Engine, and handling data serialization formats like YAML.
+"""

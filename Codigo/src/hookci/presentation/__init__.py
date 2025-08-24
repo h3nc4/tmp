@@ -13,3 +13,11 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+The presentation layer package.
+
+This package is responsible for all user-facing interactions. In this
+application, it contains the CLI implementation, which handles parsing
+arguments and displaying output to the user.
+"""

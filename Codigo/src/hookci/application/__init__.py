@@ -13,3 +13,16 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+The application layer package.
+
+This package orchestrates the application's use cases by coordinating the
+domain and infrastructure layers. It acts as an intermediary, translating
+user actions from the presentation layer into a sequence of operations.
+
+Application services within this package implement the logic for specific
+features without containing core business rules or direct infrastructure
+access details, thus decoupling the high-level policy from the low-level
+implementation.
+"""

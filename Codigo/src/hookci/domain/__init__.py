@@ -13,3 +13,12 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+The domain layer package.
+
+This package encapsulates the core business logic and entities of the
+application, such as the configuration model. It is independent of any
+specific framework or infrastructure concern, representing the heart of
+the software's functionality.
+"""

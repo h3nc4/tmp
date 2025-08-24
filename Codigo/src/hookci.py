@@ -16,9 +16,17 @@
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Main entry point script for the HookCI application.
+Main executable entry point for the HookCI application.
+
+This script serves as the primary entry point for launching the HookCI
+CLI. It imports the main CLI application object from the presentation
+layer and executes it, effectively starting the program.
+
+By design, this file contains no application or business logic. Its sole
+purpose is to bootstrap the application.
 """
 
 from hookci.presentation import cli
 
-cli.main()
+if __name__ == "__main__":
+    cli.main()

@@ -13,3 +13,12 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+HookCI: Local Continuous Integration with Git hooks and Docker.
+
+This package is the root of the HookCI application. It organizes the source
+code into sub-packages based on a layered architecture, separating concerns
+into presentation, application, domain, and infrastructure layers to promote
+maintainability, testability, and scalability.
+"""
