@@ -49,7 +49,7 @@ else
 endif
 
 hookci: $(SRC_FILES) src/_version.py
-	pyinstaller --exclude-module=pkg_resources --exclude-module=setuptools --onefile src/hookci
+	pyinstaller --exclude-module=pkg_resources --exclude-module=setuptools --onefile src/hookci.py
 	mv -f dist/hookci .
 	rm -f src/_version.py
 
