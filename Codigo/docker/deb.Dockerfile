@@ -16,7 +16,7 @@
 
 ###################################################### RUNTIME IMAGE
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS base
 
 ########################### APT DEPENDENCIES
 
@@ -29,10 +29,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -q
     debhelper \
     fakeroot
 
-# Clear apt cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/* /var/log/* /usr/share/doc*/* /tmp/*
+############### CACHE CLEANING
+# Clean apt cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* 
+# Clean generic cache
+RUN rm -rf /var/cache/* /var/log/* /usr/share/doc*/* /tmp/*
 
 ###################################################### LAYER SQUASHING
 
 FROM scratch
-COPY --from=runtime / /
+COPY --from=base / /
