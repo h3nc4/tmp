@@ -19,7 +19,7 @@
 Tests for application services.
 """
 from pathlib import Path
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 import pytest
 from hookci.application.errors import ProjectAlreadyInitializedError
