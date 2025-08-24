@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
 # This file is part of HookCI.
 
