@@ -18,12 +18,12 @@
 Tests for the command-line interface (presentation layer).
 """
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from typer.testing import CliRunner
 
 from hookci.application.errors import ProjectAlreadyInitializedError
-from hookci.infrastructure.errors import NotInGitRepositoryError
+from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
 from hookci.presentation.cli import app
 
 runner = CliRunner()
@@ -47,11 +47,12 @@ def test_cli_help_command() -> None:
 
 
 @patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_success(mock_init_service_cls: "patch") -> None:
+def test_init_success(mock_init_service_cls: Mock) -> None:
     """Test the 'init' command on a successful run."""
     # Arrange
     mock_service_instance = mock_init_service_cls.return_value
-    mock_service_instance.run.return_value = Path("/path/to/repo/hookci.yaml")
+    config_path = Path("/path/to/repo/.hookci/hookci.yaml")
+    mock_service_instance.run.return_value = config_path
 
     # Act
     result = runner.invoke(app, ["init"])
@@ -59,13 +60,14 @@ def test_init_success(mock_init_service_cls: "patch") -> None:
     # Assert
     assert result.exit_code == 0
     assert "🚀 Initializing HookCI..." in result.stdout
-    assert "✅ Success!" in result.stdout
-    assert "Configuration file created at: /path/to/repo/hookci.yaml" in result.stdout
+    assert "✅ Success! HookCI has been initialized." in result.stdout
+    assert f"Configuration file created at: {config_path}" in result.stdout
+    assert "Git hooks have been installed and configured." in result.stdout
     mock_service_instance.run.assert_called_once()
 
 
 @patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_already_initialized(mock_init_service_cls: "patch") -> None:
+def test_init_already_initialized(mock_init_service_cls: Mock) -> None:
     """Test the 'init' command when the project is already initialized."""
     # Arrange
     mock_service_instance = mock_init_service_cls.return_value
@@ -82,7 +84,7 @@ def test_init_already_initialized(mock_init_service_cls: "patch") -> None:
 
 
 @patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_not_in_git_repo(mock_init_service_cls: "patch") -> None:
+def test_init_not_in_git_repo(mock_init_service_cls: Mock) -> None:
     """Test the 'init' command when not inside a Git repository."""
     # Arrange
     mock_service_instance = mock_init_service_cls.return_value
@@ -97,7 +99,22 @@ def test_init_not_in_git_repo(mock_init_service_cls: "patch") -> None:
 
 
 @patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_unexpected_error(mock_init_service_cls: "patch") -> None:
+def test_init_git_command_error(mock_init_service_cls: Mock) -> None:
+    """Test the 'init' command when a git command fails."""
+    # Arrange
+    mock_service_instance = mock_init_service_cls.return_value
+    mock_service_instance.run.side_effect = GitCommandError("git failed")
+
+    # Act
+    result = runner.invoke(app, ["init"])
+
+    # Assert
+    assert result.exit_code == 1
+    assert "❌ Error during Git configuration: git failed" in result.stdout
+
+
+@patch("hookci.presentation.cli.ProjectInitializationService")
+def test_init_unexpected_error(mock_init_service_cls: Mock) -> None:
     """Test the 'init' command handles unexpected exceptions."""
     # Arrange
     mock_service_instance = mock_init_service_cls.return_value
