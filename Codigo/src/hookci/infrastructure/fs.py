@@ -17,24 +17,28 @@
 """
 Filesystem and Git interaction services.
 """
+import stat
+import subprocess
 from pathlib import Path
 from typing import Protocol
 
-from hookci.infrastructure.errors import NotInGitRepositoryError
+from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
 
 
 class IFileSystem(Protocol):
     """Interface for filesystem operations."""
 
     def file_exists(self, path: Path) -> bool: ...
-
+    def create_dir(self, path: Path) -> None: ...
     def write_file(self, path: Path, content: str) -> None: ...
+    def make_executable(self, path: Path) -> None: ...
 
 
 class IGitService(Protocol):
     """Interface for Git-related operations."""
 
     def find_git_root(self) -> Path: ...
+    def set_hooks_path(self, hooks_path: Path) -> None: ...
 
 
 class LocalFileSystem(IFileSystem):
@@ -43,8 +47,16 @@ class LocalFileSystem(IFileSystem):
     def file_exists(self, path: Path) -> bool:
         return path.exists()
 
+    def create_dir(self, path: Path) -> None:
+        path.mkdir(parents=True, exist_ok=True)
+
     def write_file(self, path: Path, content: str) -> None:
         path.write_text(content)
+
+    def make_executable(self, path: Path) -> None:
+        """Makes a file executable, similar to `chmod +x`."""
+        current_permissions = path.stat().st_mode
+        path.chmod(current_permissions | stat.S_IEXEC)
 
 
 class GitService(IGitService):
@@ -56,8 +68,26 @@ class GitService(IGitService):
         Traverses up from the current directory.
         """
         current_path = Path.cwd().resolve()
-        while current_path != current_path.parent:
-            if (current_path / ".git").is_dir():
-                return current_path
-            current_path = current_path.parent
+        if (current_path / ".git").is_dir():
+            return current_path
+
+        for parent in current_path.parents:
+            if (parent / ".git").is_dir():
+                return parent
         raise NotInGitRepositoryError("Not inside a Git repository.")
+
+    def set_hooks_path(self, hooks_path: Path) -> None:
+        """Sets the git `core.hooksPath` configuration for the repository."""
+        try:
+            git_root = self.find_git_root()
+            relative_hooks_path = hooks_path.relative_to(git_root)
+
+            subprocess.run(
+                ["git", "config", "core.hooksPath", str(relative_hooks_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=git_root,
+            )
+        except subprocess.CalledProcessError as e:
+            raise GitCommandError(f"Failed to set git hooks path: {e.stderr}") from e

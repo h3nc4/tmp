@@ -15,23 +15,15 @@
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Custom exceptions for the infrastructure layer.
+Shared application-level constants.
+
+This module centralizes constants that are used across different services
+within the application layer, such as file paths and directory names, to
+ensure consistency and ease of maintenance.
 """
 
+# Base directory name for all HookCI related files within a project.
+BASE_DIR_NAME: str = ".hookci"
 
-class InfrastructureError(Exception):
-    """Base class for infrastructure-related errors."""
-
-    pass
-
-
-class NotInGitRepositoryError(InfrastructureError):
-    """Raised when an operation is attempted outside of a Git repository."""
-
-    pass
-
-
-class GitCommandError(InfrastructureError):
-    """Raised when a Git command fails."""
-
-    pass
+# Default name for the main configuration file.
+CONFIG_FILENAME: str = "hookci.yaml"

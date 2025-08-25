@@ -21,9 +21,10 @@ handling all command-line interface interactions.
 
 import typer
 from rich.console import Console
+
 from hookci.application.errors import ProjectAlreadyInitializedError
 from hookci.application.services import ProjectInitializationService
-from hookci.infrastructure.errors import NotInGitRepositoryError
+from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
 from hookci.infrastructure.fs import GitService, LocalFileSystem
 from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
 
@@ -55,8 +56,8 @@ def help_command(ctx: typer.Context) -> None:
 def init() -> None:
     """
     Initializes HookCI in the current repository.
-    This creates a `hookci.yaml` file with default settings
-    and prepares the repository to use HookCI hooks.
+    This creates a `.hookci/hookci.yaml` file with default settings
+    and installs git hooks to `.hookci/hooks`.
     """
     console.print("🚀 Initializing HookCI...")
     try:
@@ -68,11 +69,11 @@ def init() -> None:
 
         config_path = service.run()
 
+        console.print("✅ [green]Success![/green] HookCI has been initialized.")
+        console.print(f"   - Configuration file created at: {config_path}")
+        console.print("   - Git hooks have been installed and configured.")
         console.print(
-            f"✅ [green]Success![/green] Configuration file created at: {config_path}"
-        )
-        console.print(
-            "👉 Next steps: customize `hookci.yaml` to fit your project's needs."
+            "👉 Next steps: customize the configuration file to fit your project's needs."
         )
 
     except NotInGitRepositoryError:
@@ -83,6 +84,9 @@ def init() -> None:
     except ProjectAlreadyInitializedError as e:
         console.print(f"👋 [yellow]Notice:[/yellow] {e}")
         raise typer.Exit(code=0)
+    except GitCommandError as e:
+        console.print(f"❌ [bold red]Error during Git configuration:[/bold red] {e}")
+        raise typer.Exit(code=1)
     except Exception as e:
         console.print(f"🔥 [bold red]An unexpected error occurred:[/bold red] {e}")
         raise typer.Exit(code=1)
