@@ -27,7 +27,10 @@
         "/var/lib/hookci-docker:/var/lib/docker"
     ],
     "overrideCommand": true,
-    "postStartCommand": "sudo dockerd",
+    "postStartCommand": [
+        "sudo",
+        "dockerd"
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
