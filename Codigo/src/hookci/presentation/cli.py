@@ -21,12 +21,14 @@ handling all command-line interface interactions.
 
 import typer
 from rich.console import Console
+from rich.traceback import install
 
-from hookci.application.errors import ProjectAlreadyInitializedError
-from hookci.application.services import ProjectInitializationService
-from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
-from hookci.infrastructure.fs import GitService, LocalFileSystem
-from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
+from hookci.application.errors import ApplicationError
+from hookci.containers import container
+from hookci.infrastructure.errors import InfrastructureError
+
+# Install rich traceback for better exception formatting
+install(show_locals=False, suppress=[typer])
 
 # Create a Typer app instance.
 # add_completion=False disables shell completion installation commands.
@@ -41,17 +43,6 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command(name="help", help="Shows this help message and exits.")
-def help_command(ctx: typer.Context) -> None:
-    """
-    Shows the help message for the main command and exits.
-    """
-    parent_ctx = ctx.parent
-    if parent_ctx:
-        console.print(parent_ctx.get_help())
-    raise typer.Exit()
-
-
 @app.command()
 def init() -> None:
     """
@@ -61,12 +52,7 @@ def init() -> None:
     """
     console.print("🚀 Initializing HookCI...")
     try:
-        # Dependency Injection setup
-        fs = LocalFileSystem()
-        git_service = GitService()
-        config_handler = YamlConfigurationHandler(fs)
-        service = ProjectInitializationService(git_service, fs, config_handler)
-
+        service = container.project_init_service
         config_path = service.run()
 
         console.print("✅ [green]Success![/green] HookCI has been initialized.")
@@ -76,16 +62,8 @@ def init() -> None:
             "👉 Next steps: customize the configuration file to fit your project's needs."
         )
 
-    except NotInGitRepositoryError:
-        console.print(
-            "❌ [bold red]Error:[/bold red] This is not a Git repository. Please run `git init` first."
-        )
-        raise typer.Exit(code=1)
-    except ProjectAlreadyInitializedError as e:
-        console.print(f"👋 [yellow]Notice:[/yellow] {e}")
-        raise typer.Exit(code=0)
-    except GitCommandError as e:
-        console.print(f"❌ [bold red]Error during Git configuration:[/bold red] {e}")
+    except (ApplicationError, InfrastructureError) as e:
+        console.print(f"❌ [bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
     except Exception as e:
         console.print(f"🔥 [bold red]An unexpected error occurred:[/bold red] {e}")
@@ -97,7 +75,23 @@ def run() -> None:
     """
     Manually runs the CI pipeline.
     """
-    console.print("[yellow]Notice:[/yellow] The 'run' command is not yet implemented.")
+    console.print("🏃 Running HookCI pipeline...")
+    try:
+        service = container.ci_execution_service
+        success = service.run()
+
+        if success:
+            console.print("✅ [bold green]Pipeline finished successfully![/bold green]")
+        else:
+            console.print("❌ [bold red]Pipeline failed.[/bold red]")
+            raise typer.Exit(code=1)
+
+    except (ApplicationError, InfrastructureError) as e:
+        console.print(f"❌ [bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"🔥 [bold red]An unexpected error occurred:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
 @app.command()

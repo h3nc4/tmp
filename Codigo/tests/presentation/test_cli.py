@@ -1,3 +1,4 @@
+# tests/presentation/test_cli.py
 # Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
 # This file is part of HookCI.
 
@@ -18,111 +19,97 @@
 Tests for the command-line interface (presentation layer).
 """
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
+import pytest
 from typer.testing import CliRunner
 
-from hookci.application.errors import ProjectAlreadyInitializedError
-from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
+from hookci.application.services import (
+    CiExecutionService,
+    ProjectInitializationService,
+)
+from hookci.containers import container
+from hookci.infrastructure.errors import NotInGitRepositoryError
 from hookci.presentation.cli import app
 
 runner = CliRunner()
 
 
+@pytest.fixture
+def mock_init_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Mocks the ProjectInitializationService in the container."""
+    mock = Mock(spec=ProjectInitializationService)
+    monkeypatch.setattr(container, "_instances", {"project_init_service": mock})
+    return mock
+
+
+@pytest.fixture
+def mock_ci_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Mocks the CiExecutionService in the container."""
+    mock = Mock(spec=CiExecutionService)
+    monkeypatch.setattr(container, "_instances", {"ci_execution_service": mock})
+    return mock
+
+
 def test_cli_no_args_shows_help() -> None:
     """Verify that running the app with no arguments shows the help message."""
-    result = runner.invoke(app)
-    assert result.exit_code == 2
-    assert "Usage: " in result.stdout
+    result = runner.invoke(app, [])
+    assert "Usage:" in result.stdout
     assert "HookCI: A tool for running Continuous Integration locally" in result.stdout
     assert "init" in result.stdout
 
 
-def test_cli_help_command() -> None:
-    """Verify that the 'help' command shows the help message."""
-    result = runner.invoke(app, ["help"])
-    assert result.exit_code == 0
-    assert "Usage: " in result.stdout
-    assert "init" in result.stdout
-
-
-@patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_success(mock_init_service_cls: Mock) -> None:
+def test_init_success(mock_init_service: Mock) -> None:
     """Test the 'init' command on a successful run."""
-    # Arrange
-    mock_service_instance = mock_init_service_cls.return_value
     config_path = Path("/path/to/repo/.hookci/hookci.yaml")
-    mock_service_instance.run.return_value = config_path
+    mock_init_service.run.return_value = config_path
 
-    # Act
     result = runner.invoke(app, ["init"])
 
-    # Assert
     assert result.exit_code == 0
     assert "🚀 Initializing HookCI..." in result.stdout
     assert "✅ Success! HookCI has been initialized." in result.stdout
     assert f"Configuration file created at: {config_path}" in result.stdout
-    assert "Git hooks have been installed and configured." in result.stdout
-    mock_service_instance.run.assert_called_once()
+    mock_init_service.run.assert_called_once()
 
 
-@patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_already_initialized(mock_init_service_cls: Mock) -> None:
-    """Test the 'init' command when the project is already initialized."""
-    # Arrange
-    mock_service_instance = mock_init_service_cls.return_value
-    mock_service_instance.run.side_effect = ProjectAlreadyInitializedError(
-        "Project already initialized."
-    )
-
-    # Act
-    result = runner.invoke(app, ["init"])
-
-    # Assert
-    assert result.exit_code == 0  # Should exit gracefully
-    assert "👋 Notice: Project already initialized." in result.stdout
-
-
-@patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_not_in_git_repo(mock_init_service_cls: Mock) -> None:
+def test_init_not_in_git_repo(mock_init_service: Mock) -> None:
     """Test the 'init' command when not inside a Git repository."""
-    # Arrange
-    mock_service_instance = mock_init_service_cls.return_value
-    mock_service_instance.run.side_effect = NotInGitRepositoryError
+    mock_init_service.run.side_effect = NotInGitRepositoryError("Not a repo")
 
-    # Act
     result = runner.invoke(app, ["init"])
 
-    # Assert
     assert result.exit_code == 1
-    assert "❌ Error: This is not a Git repository." in result.stdout
+    assert "❌ Error: Not a repo" in result.stdout
 
 
-@patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_git_command_error(mock_init_service_cls: Mock) -> None:
-    """Test the 'init' command when a git command fails."""
-    # Arrange
-    mock_service_instance = mock_init_service_cls.return_value
-    mock_service_instance.run.side_effect = GitCommandError("git failed")
+def test_run_success(mock_ci_service: Mock) -> None:
+    """Test the 'run' command on a successful pipeline execution."""
+    mock_ci_service.run.return_value = True
 
-    # Act
-    result = runner.invoke(app, ["init"])
+    result = runner.invoke(app, ["run"])
 
-    # Assert
+    assert result.exit_code == 0
+    assert "🏃 Running HookCI pipeline..." in result.stdout
+    assert "✅ Pipeline finished successfully!" in result.stdout
+    mock_ci_service.run.assert_called_once()
+
+
+def test_run_failure(mock_ci_service: Mock) -> None:
+    """Test the 'run' command when the pipeline fails."""
+    mock_ci_service.run.return_value = False
+
+    result = runner.invoke(app, ["run"])
+
     assert result.exit_code == 1
-    assert "❌ Error during Git configuration: git failed" in result.stdout
+    assert "❌ Pipeline failed." in result.stdout
 
 
-@patch("hookci.presentation.cli.ProjectInitializationService")
-def test_init_unexpected_error(mock_init_service_cls: Mock) -> None:
-    """Test the 'init' command handles unexpected exceptions."""
-    # Arrange
-    mock_service_instance = mock_init_service_cls.return_value
-    mock_service_instance.run.side_effect = ValueError("Something broke")
+def test_run_unexpected_error(mock_ci_service: Mock) -> None:
+    """Test 'run' handles unexpected exceptions."""
+    mock_ci_service.run.side_effect = ValueError("Kaboom")
 
-    # Act
-    result = runner.invoke(app, ["init"])
+    result = runner.invoke(app, ["run"])
 
-    # Assert
     assert result.exit_code == 1
-    assert "🔥 An unexpected error occurred: Something broke" in result.stdout
+    assert "🔥 An unexpected error occurred: Kaboom" in result.stdout

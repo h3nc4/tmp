@@ -24,6 +24,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
 from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
 from hookci.infrastructure.fs import GitService, LocalFileSystem
 
@@ -42,6 +43,18 @@ def test_local_fs_create_and_write(tmp_path: Path) -> None:
     assert file_path.read_text() == content
 
 
+def test_local_fs_read_file(tmp_path: Path) -> None:
+    """Verify LocalFileSystem can read a file's content."""
+    fs = LocalFileSystem()
+    file_path = tmp_path / "read_test.txt"
+    content = "line 1\nline 2"
+    file_path.write_text(content)
+
+    read_content = fs.read_file(file_path)
+
+    assert read_content == content
+
+
 def test_local_fs_make_executable(tmp_path: Path) -> None:
     """Verify LocalFileSystem can make a file executable."""
     fs = LocalFileSystem()
@@ -57,44 +70,36 @@ def test_local_fs_make_executable(tmp_path: Path) -> None:
     assert file_path.stat().st_mode & stat.S_IEXEC
 
 
-@patch("pathlib.Path.cwd")
-def test_find_git_root_from_subdir(mock_cwd: Mock, tmp_path: Path) -> None:
+@patch("subprocess.run")
+def test_find_git_root_success(mock_subprocess_run: Mock) -> None:
     """
-    Verify that find_git_root can locate the .git directory from a subdirectory.
+    Verify that find_git_root correctly parses the output of a successful git command.
     """
-    git_root = tmp_path / "project"
-    (git_root / ".git").mkdir(parents=True)
-    subdir = git_root / "src"
-    subdir.mkdir()
-    mock_cwd.return_value = subdir
+    expected_path = "/path/to/git/root"
+    mock_subprocess_run.return_value = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=f"{expected_path}\n", stderr=""
+    )
 
     service = GitService()
     found_root = service.find_git_root()
 
-    assert found_root == git_root
+    assert found_root == Path(expected_path)
+    mock_subprocess_run.assert_called_once_with(
+        ["git", "rev-parse", "--show-toplevel"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
-@patch("pathlib.Path.cwd")
-def test_find_git_root_from_root(mock_cwd: Mock, tmp_path: Path) -> None:
+@patch("subprocess.run")
+def test_find_git_root_not_in_repo(mock_subprocess_run: Mock) -> None:
     """
-    Verify that find_git_root works correctly when called from the repository root.
+    Verify NotInGitRepositoryError is raised when the git command fails.
     """
-    git_root = tmp_path / "project"
-    (git_root / ".git").mkdir(parents=True)
-    mock_cwd.return_value = git_root
-
-    service = GitService()
-    found_root = service.find_git_root()
-
-    assert found_root == git_root
-
-
-@patch("pathlib.Path.cwd")
-def test_find_git_root_not_in_repo(mock_cwd: Mock, tmp_path: Path) -> None:
-    """
-    Verify NotInGitRepositoryError is raised when not in a Git repository.
-    """
-    mock_cwd.return_value = tmp_path
+    mock_subprocess_run.side_effect = subprocess.CalledProcessError(
+        returncode=128, cmd="git", stderr="fatal: not a git repository"
+    )
 
     service = GitService()
     with pytest.raises(NotInGitRepositoryError):

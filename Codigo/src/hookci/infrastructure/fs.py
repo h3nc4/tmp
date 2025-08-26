@@ -31,6 +31,7 @@ class IFileSystem(Protocol):
     def file_exists(self, path: Path) -> bool: ...
     def create_dir(self, path: Path) -> None: ...
     def write_file(self, path: Path, content: str) -> None: ...
+    def read_file(self, path: Path) -> str: ...
     def make_executable(self, path: Path) -> None: ...
 
 
@@ -53,6 +54,9 @@ class LocalFileSystem(IFileSystem):
     def write_file(self, path: Path, content: str) -> None:
         path.write_text(content)
 
+    def read_file(self, path: Path) -> str:
+        return path.read_text()
+
     def make_executable(self, path: Path) -> None:
         """Makes a file executable, similar to `chmod +x`."""
         current_permissions = path.stat().st_mode
@@ -64,17 +68,19 @@ class GitService(IGitService):
 
     def find_git_root(self) -> Path:
         """
-        Finds the root directory of the Git repository.
-        Traverses up from the current directory.
+        Finds the root directory of the Git repository using `git rev-parse`.
         """
-        current_path = Path.cwd().resolve()
-        if (current_path / ".git").is_dir():
-            return current_path
-
-        for parent in current_path.parents:
-            if (parent / ".git").is_dir():
-                return parent
-        raise NotInGitRepositoryError("Not inside a Git repository.")
+        try:
+            process = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return Path(process.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            # git rev-parse returns a non-zero exit code when not in a git repo.
+            raise NotInGitRepositoryError("Not inside a Git repository.") from e
 
     def set_hooks_path(self, hooks_path: Path) -> None:
         """Sets the git `core.hooksPath` configuration for the repository."""

@@ -37,7 +37,7 @@ def test_create_default_config() -> None:
     assert config.log_level == "INFO"
 
     assert isinstance(config.docker, Docker)
-    assert config.docker.image == "python:3.11-slim-bookworm"
+    assert config.docker.image == "python:3.13-slim-trixie"
 
     assert isinstance(config.hooks, Hooks)
     assert config.hooks.pre_commit is True

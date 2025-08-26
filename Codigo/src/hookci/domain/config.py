@@ -17,54 +17,61 @@
 """
 Domain models for HookCI configuration.
 """
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field, model_validator
 from typing import Dict, List, Optional
 
 
-@dataclass
-class Step:
+class Step(BaseModel):
     """Represents a single step in the CI process."""
 
     name: str
     command: str
     critical: bool = True
-    env: Dict[str, str] = field(default_factory=dict)
+    env: Dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class Docker:
+class Docker(BaseModel):
     """Docker configuration."""
 
     image: Optional[str] = None
-    dockerfile: Optional[str] = "Dockerfile"
+    dockerfile: Optional[str] = None
+
+    @model_validator(mode="after")
+    def check_image_or_dockerfile(self) -> "Docker":
+        if self.image is None and self.dockerfile is None:
+            raise ValueError(
+                'Either "image" or "dockerfile" must be provided in the docker configuration.'
+            )
+        if self.image is not None and self.dockerfile is not None:
+            raise ValueError(
+                'Provide either "image" or "dockerfile" in the docker configuration, not both.'
+            )
+        return self
 
 
-@dataclass
-class Hooks:
+class Hooks(BaseModel):
     """Git hooks configuration."""
 
     pre_commit: bool = True
     pre_push: bool = True
 
 
-@dataclass
-class Filters:
+class Filters(BaseModel):
     """Filters for git events."""
 
     branches: Optional[str] = None
     commits: Optional[str] = None
 
 
-@dataclass
-class Configuration:
+class Configuration(BaseModel):
     """Main configuration model for HookCI."""
 
     version: str
     log_level: str = "INFO"
-    docker: Docker = field(default_factory=Docker)
-    hooks: Hooks = field(default_factory=Hooks)
+    docker: Docker = Field(default_factory=Docker)
+    hooks: Hooks = Field(default_factory=Hooks)
     filters: Optional[Filters] = None
-    steps: List[Step] = field(default_factory=list)
+    steps: List[Step] = Field(default_factory=list)
 
 
 def create_default_config() -> Configuration:
@@ -74,7 +81,7 @@ def create_default_config() -> Configuration:
     return Configuration(
         version="1.0",
         log_level="INFO",
-        docker=Docker(image="python:3.11-slim-bookworm"),
+        docker=Docker(image="python:3.13-slim-trixie"),
         hooks=Hooks(pre_commit=True, pre_push=True),
         steps=[
             Step(name="Linting", command="echo 'Linting...'"),

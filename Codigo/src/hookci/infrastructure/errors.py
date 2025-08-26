@@ -35,3 +35,15 @@ class GitCommandError(InfrastructureError):
     """Raised when a Git command fails."""
 
     pass
+
+
+class ConfigurationNotFoundError(InfrastructureError):
+    """Raised when the configuration file cannot be found."""
+
+    pass
+
+
+class ConfigurationParseError(InfrastructureError):
+    """Raised when the configuration file is invalid or cannot be parsed."""
+
+    pass

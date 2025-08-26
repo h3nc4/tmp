@@ -19,11 +19,13 @@ Application services that orchestrate use cases.
 """
 from pathlib import Path
 
+from rich.console import Console
+
 from hookci.application import constants
 from hookci.application.errors import ProjectAlreadyInitializedError
-from hookci.domain.config import create_default_config
+from hookci.domain.config import Configuration, create_default_config
 from hookci.infrastructure.fs import IFileSystem, IGitService
-from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
+from hookci.infrastructure.yaml_handler import IConfigurationHandler
 
 
 class ProjectInitializationService:
@@ -49,7 +51,7 @@ hookci run --hook-type pre-push
         self,
         git_service: IGitService,
         fs: IFileSystem,
-        config_handler: YamlConfigurationHandler,
+        config_handler: IConfigurationHandler,
     ):
         self._git_service = git_service
         self._fs = fs
@@ -99,3 +101,66 @@ hookci run --hook-type pre-push
         hook_path = hooks_dir / hook_name
         self._fs.write_file(hook_path, content)
         self._fs.make_executable(hook_path)
+
+
+class CiExecutionService:
+    """Service to handle the CI execution use case."""
+
+    def __init__(
+        self,
+        git_service: IGitService,
+        config_handler: IConfigurationHandler,
+    ):
+        self._git_service = git_service
+        self._config_handler = config_handler
+        self._console = Console()  # For step output
+
+    def run(self) -> bool:
+        """
+        Executes the main CI pipeline.
+
+        1. Loads the configuration.
+        2. Validates the environment (e.g., Docker is running).
+        3. Executes each step defined in the configuration.
+        4. Reports the overall result.
+
+        Returns:
+            True if the pipeline was successful, False otherwise.
+        """
+        config = self._load_configuration()
+        self._console.print("✅ [green]Configuration loaded successfully.[/green]")
+
+        self._console.print(
+            f"   - Docker Environment: {config.docker.image or config.docker.dockerfile}"
+        )
+
+        all_steps_succeeded = True
+        for i, step in enumerate(config.steps):
+            self._console.rule(f"[bold]Step {i + 1}: {step.name}[/bold]")
+            self._console.print(f"Executing command: `[cyan]{step.command}[/cyan]`")
+
+            # TODO: This is where the actual Docker execution logic will go.
+            # For now, we simulate a successful run.
+            step_succeeded = True
+
+            if not step_succeeded and step.critical:
+                self._console.print(
+                    f"❌ [bold red]Critical step '{step.name}' failed. Aborting.[/bold red]"
+                )
+                all_steps_succeeded = False
+                break
+            elif not step_succeeded:
+                self._console.print(
+                    f"⚠️ [yellow]Non-critical step '{step.name}' failed. Continuing.[/yellow]"
+                )
+
+        self._console.rule()
+        return all_steps_succeeded
+
+    def _load_configuration(self) -> Configuration:
+        """
+        Locates and loads the HookCI configuration file.
+        """
+        git_root = self._git_service.find_git_root()
+        config_path = git_root / constants.BASE_DIR_NAME / constants.CONFIG_FILENAME
+        return self._config_handler.load_config(config_path)

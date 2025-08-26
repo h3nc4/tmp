@@ -21,15 +21,13 @@ from pathlib import Path
 from unittest.mock import Mock, call
 
 import pytest
+
+from hookci.application import constants
 from hookci.application.errors import ProjectAlreadyInitializedError
-from hookci.application.constants import (
-    BASE_DIR_NAME,
-    CONFIG_FILENAME,
-)
-from hookci.application.services import ProjectInitializationService
-from hookci.domain.config import Configuration
+from hookci.application.services import CiExecutionService, ProjectInitializationService
+from hookci.domain.config import Configuration, Docker
 from hookci.infrastructure.fs import IFileSystem, IGitService
-from hookci.infrastructure.yaml_handler import YamlConfigurationHandler
+from hookci.infrastructure.yaml_handler import IConfigurationHandler
 
 
 @pytest.fixture
@@ -48,8 +46,8 @@ def mock_fs() -> Mock:
 
 @pytest.fixture
 def mock_config_handler() -> Mock:
-    """Fixture for a mocked YamlConfigurationHandler."""
-    return Mock(spec=YamlConfigurationHandler)
+    """Fixture for a mocked IConfigurationHandler."""
+    return Mock(spec=IConfigurationHandler)
 
 
 def test_init_service_success(
@@ -66,9 +64,9 @@ def test_init_service_success(
     )
 
     git_root = Path("/repo")
-    base_dir = git_root / BASE_DIR_NAME
+    base_dir = git_root / constants.BASE_DIR_NAME
     hooks_dir = base_dir / service._HOOKS_DIR_NAME
-    config_path = base_dir / CONFIG_FILENAME
+    config_path = base_dir / constants.CONFIG_FILENAME
     pre_commit_path = hooks_dir / service._PRE_COMMIT_FILENAME
     pre_push_path = hooks_dir / service._PRE_PUSH_FILENAME
 
@@ -118,3 +116,26 @@ def test_init_service_already_initialized(
     mock_config_handler.write_config.assert_not_called()
     mock_fs.write_file.assert_not_called()
     mock_git_service.set_hooks_path.assert_not_called()
+
+
+def test_ci_execution_service_run_loads_config(
+    mock_git_service: Mock, mock_config_handler: Mock
+) -> None:
+    """
+    Verify the CI execution service's run method correctly orchestrates configuration loading.
+    """
+    # Arrange
+    service = CiExecutionService(mock_git_service, mock_config_handler)
+    git_root = Path("/repo")
+    config_path = git_root / constants.BASE_DIR_NAME / constants.CONFIG_FILENAME
+    expected_config = Configuration(
+        version="1.0", steps=[], docker=Docker(image="test:latest")
+    )
+    mock_config_handler.load_config.return_value = expected_config
+
+    # Act
+    service.run()
+
+    # Assert
+    mock_git_service.find_git_root.assert_called_once()
+    mock_config_handler.load_config.assert_called_once_with(config_path)
