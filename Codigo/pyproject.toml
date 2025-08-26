@@ -15,7 +15,8 @@ dependencies = [
     "pyinstaller (>=6.13.0,<7.0.0)",
     "docker (>=7.1.0,<8.0.0)",
     "typer (>=0.16.1,<0.17.0)",
-    "pyyaml (>=6.0.2,<7.0.0)"
+    "pyyaml (>=6.0.2,<7.0.0)",
+    "pydantic (>=2.11.7,<3.0.0)"
 ]
 
 
@@ -23,14 +24,25 @@ dependencies = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry.scripts]
+hookci = "hookci.presentation.cli:main"
+
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 ipdb = "^0.13.13"
 mypy = "^1.16.0"
 pytest = "^8.3.5"
 types-pyyaml = "^6.0.12.20250822"
+ruff = "^0.12.10"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 150
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F"]
