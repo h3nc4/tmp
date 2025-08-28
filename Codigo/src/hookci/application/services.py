@@ -18,14 +18,31 @@
 Application services that orchestrate use cases.
 """
 from pathlib import Path
+from textwrap import dedent
+from typing import Generator, Literal
 
-from rich.console import Console
+from pydantic import ValidationError
 
 from hookci.application import constants
 from hookci.application.errors import ProjectAlreadyInitializedError
+from hookci.application.events import (
+    ImageBuildEnd,
+    ImageBuildStart,
+    LogLine,
+    PipelineEnd,
+    PipelineEvent,
+    PipelineStart,
+    StepEnd,
+    StepStart,
+)
 from hookci.domain.config import Configuration, create_default_config
+from hookci.infrastructure.docker import IDockerService
+from hookci.infrastructure.errors import ConfigurationParseError, DockerError
 from hookci.infrastructure.fs import IFileSystem, IGitService
 from hookci.infrastructure.yaml_handler import IConfigurationHandler
+from hookci.log import get_logger, setup_logging
+
+logger = get_logger(__name__)
 
 
 class ProjectInitializationService:
@@ -35,17 +52,23 @@ class ProjectInitializationService:
     _PRE_COMMIT_FILENAME: str = "pre-commit"
     _PRE_PUSH_FILENAME: str = "pre-push"
 
-    _PRE_COMMIT_SCRIPT: str = """#!/usr/bin/env sh
-# HookCI pre-commit hook
+    _PRE_COMMIT_SCRIPT: str = dedent(
+        """\
+        #!/usr/bin/env sh
+        # HookCI pre-commit hook
 
-hookci run --hook-type pre-commit
-"""
+        hookci run --hook-type pre-commit
+        """
+    )
 
-    _PRE_PUSH_SCRIPT: str = """#!/usr/bin/env sh
-# HookCI pre-push hook
+    _PRE_PUSH_SCRIPT: str = dedent(
+        """\
+        #!/usr/bin/env sh
+        # HookCI pre-push hook
 
-hookci run --hook-type pre-push
-"""
+        hookci run --hook-type pre-push
+        """
+    )
 
     def __init__(
         self,
@@ -60,16 +83,6 @@ hookci run --hook-type pre-push
     def run(self) -> Path:
         """
         Executes the project initialization logic.
-
-        1. Finds the Git repository root.
-        2. Creates the .hookci directory structure.
-        3. Checks if the project is already initialized.
-        4. Creates the default hookci.yaml file.
-        5. Installs Git hooks scripts.
-        6. Configures Git to use the new hooks path.
-
-        Returns:
-            The path to the created configuration file.
         """
         git_root = self._git_service.find_git_root()
         base_dir = git_root / constants.BASE_DIR_NAME
@@ -83,7 +96,10 @@ hookci run --hook-type pre-push
 
         self._fs.create_dir(hooks_dir)
         default_config = create_default_config()
-        self._config_handler.write_config(config_path, default_config)
+
+        config_data = default_config.model_dump(exclude_none=True)
+        self._config_handler.write_config_data(config_path, config_data)
+
         self._install_hook_script(
             hooks_dir, self._PRE_COMMIT_FILENAME, self._PRE_COMMIT_SCRIPT
         )
@@ -110,57 +126,96 @@ class CiExecutionService:
         self,
         git_service: IGitService,
         config_handler: IConfigurationHandler,
+        docker_service: IDockerService,
     ):
         self._git_service = git_service
         self._config_handler = config_handler
-        self._console = Console()  # For step output
+        self._docker_service = docker_service
+        self.git_root = self._git_service.find_git_root()
 
-    def run(self) -> bool:
+    def run(self) -> Generator[PipelineEvent, None, None]:
         """
-        Executes the main CI pipeline.
-
-        1. Loads the configuration.
-        2. Validates the environment (e.g., Docker is running).
-        3. Executes each step defined in the configuration.
-        4. Reports the overall result.
-
-        Returns:
-            True if the pipeline was successful, False otherwise.
+        Executes the main CI pipeline, yielding events for real-time feedback.
         """
-        config = self._load_configuration()
-        self._console.print("✅ [green]Configuration loaded successfully.[/green]")
+        config = self._load_and_validate_configuration()
+        setup_logging(config.log_level)
 
-        self._console.print(
-            f"   - Docker Environment: {config.docker.image or config.docker.dockerfile}"
+        yield PipelineStart(total_steps=len(config.steps))
+
+        docker_image = yield from self._prepare_docker_image(config)
+        if not docker_image:
+            yield PipelineEnd(status="FAILURE")
+            return
+
+        final_status: Literal["SUCCESS", "FAILURE"] = "SUCCESS"
+        for step in config.steps:
+            yield StepStart(step=step)
+
+            exit_code = 1  # Default to failure
+            command_gen = self._docker_service.run_command_in_container(
+                image=docker_image,
+                command=step.command,
+                workdir=self.git_root,
+                env=step.env,
+            )
+
+            try:
+                while True:
+                    log_line = next(command_gen)
+                    yield LogLine(line=log_line)
+            except StopIteration as e:
+                # The return value of the generator is in the exception's `value` attribute
+                exit_code = e.value
+
+            if exit_code == 0:
+                yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
+            else:
+                if step.critical:
+                    yield StepEnd(step=step, status="FAILURE", exit_code=exit_code)
+                    final_status = "FAILURE"
+                    break
+                else:
+                    yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
+
+        yield PipelineEnd(status=final_status)
+
+    def _prepare_docker_image(
+        self, config: Configuration
+    ) -> Generator[PipelineEvent, None, str | None]:
+        """
+        Builds image from Dockerfile if specified, otherwise returns image name.
+        Yields build events and returns the final image name or None on failure.
+        """
+        if config.docker.dockerfile:
+            tag = f"hookci-project:{self.git_root.name}"
+            dockerfile_path = self.git_root / config.docker.dockerfile
+            yield ImageBuildStart(dockerfile_path=str(dockerfile_path), tag=tag)
+            try:
+                build_generator = self._docker_service.build_image(dockerfile_path, tag)
+                for log_line in build_generator:
+                    yield LogLine(line=log_line)
+                yield ImageBuildEnd(status="SUCCESS")
+                return tag
+            except DockerError as e:
+                logger.error(f"Docker build failed: {e}")
+                yield LogLine(line=str(e))
+                yield ImageBuildEnd(status="FAILURE")
+                return None
+
+        # We can be sure image is not None due to Pydantic validation
+        return config.docker.image
+
+    def _load_and_validate_configuration(self) -> Configuration:
+        """
+        Locates, loads, and validates the HookCI configuration file.
+        """
+        config_path = (
+            self.git_root / constants.BASE_DIR_NAME / constants.CONFIG_FILENAME
         )
-
-        all_steps_succeeded = True
-        for i, step in enumerate(config.steps):
-            self._console.rule(f"[bold]Step {i + 1}: {step.name}[/bold]")
-            self._console.print(f"Executing command: `[cyan]{step.command}[/cyan]`")
-
-            # TODO: This is where the actual Docker execution logic will go.
-            # For now, we simulate a successful run.
-            step_succeeded = True
-
-            if not step_succeeded and step.critical:
-                self._console.print(
-                    f"❌ [bold red]Critical step '{step.name}' failed. Aborting.[/bold red]"
-                )
-                all_steps_succeeded = False
-                break
-            elif not step_succeeded:
-                self._console.print(
-                    f"⚠️ [yellow]Non-critical step '{step.name}' failed. Continuing.[/yellow]"
-                )
-
-        self._console.rule()
-        return all_steps_succeeded
-
-    def _load_configuration(self) -> Configuration:
-        """
-        Locates and loads the HookCI configuration file.
-        """
-        git_root = self._git_service.find_git_root()
-        config_path = git_root / constants.BASE_DIR_NAME / constants.CONFIG_FILENAME
-        return self._config_handler.load_config(config_path)
+        config_data = self._config_handler.load_config_data(config_path)
+        try:
+            return Configuration.model_validate(config_data)
+        except ValidationError as e:
+            raise ConfigurationParseError(
+                f"Invalid configuration structure:\n{e}"
+            ) from e

@@ -17,6 +17,7 @@
 """
 Domain models for HookCI configuration.
 """
+from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
 from typing import Dict, List, Optional
 
@@ -37,7 +38,7 @@ class Docker(BaseModel):
     dockerfile: Optional[str] = None
 
     @model_validator(mode="after")
-    def check_image_or_dockerfile(self) -> "Docker":
+    def check_image_or_dockerfile(self) -> Docker:
         if self.image is None and self.dockerfile is None:
             raise ValueError(
                 'Either "image" or "dockerfile" must be provided in the docker configuration.'
@@ -63,12 +64,17 @@ class Filters(BaseModel):
     commits: Optional[str] = None
 
 
+def default_docker_config() -> Docker:
+    """Provides a default Docker configuration."""
+    return Docker(image="python:3.13-slim-trixie")
+
+
 class Configuration(BaseModel):
     """Main configuration model for HookCI."""
 
     version: str
     log_level: str = "INFO"
-    docker: Docker = Field(default_factory=Docker)
+    docker: Docker = Field(default_factory=default_docker_config)
     hooks: Hooks = Field(default_factory=Hooks)
     filters: Optional[Filters] = None
     steps: List[Step] = Field(default_factory=list)
@@ -81,7 +87,7 @@ def create_default_config() -> Configuration:
     return Configuration(
         version="1.0",
         log_level="INFO",
-        docker=Docker(image="python:3.13-slim-trixie"),
+        docker=default_docker_config(),
         hooks=Hooks(pre_commit=True, pre_push=True),
         steps=[
             Step(name="Linting", command="echo 'Linting...'"),

@@ -18,12 +18,8 @@
 Handles serialization and deserialization of YAML configuration files.
 """
 from pathlib import Path
-from typing import Protocol
-
-from pydantic import ValidationError
+from typing import Any, Dict, Protocol
 import yaml
-
-from hookci.domain.config import Configuration
 from hookci.infrastructure.errors import (
     ConfigurationNotFoundError,
     ConfigurationParseError,
@@ -32,10 +28,10 @@ from hookci.infrastructure.fs import IFileSystem
 
 
 class IConfigurationHandler(Protocol):
-    """Interface for loading and writing configuration."""
+    """Interface for loading and writing configuration data."""
 
-    def load_config(self, path: Path) -> Configuration: ...
-    def write_config(self, path: Path, config: Configuration) -> None: ...
+    def load_config_data(self, path: Path) -> Dict[str, Any]: ...
+    def write_config_data(self, path: Path, config_data: Dict[str, Any]) -> None: ...
 
 
 class YamlConfigurationHandler(IConfigurationHandler):
@@ -44,9 +40,9 @@ class YamlConfigurationHandler(IConfigurationHandler):
     def __init__(self, fs: IFileSystem):
         self._fs = fs
 
-    def load_config(self, path: Path) -> Configuration:
+    def load_config_data(self, path: Path) -> Dict[str, Any]:
         """
-        Loads, parses, and validates a YAML configuration file into a Configuration object.
+        Loads and parses a YAML configuration file into a dictionary.
         """
         if not self._fs.file_exists(path):
             raise ConfigurationNotFoundError(f"Configuration file not found at: {path}")
@@ -57,26 +53,18 @@ class YamlConfigurationHandler(IConfigurationHandler):
                 raise ConfigurationParseError(
                     "Top-level YAML content must be a dictionary."
                 )
-            # Pydantic handles all validation and mapping from the dictionary.
-            return Configuration.model_validate(data)
+            return data
         except yaml.YAMLError as e:
             raise ConfigurationParseError(f"Error parsing YAML file: {e}") from e
-        except ValidationError as e:
-            raise ConfigurationParseError(
-                f"Invalid configuration structure:\n{e}"
-            ) from e
 
-    def write_config(self, path: Path, config: Configuration) -> None:
+    def write_config_data(self, path: Path, config_data: Dict[str, Any]) -> None:
         """
-        Serializes a Configuration object to YAML and writes it to a file.
+        Serializes a dictionary to YAML and writes it to a file.
         """
-        # Convert the Pydantic model to a dictionary, filtering out fields with None values.
-        config_dict = config.model_dump(exclude_none=True)
-
         self._fs.write_file(
             path,
             yaml.dump(
-                config_dict,
+                config_data,
                 default_flow_style=False,
                 sort_keys=False,
                 indent=2,

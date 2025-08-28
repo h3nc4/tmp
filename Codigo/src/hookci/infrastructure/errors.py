@@ -47,3 +47,9 @@ class ConfigurationParseError(InfrastructureError):
     """Raised when the configuration file is invalid or cannot be parsed."""
 
     pass
+
+
+class DockerError(InfrastructureError):
+    """Raised for errors related to Docker operations."""
+
+    pass
