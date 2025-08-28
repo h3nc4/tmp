@@ -22,12 +22,13 @@ such as services and infrastructure handlers. It follows the Dependency
 Inversion Principle, allowing high-level modules (like the CLI) to depend on
 abstractions rather than concrete implementations.
 """
-from typing import Any, Dict, cast
+from functools import cached_property
 
 from hookci.application.services import (
     CiExecutionService,
     ProjectInitializationService,
 )
+from hookci.infrastructure.docker import DockerService, IDockerService
 from hookci.infrastructure.fs import (
     GitService,
     IFileSystem,
@@ -41,51 +42,44 @@ from hookci.infrastructure.yaml_handler import (
 
 
 class Container:
-    """A simple container for dependency injection."""
+    """
+    A simple container for dependency injection using cached properties.
+    Services are instantiated lazily on their first access.
+    """
 
-    def __init__(self) -> None:
-        self._instances: Dict[str, Any] = {}
-
-    @property
+    @cached_property
     def file_system(self) -> IFileSystem:
-        if "file_system" not in self._instances:
-            self._instances["file_system"] = LocalFileSystem()
-        return cast(IFileSystem, self._instances["file_system"])
+        return LocalFileSystem()
 
-    @property
+    @cached_property
     def git_service(self) -> IGitService:
-        if "git_service" not in self._instances:
-            self._instances["git_service"] = GitService()
-        return cast(IGitService, self._instances["git_service"])
+        return GitService()
 
-    @property
+    @cached_property
+    def docker_service(self) -> IDockerService:
+        return DockerService()
+
+    @cached_property
     def config_handler(self) -> IConfigurationHandler:
-        if "config_handler" not in self._instances:
-            self._instances["config_handler"] = YamlConfigurationHandler(
-                fs=self.file_system
-            )
-        return cast(IConfigurationHandler, self._instances["config_handler"])
+        return YamlConfigurationHandler(fs=self.file_system)
 
-    @property
+    @cached_property
     def project_init_service(self) -> ProjectInitializationService:
-        if "project_init_service" not in self._instances:
-            self._instances["project_init_service"] = ProjectInitializationService(
-                git_service=self.git_service,
-                fs=self.file_system,
-                config_handler=self.config_handler,
-            )
-        return cast(
-            ProjectInitializationService, self._instances["project_init_service"]
+        return ProjectInitializationService(
+            git_service=self.git_service,
+            fs=self.file_system,
+            config_handler=self.config_handler,
         )
 
-    @property
+    @cached_property
     def ci_execution_service(self) -> CiExecutionService:
-        if "ci_execution_service" not in self._instances:
-            self._instances["ci_execution_service"] = CiExecutionService(
-                git_service=self.git_service,
-                config_handler=self.config_handler,
-            )
-        return cast(CiExecutionService, self._instances["ci_execution_service"])
+        return CiExecutionService(
+            git_service=self.git_service,
+            config_handler=self.config_handler,
+            docker_service=self.docker_service,
+        )
 
 
+# A singleton instance of the container, making it easily accessible
+# throughout the application while ensuring services are singletons too.
 container = Container()
