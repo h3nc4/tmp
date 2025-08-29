@@ -17,6 +17,8 @@
 """
 Tests for the domain configuration models.
 """
+import pytest
+
 from hookci.domain.config import (
     Configuration,
     Docker,
@@ -50,3 +52,28 @@ def test_create_default_config() -> None:
     assert config.steps[0].command == "echo 'Linting...'"
     assert config.steps[1].name == "Testing"
     assert config.steps[1].command == "echo 'Testing...'"
+
+
+def test_configuration_with_default_docker() -> None:
+    """
+    Verify that Configuration model instantiates with a default docker config
+    if none is provided.
+    """
+    config = Configuration(version="1.0")
+    assert config.docker is not None
+    assert config.docker.image == "python:3.13-slim-trixie"
+    assert config.docker.dockerfile is None
+
+
+def test_docker_model_validation() -> None:
+    """
+    Verify that the Docker model validator works correctly.
+    """
+    assert Docker(image="my-image")
+    assert Docker(dockerfile="Dockerfile")
+
+    with pytest.raises(ValueError, match="not both"):
+        Docker(image="my-image", dockerfile="Dockerfile")
+
+    with pytest.raises(ValueError, match="must be provided"):
+        Docker()

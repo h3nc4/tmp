@@ -18,17 +18,29 @@
 """
 Tests for the command-line interface (presentation layer).
 """
+import logging
 from pathlib import Path
+from typing import Generator
 from unittest.mock import Mock
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from typer.testing import CliRunner
 
+from hookci.application.events import (
+    LogLine,
+    PipelineEnd,
+    PipelineEvent,
+    PipelineStart,
+    StepEnd,
+    StepStart,
+)
 from hookci.application.services import (
     CiExecutionService,
     ProjectInitializationService,
 )
 from hookci.containers import container
+from hookci.domain.config import Step
 from hookci.infrastructure.errors import NotInGitRepositoryError
 from hookci.presentation.cli import app
 
@@ -39,7 +51,7 @@ runner = CliRunner()
 def mock_init_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
     """Mocks the ProjectInitializationService in the container."""
     mock = Mock(spec=ProjectInitializationService)
-    monkeypatch.setattr(container, "_instances", {"project_init_service": mock})
+    monkeypatch.setattr(container, "project_init_service", mock, raising=False)
     return mock
 
 
@@ -47,7 +59,7 @@ def mock_init_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
 def mock_ci_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
     """Mocks the CiExecutionService in the container."""
     mock = Mock(spec=CiExecutionService)
-    monkeypatch.setattr(container, "_instances", {"ci_execution_service": mock})
+    monkeypatch.setattr(container, "ci_execution_service", mock, raising=False)
     return mock
 
 
@@ -59,57 +71,80 @@ def test_cli_no_args_shows_help() -> None:
     assert "init" in result.stdout
 
 
-def test_init_success(mock_init_service: Mock) -> None:
+def test_init_success(mock_init_service: Mock, caplog: LogCaptureFixture) -> None:
     """Test the 'init' command on a successful run."""
     config_path = Path("/path/to/repo/.hookci/hookci.yaml")
     mock_init_service.run.return_value = config_path
 
-    result = runner.invoke(app, ["init"])
+    with caplog.at_level(logging.INFO):
+        result = runner.invoke(app, ["init"])
 
     assert result.exit_code == 0
-    assert "🚀 Initializing HookCI..." in result.stdout
-    assert "✅ Success! HookCI has been initialized." in result.stdout
-    assert f"Configuration file created at: {config_path}" in result.stdout
+    assert "Initializing HookCI..." in caplog.text
+    assert "Success! HookCI has been initialized." in result.stdout
     mock_init_service.run.assert_called_once()
 
 
-def test_init_not_in_git_repo(mock_init_service: Mock) -> None:
+def test_init_not_in_git_repo(
+    mock_init_service: Mock, caplog: LogCaptureFixture
+) -> None:
     """Test the 'init' command when not inside a Git repository."""
     mock_init_service.run.side_effect = NotInGitRepositoryError("Not a repo")
 
-    result = runner.invoke(app, ["init"])
+    with caplog.at_level(logging.ERROR):
+        result = runner.invoke(app, ["init"])
 
     assert result.exit_code == 1
-    assert "❌ Error: Not a repo" in result.stdout
+    assert "Not a repo" in caplog.text
 
 
 def test_run_success(mock_ci_service: Mock) -> None:
     """Test the 'run' command on a successful pipeline execution."""
-    mock_ci_service.run.return_value = True
+
+    def event_generator() -> Generator[PipelineEvent, None, None]:
+        yield PipelineStart(total_steps=1)
+        step = Step(name="Test", command="pytest")
+        yield StepStart(step=step)
+        yield LogLine(line="running tests...")
+        yield StepEnd(step=step, status="SUCCESS", exit_code=0)
+        yield PipelineEnd(status="SUCCESS")
+
+    mock_ci_service.run.return_value = event_generator()
 
     result = runner.invoke(app, ["run"])
 
     assert result.exit_code == 0
-    assert "🏃 Running HookCI pipeline..." in result.stdout
-    assert "✅ Pipeline finished successfully!" in result.stdout
+    assert "Pipeline Finished" in result.stdout
+    assert "Pipeline finished successfully!" in result.stdout
     mock_ci_service.run.assert_called_once()
 
 
 def test_run_failure(mock_ci_service: Mock) -> None:
     """Test the 'run' command when the pipeline fails."""
-    mock_ci_service.run.return_value = False
+
+    def event_generator() -> Generator[PipelineEvent, None, None]:
+        yield PipelineStart(total_steps=1)
+        step = Step(name="Test", command="pytest")
+        yield StepStart(step=step)
+        yield LogLine(line="test failed!")
+        yield StepEnd(step=step, status="FAILURE", exit_code=1)
+        yield PipelineEnd(status="FAILURE")
+
+    mock_ci_service.run.return_value = event_generator()
 
     result = runner.invoke(app, ["run"])
 
     assert result.exit_code == 1
-    assert "❌ Pipeline failed." in result.stdout
+    assert "Pipeline Failed" in result.stdout
+    assert "Pipeline failed." in result.stdout
 
 
-def test_run_unexpected_error(mock_ci_service: Mock) -> None:
+def test_run_unexpected_error(mock_ci_service: Mock, caplog: LogCaptureFixture) -> None:
     """Test 'run' handles unexpected exceptions."""
     mock_ci_service.run.side_effect = ValueError("Kaboom")
 
-    result = runner.invoke(app, ["run"])
+    with caplog.at_level(logging.ERROR):
+        result = runner.invoke(app, ["run"])
 
     assert result.exit_code == 1
-    assert "🔥 An unexpected error occurred: Kaboom" in result.stdout
+    assert "An unexpected error occurred: Kaboom" in caplog.text
