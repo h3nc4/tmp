@@ -46,3 +46,7 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F"]
+
+[[tool.mypy.overrides]]
+module = ["docker.*"]
+follow_untyped_imports = true
