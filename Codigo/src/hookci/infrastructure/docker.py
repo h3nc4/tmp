@@ -74,7 +74,7 @@ class DockerService(IDockerService):
             logger.debug(f"Running command in container using image {image}...")
             container = self.client.containers.run(
                 image=image,
-                command=command,
+                command=["/bin/sh", "-c", command],
                 volumes={str(workdir): {"bind": "/app", "mode": "rw"}},
                 working_dir="/app",
                 environment=env or {},

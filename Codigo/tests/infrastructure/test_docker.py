@@ -98,8 +98,9 @@ def test_run_command_success_streams_and_returns_code(
     mock_container.wait.return_value = {"StatusCode": 0}
 
     service = DockerService()
+    command_str = "pytest && echo 'done'"
     command_generator = service.run_command_in_container(
-        image="my-image", command="pytest", workdir=tmp_path, env={"CI": "true"}
+        image="my-image", command=command_str, workdir=tmp_path, env={"CI": "true"}
     )
 
     assert isinstance(command_generator, Generator)
@@ -118,7 +119,7 @@ def test_run_command_success_streams_and_returns_code(
 
     mock_docker_client.containers.run.assert_called_once_with(
         image="my-image",
-        command="pytest",
+        command=["/bin/sh", "-c", command_str],
         volumes={str(tmp_path): {"bind": "/app", "mode": "rw"}},
         working_dir="/app",
         environment={"CI": "true"},
