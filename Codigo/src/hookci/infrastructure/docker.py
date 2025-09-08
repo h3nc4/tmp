@@ -24,6 +24,7 @@ import docker
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.containers import Container
 
+from hookci.infrastructure import constants
 from hookci.infrastructure.errors import DockerError
 from hookci.log import get_logger
 
@@ -75,8 +76,13 @@ class DockerService(IDockerService):
             container = self.client.containers.run(
                 image=image,
                 command=["/bin/sh", "-c", command],
-                volumes={str(workdir): {"bind": "/app", "mode": "rw"}},
-                working_dir="/app",
+                volumes={
+                    str(workdir): {
+                        "bind": constants.CONTAINER_WORKDIR,
+                        "mode": "rw",
+                    }
+                },
+                working_dir=constants.CONTAINER_WORKDIR,
                 environment=env or {},
                 detach=True,
             )

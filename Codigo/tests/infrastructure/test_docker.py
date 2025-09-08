@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from docker.errors import BuildError, DockerException, ImageNotFound
 
+from hookci.infrastructure import constants
 from hookci.infrastructure.docker import DockerService
 from hookci.infrastructure.errors import DockerError
 
@@ -120,8 +121,8 @@ def test_run_command_success_streams_and_returns_code(
     mock_docker_client.containers.run.assert_called_once_with(
         image="my-image",
         command=["/bin/sh", "-c", command_str],
-        volumes={str(tmp_path): {"bind": "/app", "mode": "rw"}},
-        working_dir="/app",
+        volumes={str(tmp_path): {"bind": constants.CONTAINER_WORKDIR, "mode": "rw"}},
+        working_dir=constants.CONTAINER_WORKDIR,
         environment={"CI": "true"},
         detach=True,
     )
