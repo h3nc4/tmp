@@ -34,7 +34,7 @@ RUN chmod 0644 /opt/plantuml.jar && \
     gpg --verify /opt/plantuml.jar.asc /opt/plantuml.jar
 
 ################################## RUNTIME IMAGE
-FROM python:${PYTHON_VERSION} AS base
+FROM python:${PYTHON_VERSION}-slim-trixie AS base
 
 ############### ENV VARS
 # APT

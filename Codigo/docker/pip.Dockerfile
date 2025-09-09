@@ -18,7 +18,7 @@
 ARG PYTHON_VERSION=3.13
 
 ###################################################### RUNTIME IMAGE
-FROM python:${PYTHON_VERSION} AS base
+FROM python:${PYTHON_VERSION}-slim-trixie AS base
 
 ########################### ENV VARS
 # Python
