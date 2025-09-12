@@ -17,9 +17,10 @@
 """
 Application services that orchestrate use cases.
 """
+import re
 from pathlib import Path
 from textwrap import dedent
-from typing import Generator, Literal
+from typing import Generator, Literal, Optional
 
 from pydantic import ValidationError
 
@@ -57,7 +58,7 @@ class ProjectInitializationService:
         #!/usr/bin/env sh
         # HookCI pre-commit hook
 
-        hookci run --hook-type pre-commit
+        exec hookci run --hook-type pre-commit
         """
     )
 
@@ -66,7 +67,7 @@ class ProjectInitializationService:
         #!/usr/bin/env sh
         # HookCI pre-push hook
 
-        hookci run --hook-type pre-push
+        exec hookci run --hook-type pre-push
         """
     )
 
@@ -84,7 +85,7 @@ class ProjectInitializationService:
         """
         Executes the project initialization logic.
         """
-        git_root = self._git_service.find_git_root()
+        git_root = self._git_service.git_root
         base_dir = git_root / constants.BASE_DIR_NAME
         hooks_dir = base_dir / self._HOOKS_DIR_NAME
         config_path = base_dir / constants.CONFIG_FILENAME
@@ -131,14 +132,16 @@ class CiExecutionService:
         self._git_service = git_service
         self._config_handler = config_handler
         self._docker_service = docker_service
-        self.git_root = self._git_service.find_git_root()
 
-    def run(self) -> Generator[PipelineEvent, None, None]:
+    def run(self, hook_type: Optional[str]) -> Generator[PipelineEvent, None, None]:
         """
         Executes the main CI pipeline, yielding events for real-time feedback.
         """
         config = self._load_and_validate_configuration()
         setup_logging(config.log_level)
+
+        if not self._should_run(hook_type, config):
+            return
 
         yield PipelineStart(total_steps=len(config.steps))
 
@@ -147,7 +150,7 @@ class CiExecutionService:
             yield PipelineEnd(status="FAILURE")
             return
 
-        final_status: Literal["SUCCESS", "FAILURE"] = "SUCCESS"
+        final_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
         for step in config.steps:
             yield StepStart(step=step)
 
@@ -155,7 +158,7 @@ class CiExecutionService:
             command_gen = self._docker_service.run_command_in_container(
                 image=docker_image,
                 command=step.command,
-                workdir=self.git_root,
+                workdir=self._git_service.git_root,
                 env=step.env,
             )
 
@@ -164,7 +167,6 @@ class CiExecutionService:
                     log_line = next(command_gen)
                     yield LogLine(line=log_line)
             except StopIteration as e:
-                # The return value of the generator is in the exception's `value` attribute
                 exit_code = e.value
 
             if exit_code == 0:
@@ -175,9 +177,36 @@ class CiExecutionService:
                     final_status = "FAILURE"
                     break
                 else:
+                    final_status = "WARNING"
                     yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
 
         yield PipelineEnd(status=final_status)
+
+    def _should_run(self, hook_type: Optional[str], config: Configuration) -> bool:
+        """Determines if the pipeline should run based on context and config."""
+        if not hook_type:
+            logger.debug("Manual run triggered. Skipping checks.")
+            return True
+
+        if hook_type == "pre-commit" and not config.hooks.pre_commit:
+            logger.info("Skipping: pre-commit hook is disabled in the configuration.")
+            return False
+
+        if hook_type == "pre-push" and not config.hooks.pre_push:
+            logger.info("Skipping: pre-push hook is disabled in the configuration.")
+            return False
+
+        if config.filters and config.filters.branches:
+            current_branch = self._git_service.get_current_branch()
+            if not re.match(config.filters.branches, current_branch):
+                logger.info(
+                    f"Skipping: current branch '{current_branch}' does not match "
+                    f"filter '{config.filters.branches}'."
+                )
+                return False
+
+        logger.debug(f"Checks passed for '{hook_type}' hook. Proceeding with run.")
+        return True
 
     def _prepare_docker_image(
         self, config: Configuration
@@ -187,8 +216,9 @@ class CiExecutionService:
         Yields build events and returns the final image name or None on failure.
         """
         if config.docker.dockerfile:
-            tag = f"hookci-project:{self.git_root.name}"
-            dockerfile_path = self.git_root / config.docker.dockerfile
+            git_root = self._git_service.git_root
+            tag = f"hookci-project:{git_root.name}"
+            dockerfile_path = git_root / config.docker.dockerfile
             yield ImageBuildStart(dockerfile_path=str(dockerfile_path), tag=tag)
             try:
                 build_generator = self._docker_service.build_image(dockerfile_path, tag)
@@ -202,7 +232,6 @@ class CiExecutionService:
                 yield ImageBuildEnd(status="FAILURE")
                 return None
 
-        # We can be sure image is not None due to Pydantic validation
         return config.docker.image
 
     def _load_and_validate_configuration(self) -> Configuration:
@@ -210,7 +239,9 @@ class CiExecutionService:
         Locates, loads, and validates the HookCI configuration file.
         """
         config_path = (
-            self.git_root / constants.BASE_DIR_NAME / constants.CONFIG_FILENAME
+            self._git_service.git_root
+            / constants.BASE_DIR_NAME
+            / constants.CONFIG_FILENAME
         )
         config_data = self._config_handler.load_config_data(config_path)
         try:

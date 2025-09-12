@@ -61,27 +61,22 @@ def test_local_fs_make_executable(tmp_path: Path) -> None:
     file_path = tmp_path / "script.sh"
     file_path.touch()
 
-    # Ensure it's not initially executable
     assert not os.access(file_path, os.X_OK)
-
     fs.make_executable(file_path)
-
-    # Check if the executable bit is set
     assert file_path.stat().st_mode & stat.S_IEXEC
 
 
 @patch("subprocess.run")
-def test_find_git_root_success(mock_subprocess_run: Mock) -> None:
+def test_git_root_property_success(mock_subprocess_run: Mock) -> None:
     """
-    Verify that find_git_root correctly parses the output of a successful git command.
+    Verify that the git_root property correctly parses the output.
     """
     expected_path = "/path/to/git/root"
     mock_subprocess_run.return_value = subprocess.CompletedProcess(
         args=[], returncode=0, stdout=f"{expected_path}\n", stderr=""
     )
-
     service = GitService()
-    found_root = service.find_git_root()
+    found_root = service.git_root
 
     assert found_root == Path(expected_path)
     mock_subprocess_run.assert_called_once_with(
@@ -93,29 +88,42 @@ def test_find_git_root_success(mock_subprocess_run: Mock) -> None:
 
 
 @patch("subprocess.run")
-def test_find_git_root_not_in_repo(mock_subprocess_run: Mock) -> None:
+def test_git_root_property_caches_value(mock_subprocess_run: Mock) -> None:
+    """
+    Verify that the git_root property caches the result after the first call.
+    """
+    expected_path = "/path/to/git/root"
+    mock_subprocess_run.return_value = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=f"{expected_path}\n", stderr=""
+    )
+    service = GitService()
+    root1 = service.git_root
+    root2 = service.git_root
+
+    assert root1 == Path(expected_path)
+    assert root2 == Path(expected_path)
+    mock_subprocess_run.assert_called_once()
+
+
+@patch("subprocess.run")
+def test_git_root_property_not_in_repo(mock_subprocess_run: Mock) -> None:
     """
     Verify NotInGitRepositoryError is raised when the git command fails.
     """
     mock_subprocess_run.side_effect = subprocess.CalledProcessError(
         returncode=128, cmd="git", stderr="fatal: not a git repository"
     )
-
     service = GitService()
     with pytest.raises(NotInGitRepositoryError):
-        service.find_git_root()
+        _ = service.git_root
 
 
 @patch("subprocess.run")
-@patch("hookci.infrastructure.fs.GitService.find_git_root")
-def test_set_hooks_path_success(
-    mock_find_root: Mock, mock_subprocess: Mock, tmp_path: Path
-) -> None:
+def test_set_hooks_path_success(mock_subprocess: Mock, tmp_path: Path) -> None:
     """Verify the correct git config command is executed on success."""
-    mock_find_root.return_value = tmp_path
     service = GitService()
+    service.git_root = tmp_path
     hooks_dir = tmp_path / ".hookci" / "hooks"
-
     service.set_hooks_path(hooks_dir)
 
     mock_subprocess.assert_called_once_with(
@@ -128,17 +136,35 @@ def test_set_hooks_path_success(
 
 
 @patch("subprocess.run")
-@patch("hookci.infrastructure.fs.GitService.find_git_root")
-def test_set_hooks_path_failure(
-    mock_find_root: Mock, mock_subprocess: Mock, tmp_path: Path
-) -> None:
+def test_set_hooks_path_failure(mock_subprocess: Mock, tmp_path: Path) -> None:
     """Verify GitCommandError is raised when the git command fails."""
-    mock_find_root.return_value = tmp_path
+    service = GitService()
+    service.git_root = tmp_path
     mock_subprocess.side_effect = subprocess.CalledProcessError(
         returncode=1, cmd="git", stderr="fatal: error"
     )
-    service = GitService()
     hooks_dir = tmp_path / ".hookci" / "hooks"
 
-    with pytest.raises(GitCommandError, match="Failed to set git hooks path"):
+    # Match the new, more specific error message
+    with pytest.raises(GitCommandError, match="Git command 'config .*' failed"):
         service.set_hooks_path(hooks_dir)
+
+
+@patch("subprocess.run")
+def test_get_current_branch(mock_subprocess: Mock, tmp_path: Path) -> None:
+    """Verify get_current_branch returns the correct branch name."""
+    service = GitService()
+    service.git_root = tmp_path
+    mock_subprocess.return_value = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="feature/login\n", stderr=""
+    )
+    branch = service.get_current_branch()
+
+    assert branch == "feature/login"
+    mock_subprocess.assert_called_once_with(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )

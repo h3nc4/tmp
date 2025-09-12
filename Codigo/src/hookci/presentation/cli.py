@@ -18,7 +18,8 @@
 This module defines the presentation layer of HookCI,
 handling all command-line interface interactions.
 """
-from typing import Dict, List
+from itertools import chain
+from typing import Dict, List, Optional
 
 import typer
 from rich.console import Console, Group
@@ -96,31 +97,50 @@ def init() -> None:
 
 
 @app.command()
-def run() -> None:
-    """
-    Manually runs the CI pipeline.
-    """
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
+def run(
+    hook_type: Optional[str] = typer.Option(
+        None,
+        "--hook-type",
+        help="The type of git hook triggering the run (e.g., 'pre-commit').",
+        hidden=True,
     )
-    overall_task = progress.add_task("[bold]Pipeline", total=1)
-    step_tasks: Dict[str, TaskID] = {}
-    output_panel = Panel("", border_style="dim", title="Output")
-    layout = Group(progress, output_panel)
-
+) -> None:
+    """
+    Manually runs the CI pipeline based on the configuration file.
+    """
     try:
+        service = container.ci_execution_service
+        event_generator = service.run(hook_type=hook_type)
+
+        try:
+            first_event = next(event_generator)
+        except StopIteration:
+            logger.info("Pipeline run was skipped based on configuration filters.")
+            return
+
+        # If we get here, the pipeline is running. Set up the UI.
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+        )
+        overall_task = progress.add_task("[bold]Pipeline", total=1)
+        step_tasks: Dict[str, TaskID] = {}
+        output_panel = Panel("", border_style="dim", title="Output")
+        layout = Group(progress, output_panel)
+
         with Live(layout, console=console, screen=False, redirect_stderr=False) as live:
-            service = container.ci_execution_service
             final_status = "FAILURE"
             command_text: Text | None = None
             log_lines: List[str] = []
 
-            for event in service.run():
+            # Chain the first event back with the rest of the generator
+            all_events = chain([first_event], event_generator)
+
+            for event in all_events:
                 if isinstance(event, PipelineStart):
                     progress.update(overall_task, total=event.total_steps)
 
@@ -135,7 +155,6 @@ def run() -> None:
 
                 elif isinstance(event, LogLine):
                     log_lines.append(event.line)
-                    # Limit output to a reasonable number of lines to avoid flicker
                     if len(log_lines) > console.height:
                         log_lines.pop(0)
                     log_syntax = Syntax(
@@ -157,7 +176,7 @@ def run() -> None:
                             description = f"[green]✔[/] {description}"
                         elif event.status == "FAILURE":
                             description = f"[red]✖[/] {description}"
-                        else:
+                        else:  # WARNING
                             description = f"[yellow]⚠[/] {description}"
                         progress.update(
                             step_task_id, completed=1, description=description
@@ -171,15 +190,24 @@ def run() -> None:
                             overall_task,
                             description="[bold green]✅ Pipeline Finished[/]",
                         )
+                    elif final_status == "WARNING":
+                        progress.update(
+                            overall_task,
+                            description="[bold yellow]🔶 Pipeline Finished with Warnings[/]",
+                        )
                     else:
                         progress.update(
                             overall_task, description="[bold red]❌ Pipeline Failed[/]"
                         )
-                    live.stop()  # Stop live updates before final print
+                    live.stop()
 
             if final_status == "SUCCESS":
                 console.print(
                     "[bold green]✅ Pipeline finished successfully![/bold green]"
+                )
+            elif final_status == "WARNING":
+                console.print(
+                    "[bold yellow]🔶 Pipeline finished with non-critical failures.[/bold yellow]"
                 )
             else:
                 console.print("[bold red]❌ Pipeline failed.[/bold red]")

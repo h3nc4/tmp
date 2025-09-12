@@ -19,6 +19,7 @@ Filesystem and Git interaction services.
 """
 import stat
 import subprocess
+from functools import cached_property
 from pathlib import Path
 from typing import Protocol
 
@@ -38,8 +39,10 @@ class IFileSystem(Protocol):
 class IGitService(Protocol):
     """Interface for Git-related operations."""
 
-    def find_git_root(self) -> Path: ...
+    @property
+    def git_root(self) -> Path: ...
     def set_hooks_path(self, hooks_path: Path) -> None: ...
+    def get_current_branch(self) -> str: ...
 
 
 class LocalFileSystem(IFileSystem):
@@ -66,9 +69,11 @@ class LocalFileSystem(IFileSystem):
 class GitService(IGitService):
     """Service for interacting with Git repositories."""
 
-    def find_git_root(self) -> Path:
+    @cached_property
+    def git_root(self) -> Path:
         """
-        Finds the root directory of the Git repository using `git rev-parse`.
+        Finds and caches the root directory of the Git repository.
+        This command can run from anywhere inside the repo, so no cwd is needed.
         """
         try:
             process = subprocess.run(
@@ -79,21 +84,29 @@ class GitService(IGitService):
             )
             return Path(process.stdout.strip())
         except subprocess.CalledProcessError as e:
-            # git rev-parse returns a non-zero exit code when not in a git repo.
             raise NotInGitRepositoryError("Not inside a Git repository.") from e
 
-    def set_hooks_path(self, hooks_path: Path) -> None:
-        """Sets the git `core.hooksPath` configuration for the repository."""
+    def _run_git_command(self, *args: str) -> str:
+        """Helper to run a git command from the git root and return its stdout."""
         try:
-            git_root = self.find_git_root()
-            relative_hooks_path = hooks_path.relative_to(git_root)
-
-            subprocess.run(
-                ["git", "config", "core.hooksPath", str(relative_hooks_path)],
+            process = subprocess.run(
+                ["git", *args],
                 check=True,
                 capture_output=True,
                 text=True,
-                cwd=git_root,
+                cwd=self.git_root,  # Now uses the cached property, preventing recursion.
             )
+            return process.stdout.strip()
         except subprocess.CalledProcessError as e:
-            raise GitCommandError(f"Failed to set git hooks path: {e.stderr}") from e
+            raise GitCommandError(
+                f"Git command '{' '.join(args)}' failed: {e.stderr.strip()}"
+            ) from e
+
+    def set_hooks_path(self, hooks_path: Path) -> None:
+        """Sets the git `core.hooksPath` configuration for the repository."""
+        relative_hooks_path = hooks_path.relative_to(self.git_root)
+        self._run_git_command("config", "core.hooksPath", str(relative_hooks_path))
+
+    def get_current_branch(self) -> str:
+        """Gets the current active branch name."""
+        return self._run_git_command("rev-parse", "--abbrev-ref", "HEAD")

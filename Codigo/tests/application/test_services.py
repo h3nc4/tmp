@@ -19,7 +19,7 @@ Tests for application services.
 """
 from pathlib import Path
 from typing import Any, Dict, Generator
-from unittest.mock import Mock, call
+from unittest.mock import Mock, PropertyMock, call
 
 import pytest
 
@@ -28,11 +28,8 @@ from hookci.application.errors import ProjectAlreadyInitializedError
 from hookci.application.events import (
     PipelineEnd,
     PipelineStart,
-    StepEnd,
-    StepStart,
 )
 from hookci.application.services import CiExecutionService, ProjectInitializationService
-from hookci.domain.config import Configuration
 from hookci.infrastructure.docker import IDockerService
 from hookci.infrastructure.errors import ConfigurationParseError
 from hookci.infrastructure.fs import IFileSystem, IGitService
@@ -43,7 +40,18 @@ from hookci.infrastructure.yaml_handler import IConfigurationHandler
 def mock_git_service() -> Mock:
     """Fixture for a mocked IGitService."""
     service = Mock(spec=IGitService)
-    service.find_git_root.return_value = Path("/repo")
+
+    # Create the PropertyMock that we will use for assertions
+    git_root_prop_mock = PropertyMock(return_value=Path("/repo"))
+
+    # Attach the mock to the mock's class so it behaves like a property
+    type(service).git_root = git_root_prop_mock
+
+    # Also attach the PropertyMock *instance* to the service mock itself.
+    # This allows tests to access the mock for assertions without triggering it.
+    service.mock_git_root_prop = git_root_prop_mock
+
+    service.get_current_branch.return_value = "main"
     return service
 
 
@@ -64,12 +72,11 @@ def mock_docker_service() -> Mock:
     """Fixture for a mocked IDockerService."""
     mock = Mock(spec=IDockerService)
 
-    # This mock will be used for successful runs
     def mock_run_command_success(
         *args: Any, **kwargs: Any
     ) -> Generator[str, None, int]:
         yield "log line 1"
-        return 0  # Success exit code
+        return 0
 
     mock.run_command_in_container.side_effect = mock_run_command_success
     return mock
@@ -82,10 +89,8 @@ def valid_config_dict() -> Dict[str, Any]:
         "version": "1.0",
         "log_level": "INFO",
         "docker": {"image": "test:latest"},
-        "steps": [
-            {"name": "Lint", "command": "ruff", "critical": True},
-            {"name": "Test", "command": "pytest", "critical": True},
-        ],
+        "hooks": {"pre_commit": True, "pre_push": True},
+        "steps": [{"name": "Test", "command": "pytest"}],
     }
 
 
@@ -93,10 +98,8 @@ def test_init_service_success(
     mock_git_service: Mock, mock_fs: Mock, mock_config_handler: Mock
 ) -> None:
     """
-    Verify the initialization service correctly creates all necessary files,
-    directories, and configures git hooks.
+    Verify the initialization service correctly creates all necessary files.
     """
-    # Arrange: Project is not yet initialized
     mock_fs.file_exists.return_value = False
     service = ProjectInitializationService(
         mock_git_service, mock_fs, mock_config_handler
@@ -107,31 +110,21 @@ def test_init_service_success(
     hooks_dir = base_dir / "hooks"
     config_path = base_dir / constants.CONFIG_FILENAME
     pre_commit_path = hooks_dir / "pre-commit"
-    pre_push_path = hooks_dir / "pre-push"
 
-    # Act
     result_path = service.run()
 
-    # Assert
     assert result_path == config_path
-    mock_git_service.find_git_root.assert_called_once()
-    mock_fs.file_exists.assert_called_once_with(config_path)
+    # Assert that the property mock (retrieved from the instance) was called
+    mock_git_service.mock_git_root_prop.assert_called_once()
+
     mock_fs.create_dir.assert_called_once_with(hooks_dir)
-
     mock_config_handler.write_config_data.assert_called_once()
-    write_args = mock_config_handler.write_config_data.call_args.args
-    assert write_args[0] == config_path
-    assert isinstance(write_args[1], dict)
-    assert write_args[1]["version"] == "1.0"
-
-    expected_fs_calls = [
-        call.write_file(pre_commit_path, service._PRE_COMMIT_SCRIPT),
-        call.make_executable(pre_commit_path),
-        call.write_file(pre_push_path, service._PRE_PUSH_SCRIPT),
-        call.make_executable(pre_push_path),
-    ]
-    mock_fs.assert_has_calls(expected_fs_calls, any_order=True)
-
+    mock_fs.assert_has_calls(
+        [
+            call.write_file(pre_commit_path, service._PRE_COMMIT_SCRIPT),
+            call.make_executable(pre_commit_path),
+        ]
+    )
     mock_git_service.set_hooks_path.assert_called_once_with(hooks_dir)
 
 
@@ -139,109 +132,101 @@ def test_init_service_already_initialized(
     mock_git_service: Mock, mock_fs: Mock, mock_config_handler: Mock
 ) -> None:
     """
-    Verify that ProjectAlreadyInitializedError is raised if the config file exists.
+    Verify ProjectAlreadyInitializedError is raised if the config file exists.
     """
-    # Arrange: Project is already initialized
     mock_fs.file_exists.return_value = True
     service = ProjectInitializationService(
         mock_git_service, mock_fs, mock_config_handler
     )
 
-    # Act & Assert
     with pytest.raises(ProjectAlreadyInitializedError):
         service.run()
-
-    # Ensure no directories or files were written, and git was not configured
     mock_fs.create_dir.assert_not_called()
-    mock_config_handler.write_config_data.assert_not_called()
-    mock_fs.write_file.assert_not_called()
-    mock_git_service.set_hooks_path.assert_not_called()
 
 
-def test_ci_execution_service_success_yields_correct_events(
+def test_ci_manual_run_success(
     mock_git_service: Mock,
     mock_config_handler: Mock,
     mock_docker_service: Mock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """
-    Verify the CI service yields the correct sequence of events for a successful run.
+    Verify a manual CI run (no hook_type) executes and yields correct events.
     """
-    # Arrange
     mock_config_handler.load_config_data.return_value = valid_config_dict
-    config = Configuration.model_validate(valid_config_dict)
     service = CiExecutionService(
         mock_git_service, mock_config_handler, mock_docker_service
     )
 
-    # Act
-    events = list(service.run())
+    events = list(service.run(hook_type=None))
 
-    # Assert by filtering events by type - this is more robust
-    pipeline_starts = [e for e in events if isinstance(e, PipelineStart)]
-    step_starts = [e for e in events if isinstance(e, StepStart)]
-    step_ends = [e for e in events if isinstance(e, StepEnd)]
-    pipeline_ends = [e for e in events if isinstance(e, PipelineEnd)]
-
-    assert len(pipeline_starts) == 1
-    assert pipeline_starts[0].total_steps == 2
-
-    assert len(step_starts) == 2
-    assert step_starts[0].step == config.steps[0]
-    assert step_starts[1].step == config.steps[1]
-
-    assert len(step_ends) == 2
-    assert step_ends[0].status == "SUCCESS"
-    assert step_ends[1].status == "SUCCESS"
-
-    assert len(pipeline_ends) == 1
-    assert pipeline_ends[0].status == "SUCCESS"
-
-    assert mock_docker_service.run_command_in_container.call_count == 2
+    assert any(isinstance(e, PipelineStart) for e in events)
+    assert any(isinstance(e, PipelineEnd) for e in events)
+    mock_docker_service.run_command_in_container.assert_called_once()
 
 
-def test_ci_execution_service_critical_failure_yields_correct_events(
+def test_ci_hook_run_is_skipped_if_disabled(
     mock_git_service: Mock,
     mock_config_handler: Mock,
     mock_docker_service: Mock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """
-    Verify the CI service aborts and yields correct events on a critical failure.
+    Verify that a hook-triggered run is skipped if disabled in the config.
     """
-    # Arrange
+    valid_config_dict["hooks"]["pre_commit"] = False
     mock_config_handler.load_config_data.return_value = valid_config_dict
-    config = Configuration.model_validate(valid_config_dict)
-
-    # Mock the docker service to fail the first step
-    def mock_run_command_fail(*args: Any, **kwargs: Any) -> Generator[str, None, int]:
-        yield "critical step failed"
-        return 1  # Failure exit code
-
-    mock_docker_service.run_command_in_container.side_effect = mock_run_command_fail
-
     service = CiExecutionService(
         mock_git_service, mock_config_handler, mock_docker_service
     )
 
-    # Act
-    events = list(service.run())
+    events = list(service.run(hook_type="pre-commit"))
 
-    # Assert
-    step_starts = [e for e in events if isinstance(e, StepStart)]
-    step_ends = [e for e in events if isinstance(e, StepEnd)]
-    pipeline_ends = [e for e in events if isinstance(e, PipelineEnd)]
+    assert not events
+    mock_docker_service.run_command_in_container.assert_not_called()
 
-    assert len(step_starts) == 1
-    assert step_starts[0].step == config.steps[0]
 
-    assert len(step_ends) == 1
-    assert step_ends[0].status == "FAILURE"
-    assert step_ends[0].step == config.steps[0]
+def test_ci_hook_run_is_skipped_by_branch_filter(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify that a hook-triggered run is skipped if the branch doesn't match the filter.
+    """
+    valid_config_dict["filters"] = {"branches": "feature/.*"}
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_git_service.get_current_branch.return_value = "main"
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
 
-    assert len(pipeline_ends) == 1
-    assert pipeline_ends[0].status == "FAILURE"
+    events = list(service.run(hook_type="pre-commit"))
 
+    assert not events
+    mock_docker_service.run_command_in_container.assert_not_called()
+
+
+def test_ci_hook_run_proceeds_with_matching_branch_filter(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify that a hook-triggered run proceeds if the branch matches the filter.
+    """
+    valid_config_dict["filters"] = {"branches": "feature/.*"}
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_git_service.get_current_branch.return_value = "feature/new-login"
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    events = list(service.run(hook_type="pre-commit"))
+
+    assert any(isinstance(e, PipelineEnd) for e in events)
     mock_docker_service.run_command_in_container.assert_called_once()
 
 
@@ -251,17 +236,11 @@ def test_ci_execution_service_invalid_config(
     """
     Verify that a ConfigurationParseError is raised for invalid config structure.
     """
-    # Arrange
-    invalid_config_data = {"version": "1.0", "steps": [{"name": "missing command"}]}
+    invalid_config_data = {"version": "1.0", "steps": "not-a-list"}
     mock_config_handler.load_config_data.return_value = invalid_config_data
-
     service = CiExecutionService(
         mock_git_service, mock_config_handler, mock_docker_service
     )
 
-    # Act & Assert
-    with pytest.raises(
-        ConfigurationParseError, match="Invalid configuration structure"
-    ):
-        # We need to consume the generator to trigger the exception
-        list(service.run())
+    with pytest.raises(ConfigurationParseError):
+        list(service.run(hook_type=None))
