@@ -133,7 +133,7 @@ def test_run_failure(mock_ci_service: Mock) -> None:
 
     mock_ci_service.run.return_value = event_generator()
 
-    result = runner.invoke(app, ["run"])
+    result = runner.invoke(app, ["run"], env={"TERM": "dumb"})
 
     assert result.exit_code == 1
     assert "Pipeline failed." in result.stdout

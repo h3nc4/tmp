@@ -72,15 +72,20 @@ class PipelineUI:
 
     def __init__(self, console: Console):
         self.console = console
-        self.progress = Progress(
-            SpinnerColumn(),
+        self.overall_progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
         )
-        self.overall_task = self.progress.add_task("[bold]Pipeline", total=1)
+        self.steps_progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=self.console,
+        )
+        self.overall_task = self.overall_progress.add_task("[bold]Pipeline", total=1)
         self.step_tasks: Dict[str, TaskID] = {}
         self.log_level: LogLevel = LogLevel.INFO
 
@@ -92,7 +97,7 @@ class PipelineUI:
 
     def _get_display_group(self) -> Group:
         """Constructs the renderable group based on the current UI state."""
-        items: List[Panel | Progress] = [self.progress]
+        items: List[Panel | Progress] = [self.overall_progress, self.steps_progress]
         if self.active_info_panel:
             items.append(self.active_info_panel)
         items.extend(self.debug_panels.values())
@@ -103,10 +108,10 @@ class PipelineUI:
         """Updates the UI based on a pipeline event."""
         if isinstance(event, PipelineStart):
             self.log_level = event.log_level
-            self.progress.update(self.overall_task, total=event.total_steps)
+            self.overall_progress.update(self.overall_task, total=event.total_steps)
 
         elif isinstance(event, StepStart):
-            task_id = self.progress.add_task(f"  - {event.step.name}", total=1)
+            task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
             self.step_tasks[event.step.name] = task_id
             if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
                 self._create_panel_for_step(event)
@@ -166,14 +171,23 @@ class PipelineUI:
                 description = f"[red]✖[/] {description}"
             else:  # WARNING
                 description = f"[yellow]⚠[/] {description}"
-            self.progress.update(task_id, completed=1, description=description)
+            self.steps_progress.update(task_id, completed=1, description=description)
 
-        self.progress.update(self.overall_task, advance=1)
+        if event.status == "SUCCESS":
+            self.overall_progress.update(self.overall_task, advance=1)
 
+        # Clear active info panel for INFO level
         if self.log_level == LogLevel.INFO:
             self.active_info_panel = None
 
-        if self.log_level == LogLevel.ERROR and event.status == "FAILURE":
+        # For failures, remove any existing debug panel and create a dedicated error panel
+        if event.status == "FAILURE":
+            if (
+                self.log_level == LogLevel.DEBUG
+                and event.step.name in self.debug_panels
+            ):
+                del self.debug_panels[event.step.name]
+
             log_content = "".join(log.line for log in self.all_logs[event.step.name])
             command_text = Text.from_markup(
                 f"[bold]Command:[/] [cyan]{event.step.command}[/]\n"
@@ -197,18 +211,9 @@ class PipelineUI:
         elif event.status == "WARNING":
             description = "[bold yellow]🔶 Pipeline Finished with Warnings[/]"
 
-        # Explicitly mark the overall task as complete to remove the spinner
-        overall_task_details = self.progress.tasks[self.overall_task]
-        if overall_task_details.total is not None:
-            self.progress.update(
-                self.overall_task,
-                description=description,
-                completed=overall_task_details.total,
-            )
-        else:  # Fallback for an indeterminate task
-            self.progress.update(
-                self.overall_task, description=description, completed=1
-            )
+        # Update the overall task description without forcing completion to 100%.
+        # The 'completed' count now accurately reflects successful steps.
+        self.overall_progress.update(self.overall_task, description=description)
 
 
 def _handle_error(e: Exception) -> None:
