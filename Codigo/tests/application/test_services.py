@@ -18,7 +18,7 @@
 Tests for application services.
 """
 from pathlib import Path
-from typing import Any, Dict, Generator
+from typing import Any, Dict, Generator, Tuple
 from unittest.mock import Mock, PropertyMock, call
 
 import pytest
@@ -26,11 +26,14 @@ import pytest
 from hookci.application import constants
 from hookci.application.errors import ProjectAlreadyInitializedError
 from hookci.application.events import (
+    LogLine,
     PipelineEnd,
     PipelineStart,
+    StepStart,
 )
 from hookci.application.services import CiExecutionService, ProjectInitializationService
-from hookci.infrastructure.docker import IDockerService
+from hookci.domain.config import LogLevel
+from hookci.infrastructure.docker import IDockerService, LogStream
 from hookci.infrastructure.errors import ConfigurationParseError
 from hookci.infrastructure.fs import IFileSystem, IGitService
 from hookci.infrastructure.yaml_handler import IConfigurationHandler
@@ -74,8 +77,8 @@ def mock_docker_service() -> Mock:
 
     def mock_run_command_success(
         *args: Any, **kwargs: Any
-    ) -> Generator[str, None, int]:
-        yield "log line 1"
+    ) -> Generator[Tuple[LogStream, str], None, int]:
+        yield "stdout", "log line 1"
         return 0
 
     mock.run_command_in_container.side_effect = mock_run_command_success
@@ -160,7 +163,14 @@ def test_ci_manual_run_success(
 
     events = list(service.run(hook_type=None))
 
-    assert any(isinstance(e, PipelineStart) for e in events)
+    pipeline_start_event = next(e for e in events if isinstance(e, PipelineStart))
+    assert pipeline_start_event.log_level == LogLevel.INFO
+
+    log_line_event = next(e for e in events if isinstance(e, LogLine))
+    assert log_line_event.stream == "stdout"
+    assert log_line_event.line == "log line 1"
+
+    assert any(isinstance(e, StepStart) for e in events)
     assert any(isinstance(e, PipelineEnd) for e in events)
     mock_docker_service.run_command_in_container.assert_called_once()
 

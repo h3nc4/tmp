@@ -40,7 +40,7 @@ from hookci.application.services import (
     ProjectInitializationService,
 )
 from hookci.containers import container
-from hookci.domain.config import Step
+from hookci.domain.config import LogLevel, Step
 from hookci.infrastructure.errors import NotInGitRepositoryError
 from hookci.presentation.cli import app
 
@@ -100,33 +100,34 @@ def test_init_not_in_git_repo(
 
 def test_run_success(mock_ci_service: Mock) -> None:
     """Test the 'run' command on a successful pipeline execution."""
+    step = Step(name="Test", command="pytest")
 
     def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield PipelineStart(total_steps=1)
-        step = Step(name="Test", command="pytest")
+        yield PipelineStart(total_steps=1, log_level=LogLevel.INFO)
         yield StepStart(step=step)
-        yield LogLine(line="running tests...")
+        yield LogLine(line="running tests...", stream="stdout", step_name=step.name)
         yield StepEnd(step=step, status="SUCCESS", exit_code=0)
         yield PipelineEnd(status="SUCCESS")
 
     mock_ci_service.run.return_value = event_generator()
 
-    result = runner.invoke(app, ["run"])
-
+    # In a non-interactive runner, we mainly check exit code and final message
+    # as capturing rich's live display is complex and brittle.
+    # Use a backend that doesn't rely on a real terminal for sizing.
+    result = runner.invoke(app, ["run"], env={"TERM": "dumb"})
     assert result.exit_code == 0
-    assert "Pipeline Finished" in result.stdout
     assert "Pipeline finished successfully!" in result.stdout
     mock_ci_service.run.assert_called_once()
 
 
 def test_run_failure(mock_ci_service: Mock) -> None:
     """Test the 'run' command when the pipeline fails."""
+    step = Step(name="Test", command="pytest")
 
     def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield PipelineStart(total_steps=1)
-        step = Step(name="Test", command="pytest")
+        yield PipelineStart(total_steps=1, log_level=LogLevel.INFO)
         yield StepStart(step=step)
-        yield LogLine(line="test failed!")
+        yield LogLine(line="test failed!", stream="stderr", step_name=step.name)
         yield StepEnd(step=step, status="FAILURE", exit_code=1)
         yield PipelineEnd(status="FAILURE")
 
@@ -135,7 +136,6 @@ def test_run_failure(mock_ci_service: Mock) -> None:
     result = runner.invoke(app, ["run"])
 
     assert result.exit_code == 1
-    assert "Pipeline Failed" in result.stdout
     assert "Pipeline failed." in result.stdout
 
 

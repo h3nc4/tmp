@@ -21,15 +21,17 @@ from typing import Literal, Union
 
 from pydantic import BaseModel
 
-from hookci.domain.config import Step
+from hookci.domain.config import LogLevel, Step
 
 EventStatus = Literal["SUCCESS", "FAILURE", "WARNING"]
+LogStream = Literal["stdout", "stderr"]
 
 
 class PipelineStart(BaseModel):
     """Event indicating the pipeline has started."""
 
     total_steps: int
+    log_level: LogLevel
 
 
 class ImageBuildStart(BaseModel):
@@ -43,6 +45,8 @@ class LogLine(BaseModel):
     """Event representing a single log line from a build or execution process."""
 
     line: str
+    stream: LogStream
+    step_name: str
 
 
 class ImageBuildEnd(BaseModel):

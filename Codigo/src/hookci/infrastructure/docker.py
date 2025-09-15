@@ -17,8 +17,9 @@
 """
 Docker interaction services.
 """
+import struct
 from pathlib import Path
-from typing import Dict, Generator, Optional, Protocol
+from typing import Dict, Generator, Literal, Optional, Protocol, Tuple
 
 import docker
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
@@ -30,6 +31,8 @@ from hookci.log import get_logger
 
 logger = get_logger(__name__)
 
+LogStream = Literal["stdout", "stderr"]
+
 
 class IDockerService(Protocol):
     """Interface for Docker operations."""
@@ -40,7 +43,7 @@ class IDockerService(Protocol):
         command: str,
         workdir: Path,
         env: Optional[Dict[str, str]] = None,
-    ) -> Generator[str, None, int]: ...
+    ) -> Generator[Tuple[LogStream, str], None, int]: ...
 
     def build_image(
         self, dockerfile_path: Path, tag: str
@@ -59,15 +62,62 @@ class DockerService(IDockerService):
                 "Could not connect to the Docker daemon. Is it running?"
             ) from e
 
+    def _demultiplex_docker_stream(
+        self, stream_generator: Generator[bytes, None, None]
+    ) -> Generator[Tuple[LogStream, str], None, None]:
+        """
+        Parses a raw Docker log stream, demultiplexing stdout and stderr.
+        This handles streams that may chunk data arbitrarily.
+        """
+        buffer = b""
+        while True:
+            try:
+                # Read from the generator until it's exhausted
+                chunk = next(stream_generator)
+                buffer += chunk
+            except StopIteration:
+                # If there's anything left in the buffer, it's likely an incomplete message.
+                # Treat it as stdout as a fallback.
+                if buffer:
+                    yield "stdout", buffer.decode("utf-8", errors="ignore")
+                break  # Exit the main loop
+
+            # Process as many complete frames as we have in the buffer
+            while len(buffer) >= 8:
+                header = buffer[:8]
+                try:
+                    stream_type, length = struct.unpack(">BxxxL", header)
+                except struct.error:
+                    # This indicates a malformed stream. Treat the rest of the buffer as stdout.
+                    if buffer:
+                        yield "stdout", buffer.decode("utf-8", errors="ignore")
+                    buffer = b""  # Clear buffer to prevent reprocessing
+                    break  # Exit inner loop
+
+                # Check if the full message is in the buffer
+                if len(buffer) >= 8 + length:
+                    # Extract the message content
+                    content = buffer[8 : 8 + length]
+                    # Move the buffer past the message we just processed
+                    buffer = buffer[8 + length :]
+
+                    # Stream type 2 is stderr, everything else is stdout
+                    stream_name: LogStream = "stderr" if stream_type == 2 else "stdout"
+                    yield stream_name, content.decode("utf-8", errors="ignore")
+                else:
+                    # We don't have the full message yet, break the inner loop
+                    # and wait for more chunks from the stream_generator.
+                    break
+
     def run_command_in_container(
         self,
         image: str,
         command: str,
         workdir: Path,
         env: Optional[Dict[str, str]] = None,
-    ) -> Generator[str, None, int]:
+    ) -> Generator[Tuple[LogStream, str], None, int]:
         """
-        Runs a command in a new Docker container, yielding logs in real-time.
+        Runs a command in a new Docker container, yielding demultiplexed logs.
         Returns the final exit code.
         """
         container: Optional[Container] = None
@@ -87,8 +137,12 @@ class DockerService(IDockerService):
                 detach=True,
             )
 
-            for log_line in container.logs(stream=True, follow=True):
-                yield log_line.decode("utf-8", errors="ignore")
+            # Get the raw, multiplexed stream by removing the incorrect 'demux' argument.
+            # The default behavior for a non-TTY stream is the format we handle.
+            log_stream_generator = container.logs(
+                stream=True, follow=True, stdout=True, stderr=True
+            )
+            yield from self._demultiplex_docker_stream(log_stream_generator)
 
             result = container.wait()
             return int(result.get("StatusCode", 1))

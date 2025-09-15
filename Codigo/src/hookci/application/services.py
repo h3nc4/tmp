@@ -98,7 +98,8 @@ class ProjectInitializationService:
         self._fs.create_dir(hooks_dir)
         default_config = create_default_config()
 
-        config_data = default_config.model_dump(exclude_none=True)
+        config_data = default_config.model_dump(exclude_none=True, by_alias=True)
+        config_data["log_level"] = default_config.log_level.value
         self._config_handler.write_config_data(config_path, config_data)
 
         self._install_hook_script(
@@ -138,12 +139,12 @@ class CiExecutionService:
         Executes the main CI pipeline, yielding events for real-time feedback.
         """
         config = self._load_and_validate_configuration()
-        setup_logging(config.log_level)
+        setup_logging(config.log_level.value)
 
         if not self._should_run(hook_type, config):
             return
 
-        yield PipelineStart(total_steps=len(config.steps))
+        yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
 
         docker_image = yield from self._prepare_docker_image(config)
         if not docker_image:
@@ -164,8 +165,8 @@ class CiExecutionService:
 
             try:
                 while True:
-                    log_line = next(command_gen)
-                    yield LogLine(line=log_line)
+                    stream, log_line = next(command_gen)
+                    yield LogLine(line=log_line, stream=stream, step_name=step.name)
             except StopIteration as e:
                 exit_code = e.value
 
@@ -223,16 +224,24 @@ class CiExecutionService:
             try:
                 build_generator = self._docker_service.build_image(dockerfile_path, tag)
                 for log_line in build_generator:
-                    yield LogLine(line=log_line)
+                    # Docker build logs don't have a separate stream
+                    yield LogLine(
+                        line=log_line, stream="stdout", step_name="Image Build"
+                    )
                 yield ImageBuildEnd(status="SUCCESS")
                 return tag
             except DockerError as e:
                 logger.error(f"Docker build failed: {e}")
-                yield LogLine(line=str(e))
+                yield LogLine(line=str(e), stream="stderr", step_name="Image Build")
                 yield ImageBuildEnd(status="FAILURE")
                 return None
 
-        return config.docker.image
+        # Ensure we have an image name to return
+        if config.docker.image:
+            return config.docker.image
+
+        # This case should be prevented by pydantic model validation, but as a safeguard:
+        raise ConfigurationParseError("No docker image or dockerfile was specified.")
 
     def _load_and_validate_configuration(self) -> Configuration:
         """

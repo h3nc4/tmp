@@ -18,8 +18,19 @@
 Domain models for HookCI configuration.
 """
 from __future__ import annotations
-from pydantic import BaseModel, Field, model_validator
+
+from enum import Enum
 from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field, model_validator
+
+
+class LogLevel(str, Enum):
+    """Enumeration for logging verbosity levels."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    ERROR = "ERROR"
 
 
 class Step(BaseModel):
@@ -39,6 +50,7 @@ class Docker(BaseModel):
 
     @model_validator(mode="after")
     def check_image_or_dockerfile(self) -> Docker:
+        """Ensures that either 'image' or 'dockerfile' is provided, but not both."""
         if self.image is None and self.dockerfile is None:
             raise ValueError(
                 'Either "image" or "dockerfile" must be provided in the docker configuration.'
@@ -73,7 +85,7 @@ class Configuration(BaseModel):
     """Main configuration model for HookCI."""
 
     version: str
-    log_level: str = "INFO"
+    log_level: LogLevel = LogLevel.INFO
     docker: Docker = Field(default_factory=default_docker_config)
     hooks: Hooks = Field(default_factory=Hooks)
     filters: Optional[Filters] = None
@@ -86,7 +98,7 @@ def create_default_config() -> Configuration:
     """
     return Configuration(
         version="1.0",
-        log_level="INFO",
+        log_level=LogLevel.INFO,
         docker=default_docker_config(),
         hooks=Hooks(pre_commit=True, pre_push=True),
         steps=[

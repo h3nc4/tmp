@@ -18,11 +18,13 @@
 Tests for the domain configuration models.
 """
 import pytest
+from pydantic import ValidationError
 
 from hookci.domain.config import (
     Configuration,
     Docker,
     Hooks,
+    LogLevel,
     Step,
     create_default_config,
 )
@@ -36,7 +38,7 @@ def test_create_default_config() -> None:
 
     assert isinstance(config, Configuration)
     assert config.version == "1.0"
-    assert config.log_level == "INFO"
+    assert config.log_level == LogLevel.INFO
 
     assert isinstance(config.docker, Docker)
     assert config.docker.image == "python:3.13-slim-trixie"
@@ -77,3 +79,23 @@ def test_docker_model_validation() -> None:
 
     with pytest.raises(ValueError, match="must be provided"):
         Docker()
+
+
+def test_log_level_validation() -> None:
+    """Verify that log_level accepts valid enum members and rejects invalid strings."""
+    # Valid string that matches enum member. We ignore the mypy error because
+    # we are specifically testing Pydantic's runtime string-to-enum coercion.
+    config = Configuration(version="1.0", log_level="DEBUG")  # type: ignore[arg-type]
+    assert config.log_level == LogLevel.DEBUG
+
+    # Valid enum member
+    config = Configuration(version="1.0", log_level=LogLevel.ERROR)
+    assert config.log_level == LogLevel.ERROR
+
+    # Invalid string
+    with pytest.raises(ValidationError):
+        Configuration(version="1.0", log_level="INVALID_LEVEL")  # type: ignore[arg-type]
+
+    # Check that WARNING is no longer a valid level
+    with pytest.raises(ValidationError):
+        Configuration(version="1.0", log_level="WARNING")  # type: ignore[arg-type]

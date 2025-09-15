@@ -15,6 +15,7 @@
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
 """Tests for the Docker infrastructure service."""
+import struct
 from pathlib import Path
 from typing import Generator
 from unittest.mock import MagicMock, patch
@@ -86,16 +87,35 @@ def test_build_image_failure(mock_from_env: MagicMock, tmp_path: Path) -> None:
         list(service.build_image(tmp_path / "Dockerfile", "test-tag"))
 
 
+def create_docker_log_stream(
+    lines: list[tuple[int, str]],
+) -> Generator[bytes, None, None]:
+    """Helper to create a multiplexed Docker log stream for mocking."""
+    for stream_type, content in lines:
+        content_bytes = content.encode("utf-8")
+        header = struct.pack(">BxxxL", stream_type, len(content_bytes))
+        yield header + content_bytes
+
+
 @patch("docker.from_env")
-def test_run_command_success_streams_and_returns_code(
+def test_run_command_success_demultiplexes_and_returns_code(
     mock_from_env: MagicMock, tmp_path: Path
 ) -> None:
-    """Verify a command runs, yields logs, and returns the correct exit code."""
+    """Verify a command runs, yields demultiplexed logs, and returns the correct exit code."""
     mock_docker_client = MagicMock()
     mock_from_env.return_value = mock_docker_client
     mock_container = MagicMock()
     mock_docker_client.containers.run.return_value = mock_container
-    mock_container.logs.return_value = [b"log line 1\n", b"log line 2\n"]
+
+    # Mock the log stream with multiplexed stdout and stderr
+    log_stream = create_docker_log_stream(
+        [
+            (1, "stdout line 1\n"),
+            (2, "stderr line 1\n"),
+            (1, "stdout line 2\n"),
+        ]
+    )
+    mock_container.logs.return_value = log_stream
     mock_container.wait.return_value = {"StatusCode": 0}
 
     service = DockerService()
@@ -115,7 +135,11 @@ def test_run_command_success_streams_and_returns_code(
     except StopIteration as e:
         exit_code = e.value
 
-    assert logs == ["log line 1\n", "log line 2\n"]
+    assert logs == [
+        ("stdout", "stdout line 1\n"),
+        ("stderr", "stderr line 1\n"),
+        ("stdout", "stdout line 2\n"),
+    ]
     assert exit_code == 0
 
     mock_docker_client.containers.run.assert_called_once_with(
