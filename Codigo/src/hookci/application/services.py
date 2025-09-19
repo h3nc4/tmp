@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from hookci.application import constants
 from hookci.application.errors import ProjectAlreadyInitializedError
 from hookci.application.events import (
+    DebugShellStarting,
     ImageBuildEnd,
     ImageBuildStart,
     LogLine,
@@ -36,7 +37,7 @@ from hookci.application.events import (
     StepEnd,
     StepStart,
 )
-from hookci.domain.config import Configuration, create_default_config
+from hookci.domain.config import Configuration, Step, create_default_config
 from hookci.infrastructure.docker import IDockerService
 from hookci.infrastructure.errors import ConfigurationParseError, DockerError
 from hookci.infrastructure.fs import IFileSystem, IGitService
@@ -134,7 +135,9 @@ class CiExecutionService:
         self._config_handler = config_handler
         self._docker_service = docker_service
 
-    def run(self, hook_type: Optional[str]) -> Generator[PipelineEvent, None, None]:
+    def run(
+        self, hook_type: Optional[str], debug: bool = False
+    ) -> Generator[PipelineEvent, None, None]:
         """
         Executes the main CI pipeline, yielding events for real-time feedback.
         """
@@ -144,6 +147,21 @@ class CiExecutionService:
         if not self._should_run(hook_type, config):
             return
 
+        if debug and hook_type:
+            logger.warning(
+                "Debug mode is enabled, but it is not supported for git hook runs. "
+                "The pipeline will run in standard mode."
+            )
+            debug = False
+
+        if debug:
+            yield from self._run_pipeline_debug(config)
+        else:
+            yield from self._run_pipeline_standard(config)
+
+    def _run_pipeline_standard(
+        self, config: Configuration
+    ) -> Generator[PipelineEvent, None, None]:
         yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
 
         docker_image = yield from self._prepare_docker_image(config)
@@ -155,20 +173,9 @@ class CiExecutionService:
         for step in config.steps:
             yield StepStart(step=step)
 
-            exit_code = 1  # Default to failure
-            command_gen = self._docker_service.run_command_in_container(
-                image=docker_image,
-                command=step.command,
-                workdir=self._git_service.git_root,
-                env=step.env,
+            exit_code = yield from self._execute_step(
+                step, docker_image, self._git_service.git_root
             )
-
-            try:
-                while True:
-                    stream, log_line = next(command_gen)
-                    yield LogLine(line=log_line, stream=stream, step_name=step.name)
-            except StopIteration as e:
-                exit_code = e.value
 
             if exit_code == 0:
                 yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
@@ -178,10 +185,77 @@ class CiExecutionService:
                     final_status = "FAILURE"
                     break
                 else:
-                    final_status = "WARNING"
+                    if final_status != "FAILURE":
+                        final_status = "WARNING"
                     yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
 
         yield PipelineEnd(status=final_status)
+
+    def _run_pipeline_debug(
+        self, config: Configuration
+    ) -> Generator[PipelineEvent, None, None]:
+        yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
+
+        docker_image = yield from self._prepare_docker_image(config)
+        if not docker_image:
+            yield PipelineEnd(status="FAILURE")
+            return
+
+        container_id = self._docker_service.start_persistent_container(
+            image=docker_image, workdir=self._git_service.git_root
+        )
+        logger.debug(f"Started persistent container: {container_id}")
+
+        final_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
+        try:
+            for step in config.steps:
+                yield StepStart(step=step)
+                exit_code = 1
+                try:
+                    command_gen = self._docker_service.exec_in_container(
+                        container_id, command=step.command, env=step.env
+                    )
+                    while True:
+                        stream, log_line = next(command_gen)
+                        yield LogLine(line=log_line, stream=stream, step_name=step.name)
+                except StopIteration as e:
+                    exit_code = e.value
+
+                if exit_code == 0:
+                    yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
+                else:
+                    if step.critical:
+                        yield StepEnd(step=step, status="FAILURE", exit_code=exit_code)
+                        yield DebugShellStarting(step=step, container_id=container_id)
+                        final_status = "FAILURE"
+                        break
+                    else:
+                        if final_status != "FAILURE":
+                            final_status = "WARNING"
+                        yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
+        finally:
+            logger.debug(f"Stopping and removing container: {container_id}")
+            self._docker_service.stop_and_remove_container(container_id)
+
+        yield PipelineEnd(status=final_status)
+
+    def _execute_step(
+        self, step: Step, image: str, workdir: Path
+    ) -> Generator[PipelineEvent, None, int]:
+        exit_code = 1
+        command_gen = self._docker_service.run_command_in_container(
+            image=image,
+            command=step.command,
+            workdir=workdir,
+            env=step.env,
+        )
+        try:
+            while True:
+                stream, log_line = next(command_gen)
+                yield LogLine(line=log_line, stream=stream, step_name=step.name)
+        except StopIteration as e:
+            exit_code = e.value
+        return int(exit_code)
 
     def _should_run(self, hook_type: Optional[str], config: Configuration) -> bool:
         """Determines if the pipeline should run based on context and config."""

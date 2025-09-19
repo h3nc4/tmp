@@ -61,6 +61,13 @@ class StepStart(BaseModel):
     step: Step
 
 
+class DebugShellStarting(BaseModel):
+    """Event indicating a debug shell is about to be opened."""
+
+    step: Step
+    container_id: str
+
+
 class StepEnd(BaseModel):
     """Event indicating a step has finished."""
 
@@ -82,6 +89,7 @@ PipelineEvent = Union[
     LogLine,
     ImageBuildEnd,
     StepStart,
+    DebugShellStarting,
     StepEnd,
     PipelineEnd,
 ]

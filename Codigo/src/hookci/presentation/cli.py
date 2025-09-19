@@ -20,9 +20,10 @@ handling all command-line interface interactions.
 """
 from __future__ import annotations
 
+import subprocess
 from collections import defaultdict
 from itertools import chain
-from typing import DefaultDict, Dict, List, Optional
+from typing import DefaultDict, Dict, Iterable, List, Optional
 
 import typer
 from rich.console import Console, Group
@@ -41,6 +42,7 @@ from rich.text import Text
 
 from hookci.application.errors import ApplicationError
 from hookci.application.events import (
+    DebugShellStarting,
     LogLine,
     PipelineEnd,
     PipelineEvent,
@@ -49,7 +51,7 @@ from hookci.application.events import (
     StepStart,
 )
 from hookci.containers import container
-from hookci.domain.config import LogLevel
+from hookci.domain.config import LogLevel, Step
 from hookci.infrastructure.errors import InfrastructureError
 from hookci.log import get_logger, setup_logging
 
@@ -228,6 +230,73 @@ def _handle_error(e: Exception) -> None:
     raise typer.Exit(code=1)
 
 
+def _open_interactive_shell(container_id: str, step: Step) -> None:
+    """Attempts to open an interactive shell inside the container."""
+    console.print(
+        f"\n[bold yellow]Step '{step.name}' failed. Opening debug shell...[/]"
+    )
+    console.print(f"[dim]Container ID: {container_id}. Type 'exit' to continue.[/dim]")
+
+    shells = ["bash", "ash", "sh"]
+    for shell in shells:
+        try:
+            # Use subprocess to get a fully interactive TTY
+            result = subprocess.run(
+                ["docker", "exec", "-it", container_id, shell],
+                check=False,  # Don't raise on non-zero exit, we'll check it
+            )
+            # If the shell was found and exited (e.g. user typed 'exit'), we're done.
+            # A non-zero exit code here might mean the shell itself isn't present.
+            if result.returncode != 127 and result.returncode != 126:
+                return
+        except FileNotFoundError:
+            logger.error(
+                "`docker` command not found. Is Docker installed and in your PATH?"
+            )
+            return
+        except Exception as e:
+            logger.error(f"Failed to open interactive shell with '{shell}': {e}")
+            continue
+
+    logger.error("Could not find a valid shell (bash, ash, sh) in the container.")
+
+
+def _run_debug_mode(
+    event_iterable: Iterable[PipelineEvent],
+) -> str:
+    """Handles pipeline execution with simple line-by-line output for debug mode."""
+    final_status = "FAILURE"
+    current_step: Optional[Step] = None
+    all_logs: DefaultDict[str, List[str]] = defaultdict(list)
+
+    for event in event_iterable:
+        if isinstance(event, PipelineStart):
+            console.print("[bold]🚀 Pipeline Started[/]")
+        elif isinstance(event, StepStart):
+            current_step = event.step
+            console.print(f"\n[bold]▶️ Running Step: {event.step.name}[/]")
+            console.print(f"  [cyan]Command:[/] {event.step.command}")
+        elif isinstance(event, LogLine):
+            stream_color = "red" if event.stream == "stderr" else "dim"
+            console.print(f"  [{stream_color}]{event.line.strip()}[/]")
+            if current_step:
+                all_logs[current_step.name].append(event.line)
+        elif isinstance(event, StepEnd):
+            if event.status == "SUCCESS":
+                console.print(f"[bold green]✔ Step '{event.step.name}' Succeeded[/]")
+            else:
+                style = "red" if event.status == "FAILURE" else "yellow"
+                console.print(
+                    f"[bold {style}]✖ Step '{event.step.name}' Failed (Status: {event.status})[/]"
+                )
+        elif isinstance(event, DebugShellStarting):
+            _open_interactive_shell(event.container_id, event.step)
+        elif isinstance(event, PipelineEnd):
+            final_status = event.status
+
+    return final_status
+
+
 @app.command()
 def init() -> None:
     """
@@ -260,7 +329,12 @@ def run(
         "--hook-type",
         help="The type of git hook triggering the run (e.g., 'pre-commit').",
         hidden=True,
-    )
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="On failure of a manual run, keep the container alive and open a debug shell.",
+    ),
 ) -> None:
     """
     Manually runs the CI pipeline based on the configuration file.
@@ -268,7 +342,7 @@ def run(
     final_status = "FAILURE"  # Default status
     try:
         service = container.ci_execution_service
-        event_generator = service.run(hook_type=hook_type)
+        event_generator = service.run(hook_type=hook_type, debug=debug)
 
         try:
             first_event = next(event_generator)
@@ -276,32 +350,36 @@ def run(
             logger.info("Pipeline run was skipped based on configuration filters.")
             return
 
-        pipeline_ui = PipelineUI(console)
         all_events = chain([first_event], event_generator)
 
-        with Live(
-            pipeline_ui._get_display_group(),
-            console=console,
-            screen=False,
-            redirect_stderr=False,
-        ) as live:
-            for event in all_events:
-                pipeline_ui.handle_event(event, live)
-                if isinstance(event, PipelineEnd):
-                    final_status = event.status
+        if debug:
+            final_status = _run_debug_mode(all_events)
+        else:
+            pipeline_ui = PipelineUI(console)
+            with Live(
+                pipeline_ui._get_display_group(),
+                console=console,
+                screen=False,
+                redirect_stderr=False,
+                vertical_overflow="visible",
+            ) as live:
+                for event in all_events:
+                    pipeline_ui.handle_event(event, live)
+                    if isinstance(event, PipelineEnd):
+                        final_status = event.status
 
     except Exception as e:
         _handle_error(e)
         return
 
     if final_status == "SUCCESS":
-        console.print("[bold green]✅ Pipeline finished successfully![/bold green]")
+        console.print("\n[bold green]✅ Pipeline finished successfully![/bold green]")
     elif final_status == "WARNING":
         console.print(
-            "[bold yellow]🔶 Pipeline finished with non-critical failures.[/bold yellow]"
+            "\n[bold yellow]🔶 Pipeline finished with non-critical failures.[/bold yellow]"
         )
     else:  # FAILURE
-        console.print("[bold red]❌ Pipeline failed.[/bold red]")
+        console.print("\n[bold red]❌ Pipeline failed.[/bold red]")
         raise typer.Exit(code=1)
 
 

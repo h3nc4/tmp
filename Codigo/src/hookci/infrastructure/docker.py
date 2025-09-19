@@ -49,6 +49,17 @@ class IDockerService(Protocol):
         self, dockerfile_path: Path, tag: str
     ) -> Generator[str, None, None]: ...
 
+    def start_persistent_container(self, image: str, workdir: Path) -> str: ...
+
+    def exec_in_container(
+        self,
+        container_id: str,
+        command: str,
+        env: Optional[Dict[str, str]] = None,
+    ) -> Generator[Tuple[LogStream, str], None, int]: ...
+
+    def stop_and_remove_container(self, container_id: str) -> None: ...
+
 
 class DockerService(IDockerService):
     """Concrete implementation for Docker operations using docker-py."""
@@ -182,3 +193,76 @@ class DockerService(IDockerService):
             raise DockerError(f"Failed to build Docker image: {e.msg}") from e
         except APIError as e:
             raise DockerError(f"Docker API error during build: {e.explanation}") from e
+
+    def start_persistent_container(self, image: str, workdir: Path) -> str:
+        """
+        Starts a container that remains running in the background.
+        Returns the container ID.
+        """
+        try:
+            container: Container = self.client.containers.run(
+                image=image,
+                command=["tail", "-f", "/dev/null"],  # Keep-alive command
+                volumes={
+                    str(workdir): {
+                        "bind": constants.CONTAINER_WORKDIR,
+                        "mode": "rw",
+                    }
+                },
+                working_dir=constants.CONTAINER_WORKDIR,
+                detach=True,
+            )
+            return str(container.id)
+        except ImageNotFound:
+            raise DockerError(f"Docker image '{image}' not found.")
+        except APIError as e:
+            raise DockerError(f"Docker API error: {e.explanation}") from e
+
+    def exec_in_container(
+        self,
+        container_id: str,
+        command: str,
+        env: Optional[Dict[str, str]] = None,
+    ) -> Generator[Tuple[LogStream, str], None, int]:
+        """
+        Executes a command in a running container and yields its logs.
+        Returns the command's exit code.
+        """
+        try:
+            container: Container = self.client.containers.get(container_id)
+
+            # Step 1: Create the exec instance using the low-level API
+            exec_instance = self.client.api.exec_create(
+                container.id, cmd=["/bin/sh", "-c", command], environment=env or {}
+            )
+            exec_id = exec_instance["Id"]
+
+            # Step 2: Start the exec instance and get the streaming output
+            output_stream = self.client.api.exec_start(exec_id, stream=True)
+
+            # Step 3: Yield logs from the demultiplexed stream
+            yield from self._demultiplex_docker_stream(output_stream)
+
+            # Step 4: Inspect the exec instance to get the final exit code
+            inspect_result = self.client.api.exec_inspect(exec_id)
+            exit_code = inspect_result.get("ExitCode")
+
+            if exit_code is None:
+                raise DockerError(
+                    f"Could not determine exit code for exec command in container {container_id}"
+                )
+            return int(exit_code)
+
+        except APIError as e:
+            raise DockerError(f"Docker API error during exec: {e.explanation}") from e
+
+    def stop_and_remove_container(self, container_id: str) -> None:
+        """Stops and removes a container."""
+        try:
+            container = self.client.containers.get(container_id)
+            container.stop(timeout=1)
+            container.remove()
+        except APIError as e:
+            logger.warning(
+                f"Could not stop or remove container {container_id}: {e.explanation}"
+            )
