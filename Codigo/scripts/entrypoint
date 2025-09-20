@@ -40,7 +40,7 @@ fi
 
 # check if the image needs to be (re)built
 if [ -n "${rebuild}" ] || ! docker image inspect "${container_name}" >/dev/null 2>&1; then
-	DOCKER_BUILDKIT=1 docker build --build-arg "USER=${container_name}" --build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)" -t "${container_name}" .
+	docker build --build-arg "USER=${container_name}" --build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)" -t "${container_name}" .
 fi
 
 # generate docs and exit

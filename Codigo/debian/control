@@ -9,6 +9,5 @@ Rules-Requires-Root: no
 
 Package: hookci
 Architecture: all
-Depends: ${misc:Depends}, python3, python3-rich
-Description: Git hook manager and CI assistant
- A minimal Python tool to manage git hooks and local CI tasks.
+Depends: ${misc:Depends}, git, python3, python3-rich, python3-typer, python3-yaml, python3-pydantic, python3-docker
+Description: HookCI is a tool for executing Continuous Integration (CI) tasks locally. It integrates with Docker and Git hooks to validate commits and pushes, ensuring that code meets quality standards before being shared with the team.

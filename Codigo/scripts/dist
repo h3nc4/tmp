@@ -38,7 +38,7 @@ dockerfile="${1:-"pip"}"
 
 # check if the image needs to be (re)built
 if [ -n "${rebuild}" ] || ! docker image inspect "hookci-${container_name}" >/dev/null 2>&1; then
-	DOCKER_BUILDKIT=1 docker build -t "hookci-${container_name}" -f "docker/${dockerfile}.Dockerfile" .
+	docker build -t "hookci-${container_name}" -f "docker/${dockerfile}.Dockerfile" .
 fi
 
 docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}/../:/workdir" --workdir /workdir/Codigo/ -it "hookci-${container_name}" make "$@"

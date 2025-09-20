@@ -1,1 +1,2 @@
-src/hookci.py usr/bin
+./hookci usr/bin/
+src/hookci/ usr/lib/python3/dist-packages/

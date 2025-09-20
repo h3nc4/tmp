@@ -23,35 +23,29 @@ PNGS := $(addprefix $(DOC_OUTPUT), $(WSDS:.wsd=.png))
 
 SRC_FILES := $(shell find src -type f)
 
-SUITE ?=
+SUITE ?= stable
 
 all: hookci
 
 debian/changelog:
-	@echo "$(PACKAGE) ($(VERSION)) $(SUITE); urgency=medium\n\n  * Release for $(SUITE)\n\n -- $(DEBFULLNAME) <$(DEBEMAIL)>  $(DATE)\n" > debian/changelog
+	@echo "$(PACKAGE) ($(VERSION)) $(SUITE); urgency=medium\n\n  * HookCI.\n\n -- $(DEBFULLNAME) <$(DEBEMAIL)>  $(DATE)\n" >debian/changelog
 
-src/_version.py:
-	@echo "__version__ = '$(VERSION)'" > src/_version.py
+src/hookci/_version.py:
+	@echo "__version__ = '$(VERSION)'" >src/hookci/_version.py
 
-deb: $(SRC_FILES)
-ifeq ($(SUITE),)
-	@for suite in unstable testing stable; do \
-		$(MAKE) deb SUITE=$$suite; \
-	done
-else
-	$(MAKE) debian/changelog
-	$(MAKE) src/_version.py
+$(PACKAGE).deb: $(SRC_FILES) debian/changelog src/hookci/_version.py
+	mv src/hookci.py ./hookci
 	dpkg-buildpackage -us -uc -b
-	mv ../$(PACKAGE)_$(VERSION)_all.deb ../$(PACKAGE)_$(VERSION)_$(SUITE)_all.deb
-	mv ../$(PACKAGE)_$(VERSION)_amd64.changes ../$(PACKAGE)_$(VERSION)_$(SUITE)_amd64.changes
-	mv ../$(PACKAGE)_$(VERSION)_amd64.buildinfo ../$(PACKAGE)_$(VERSION)_$(SUITE)_amd64.buildinfo
-	rm -f src/_version.py debian/changelog 
-endif
+	mv ./hookci src/hookci.py
+	mv ../$(PACKAGE)_$(VERSION)_all.deb ./$(PACKAGE).deb
+	rm -f ../$(PACKAGE)_$(VERSION)_amd64.changes ../$(PACKAGE)_$(VERSION)_amd64.buildinfo src/hookci/_version.py debian/
+	
+deb: $(PACKAGE).deb
 
-hookci: $(SRC_FILES) src/_version.py
+hookci: $(SRC_FILES) src/hookci/_version.py
 	pyinstaller --exclude-module=pkg_resources --exclude-module=setuptools --onefile src/hookci.py
 	mv -f dist/hookci .
-	rm -f src/_version.py
+	rm -f src/hookci/_version.py
 
 docs: $(PNGS)
 

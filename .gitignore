@@ -15,6 +15,7 @@ DEBIAN/
 **/debian/changelog
 **/debian/debhelper-build-stamp
 **/debian/files
+**/debian/hookci
 **/debian/.debhelper/
 **/debian/*.substvars
 **/usr/bin/
