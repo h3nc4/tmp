@@ -55,9 +55,22 @@ from hookci.domain.config import LogLevel, Step
 from hookci.infrastructure.errors import InfrastructureError
 from hookci.log import get_logger, setup_logging
 
+try:
+    from hookci._version import __version__  # type: ignore[import-not-found]
+except ImportError:
+    __version__ = "0.0.0-dev"
+
 # Configure logging with default settings initially
 setup_logging()
 logger = get_logger("hookci.cli")
+
+
+def _version_callback(value: bool) -> None:
+    """Prints the version and exits."""
+    if value:
+        console.print(f"HookCI version {__version__}")
+        raise typer.Exit()
+
 
 app = typer.Typer(
     add_completion=False,
@@ -67,6 +80,22 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+@app.callback()
+def main_options(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-V",
+        help="Show the application's version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    )
+) -> None:
+    """
+    Manage HookCI, a tool for local CI with Git hooks and Docker.
+    """
 
 
 class PipelineUI:

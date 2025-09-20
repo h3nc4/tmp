@@ -24,14 +24,22 @@ from unittest.mock import Mock, PropertyMock, call
 import pytest
 
 from hookci.application import constants
-from hookci.application.errors import ProjectAlreadyInitializedError
+from hookci.application.constants import LATEST_CONFIG_VERSION
+from hookci.application.errors import (
+    ConfigurationUpToDateError,
+    ProjectAlreadyInitializedError,
+)
 from hookci.application.events import (
     LogLine,
     PipelineEnd,
     PipelineStart,
     StepStart,
 )
-from hookci.application.services import CiExecutionService, ProjectInitializationService
+from hookci.application.services import (
+    CiExecutionService,
+    MigrationService,
+    ProjectInitializationService,
+)
 from hookci.domain.config import LogLevel
 from hookci.infrastructure.docker import IDockerService, LogStream
 from hookci.infrastructure.errors import ConfigurationParseError
@@ -254,3 +262,100 @@ def test_ci_execution_service_invalid_config(
 
     with pytest.raises(ConfigurationParseError):
         list(service.run(hook_type=None))
+
+
+def test_migration_service_success_from_unversioned(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify the migration service correctly transforms a legacy (unversioned) config.
+    """
+    legacy_config = {
+        "image": "python:3.9",
+        "steps": ["pytest", "flake8"],
+    }
+    mock_config_handler.load_config_data.return_value = legacy_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+    message = service.run()
+
+    assert "successfully migrated" in message
+    mock_config_handler.write_config_data.assert_called_once()
+
+    written_data = mock_config_handler.write_config_data.call_args[0][1]
+
+    assert written_data["version"] == LATEST_CONFIG_VERSION
+    assert written_data["docker"]["image"] == "python:3.9"
+    assert written_data["docker"].get("dockerfile") is None
+    assert len(written_data["steps"]) == 2
+    assert written_data["steps"][0]["name"] == "Step 1"
+    assert written_data["steps"][0]["command"] == "pytest"
+    assert written_data["steps"][1]["name"] == "Step 2"
+    assert written_data["steps"][1]["command"] == "flake8"
+    assert written_data["log_level"] == "INFO"
+
+
+def test_migration_service_from_old_version_string(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify the migration service correctly transforms a config with an old version string.
+    """
+    old_version_config = {
+        "version": "0.1",
+        "image": "python:3.8",
+        "steps": ["pytest"],
+    }
+    mock_config_handler.load_config_data.return_value = old_version_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+    message = service.run()
+
+    assert "successfully migrated" in message
+    mock_config_handler.write_config_data.assert_called_once()
+    written_data = mock_config_handler.write_config_data.call_args[0][1]
+
+    assert written_data["version"] == LATEST_CONFIG_VERSION
+    assert written_data["docker"]["image"] == "python:3.8"
+    assert len(written_data["steps"]) == 1
+    assert written_data["steps"][0]["command"] == "pytest"
+
+
+def test_migration_service_already_up_to_date(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify ConfigurationUpToDateError is raised if config version is the latest.
+    """
+    up_to_date_config = {"version": LATEST_CONFIG_VERSION, "steps": []}
+    mock_config_handler.load_config_data.return_value = up_to_date_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+
+    with pytest.raises(ConfigurationUpToDateError):
+        service.run()
+
+    mock_config_handler.write_config_data.assert_not_called()
+
+
+def test_migration_service_invalid_legacy_docker_config(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify it fails if legacy docker config is invalid (e.g., both image and dockerfile).
+    """
+    legacy_config = {
+        "image": "python:3.9",
+        "dockerfile": "Dockerfile",
+        "steps": [],
+    }
+    mock_config_handler.load_config_data.return_value = legacy_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+
+    with pytest.raises(ConfigurationParseError, match="not both"):
+        service.run()
