@@ -20,6 +20,7 @@ Tests for the domain configuration models.
 import pytest
 from pydantic import ValidationError
 
+from hookci.application.constants import LATEST_CONFIG_VERSION
 from hookci.domain.config import (
     Configuration,
     Docker,
@@ -37,7 +38,7 @@ def test_create_default_config() -> None:
     config = create_default_config()
 
     assert isinstance(config, Configuration)
-    assert config.version == "1.0"
+    assert config.version == LATEST_CONFIG_VERSION
     assert config.log_level == LogLevel.INFO
 
     assert isinstance(config.docker, Docker)

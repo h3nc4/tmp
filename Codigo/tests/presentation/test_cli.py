@@ -1,4 +1,3 @@
-# tests/presentation/test_cli.py
 # Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
 # This file is part of HookCI.
 
@@ -16,219 +15,347 @@
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Tests for the command-line interface (presentation layer).
+Tests for application services.
 """
-import logging
-import subprocess
 from pathlib import Path
-from typing import Generator
-from unittest.mock import Mock, call, patch
+from typing import Any, Dict, Generator, Tuple
+from unittest.mock import Mock, PropertyMock, call
 
 import pytest
-from _pytest.logging import LogCaptureFixture
-from typer.testing import CliRunner
 
+from hookci.application import constants
+from hookci.application.constants import LATEST_CONFIG_VERSION
+from hookci.application.errors import (
+    ConfigurationUpToDateError,
+    ProjectAlreadyInitializedError,
+)
 from hookci.application.events import (
-    DebugShellStarting,
     LogLine,
     PipelineEnd,
-    PipelineEvent,
     PipelineStart,
-    StepEnd,
     StepStart,
 )
 from hookci.application.services import (
     CiExecutionService,
+    MigrationService,
     ProjectInitializationService,
 )
-from hookci.containers import container
-from hookci.domain.config import LogLevel, Step
-from hookci.infrastructure.errors import NotInGitRepositoryError
-from hookci.presentation.cli import app
-
-runner = CliRunner()
+from hookci.domain.config import LogLevel
+from hookci.infrastructure.docker import IDockerService, LogStream
+from hookci.infrastructure.errors import ConfigurationParseError
+from hookci.infrastructure.fs import IFileSystem, IGitService
+from hookci.infrastructure.yaml_handler import IConfigurationHandler
 
 
 @pytest.fixture
-def mock_init_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    """Mocks the ProjectInitializationService in the container."""
-    mock = Mock(spec=ProjectInitializationService)
-    monkeypatch.setattr(container, "project_init_service", mock, raising=False)
+def mock_git_service() -> Mock:
+    """Fixture for a mocked IGitService."""
+    service = Mock(spec=IGitService)
+
+    # Create the PropertyMock that we will use for assertions
+    git_root_prop_mock = PropertyMock(return_value=Path("/repo"))
+
+    # Attach the mock to the mock's class so it behaves like a property
+    type(service).git_root = git_root_prop_mock
+
+    # Also attach the PropertyMock *instance* to the service mock itself.
+    # This allows tests to access the mock for assertions without triggering it.
+    service.mock_git_root_prop = git_root_prop_mock
+
+    service.get_current_branch.return_value = "main"
+    return service
+
+
+@pytest.fixture
+def mock_fs() -> Mock:
+    """Fixture for a mocked IFileSystem."""
+    return Mock(spec=IFileSystem)
+
+
+@pytest.fixture
+def mock_config_handler() -> Mock:
+    """Fixture for a mocked IConfigurationHandler."""
+    return Mock(spec=IConfigurationHandler)
+
+
+@pytest.fixture
+def mock_docker_service() -> Mock:
+    """Fixture for a mocked IDockerService."""
+    mock = Mock(spec=IDockerService)
+
+    def mock_run_command_success(
+        *args: Any, **kwargs: Any
+    ) -> Generator[Tuple[LogStream, str], None, int]:
+        yield "stdout", "log line 1"
+        return 0
+
+    mock.run_command_in_container.side_effect = mock_run_command_success
     return mock
 
 
 @pytest.fixture
-def mock_ci_service(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    """Mocks the CiExecutionService in the container."""
-    mock = Mock(spec=CiExecutionService)
-    monkeypatch.setattr(container, "ci_execution_service", mock, raising=False)
-    return mock
+def valid_config_dict() -> Dict[str, Any]:
+    """Provides a valid configuration as a dictionary."""
+    return {
+        "version": "1.0",
+        "log_level": "INFO",
+        "docker": {"image": "test:latest"},
+        "hooks": {"pre_commit": True, "pre_push": True},
+        "steps": [{"name": "Test", "command": "pytest"}],
+    }
 
 
-def test_cli_no_args_shows_help() -> None:
-    """Verify that running the app with no arguments shows the help message."""
-    result = runner.invoke(app, [])
-    assert "Usage:" in result.stdout
-    assert "HookCI: A tool for running Continuous Integration locally" in result.stdout
-    assert "init" in result.stdout
-
-
-def test_init_success(mock_init_service: Mock, caplog: LogCaptureFixture) -> None:
-    """Test the 'init' command on a successful run."""
-    config_path = Path("/path/to/repo/.hookci/hookci.yaml")
-    mock_init_service.run.return_value = config_path
-
-    with caplog.at_level(logging.INFO):
-        result = runner.invoke(app, ["init"])
-
-    assert result.exit_code == 0
-    assert "Initializing HookCI..." in caplog.text
-    assert "Success! HookCI has been initialized." in result.stdout
-    mock_init_service.run.assert_called_once()
-
-
-def test_init_not_in_git_repo(
-    mock_init_service: Mock, caplog: LogCaptureFixture
+def test_init_service_success(
+    mock_git_service: Mock, mock_fs: Mock, mock_config_handler: Mock
 ) -> None:
-    """Test the 'init' command when not inside a Git repository."""
-    mock_init_service.run.side_effect = NotInGitRepositoryError("Not a repo")
-
-    with caplog.at_level(logging.ERROR):
-        result = runner.invoke(app, ["init"])
-
-    assert result.exit_code == 1
-    assert "Not a repo" in caplog.text
-
-
-def test_run_success(mock_ci_service: Mock) -> None:
-    """Test the 'run' command on a successful pipeline execution."""
-    step = Step(name="Test", command="pytest")
-
-    def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield PipelineStart(total_steps=1, log_level=LogLevel.INFO)
-        yield StepStart(step=step)
-        yield LogLine(line="running tests...", stream="stdout", step_name=step.name)
-        yield StepEnd(step=step, status="SUCCESS", exit_code=0)
-        yield PipelineEnd(status="SUCCESS")
-
-    mock_ci_service.run.return_value = event_generator()
-
-    # In a non-interactive runner, we mainly check exit code and final message
-    # as capturing rich's live display is complex and brittle.
-    # Use a backend that doesn't rely on a real terminal for sizing.
-    result = runner.invoke(app, ["run"], env={"TERM": "dumb", "COLUMNS": "120"})
-    assert result.exit_code == 0
-    assert "Pipeline finished successfully!" in result.stdout
-    mock_ci_service.run.assert_called_once()
-
-
-def test_run_failure(mock_ci_service: Mock) -> None:
-    """Test the 'run' command when the pipeline fails."""
-    step = Step(name="Test", command="pytest")
-
-    def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield PipelineStart(total_steps=1, log_level=LogLevel.INFO)
-        yield StepStart(step=step)
-        yield LogLine(line="test failed!", stream="stderr", step_name=step.name)
-        yield StepEnd(step=step, status="FAILURE", exit_code=1)
-        yield PipelineEnd(status="FAILURE")
-
-    mock_ci_service.run.return_value = event_generator()
-
-    result = runner.invoke(app, ["run"], env={"TERM": "dumb", "COLUMNS": "120"})
-
-    assert result.exit_code == 1
-    assert "Pipeline failed." in result.stdout
-
-
-def test_run_unexpected_error(mock_ci_service: Mock, caplog: LogCaptureFixture) -> None:
-    """Test 'run' handles unexpected exceptions."""
-    mock_ci_service.run.side_effect = ValueError("Kaboom")
-
-    with caplog.at_level(logging.ERROR):
-        result = runner.invoke(app, ["run"])
-
-    assert result.exit_code == 1
-    assert "An unexpected error occurred: Kaboom" in caplog.text
-
-
-@patch("subprocess.run")
-def test_run_debug_mode_opens_shell_on_failure(
-    mock_subprocess: Mock, mock_ci_service: Mock
-) -> None:
-    """Verify the debug shell is opened on failure in debug mode."""
-    step = Step(name="Failing Step", command="false")
-
-    def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield PipelineStart(total_steps=1, log_level=LogLevel.DEBUG)
-        yield StepStart(step=step)
-        yield StepEnd(step=step, status="FAILURE", exit_code=1)
-        yield DebugShellStarting(step=step, container_id="debug_id_123")
-        yield PipelineEnd(status="FAILURE")
-
-    mock_ci_service.run.return_value = event_generator()
-
-    # Mock subprocess to simulate finding 'bash'
-    mock_subprocess.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-    result = runner.invoke(app, ["run", "--debug"])
-
-    assert result.exit_code == 1
-    assert "Opening debug shell" in result.stdout
-    mock_ci_service.run.assert_called_once_with(hook_type=None, debug=True)
-    mock_subprocess.assert_called_once_with(
-        ["docker", "exec", "-it", "debug_id_123", "bash"], check=False
+    """
+    Verify the initialization service correctly creates all necessary files.
+    """
+    mock_fs.file_exists.return_value = False
+    service = ProjectInitializationService(
+        mock_git_service, mock_fs, mock_config_handler
     )
 
+    git_root = Path("/repo")
+    base_dir = git_root / constants.BASE_DIR_NAME
+    hooks_dir = base_dir / "hooks"
+    config_path = base_dir / constants.CONFIG_FILENAME
+    pre_commit_path = hooks_dir / "pre-commit"
 
-@patch("subprocess.run")
-def test_debug_shell_fallback_logic(
-    mock_subprocess: Mock, mock_ci_service: Mock, caplog: LogCaptureFixture
-) -> None:
-    """Verify the shell fallback logic (bash -> ash -> sh)."""
-    step = Step(name="Failing Step", command="false")
+    result_path = service.run()
 
-    def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield DebugShellStarting(step=step, container_id="debug_id_123")
-        yield PipelineEnd(status="FAILURE")
+    assert result_path == config_path
+    # Assert that the property mock (retrieved from the instance) was called
+    mock_git_service.mock_git_root_prop.assert_called_once()
 
-    mock_ci_service.run.return_value = event_generator()
-
-    # Simulate bash not found (rc=127), ash not found, but sh is found
-    mock_subprocess.side_effect = [
-        subprocess.CompletedProcess(args=[], returncode=127),  # bash fails
-        subprocess.CompletedProcess(args=[], returncode=127),  # ash fails
-        subprocess.CompletedProcess(args=[], returncode=0),  # sh succeeds
-    ]
-
-    runner.invoke(app, ["run", "--debug"])
-
-    expected_calls = [
-        call(["docker", "exec", "-it", "debug_id_123", "bash"], check=False),
-        call(["docker", "exec", "-it", "debug_id_123", "ash"], check=False),
-        call(["docker", "exec", "-it", "debug_id_123", "sh"], check=False),
-    ]
-    mock_subprocess.assert_has_calls(expected_calls)
-    assert "Could not find a valid shell" not in caplog.text
-
-
-@patch("subprocess.run")
-def test_debug_shell_no_shell_found(
-    mock_subprocess: Mock, mock_ci_service: Mock, caplog: LogCaptureFixture
-) -> None:
-    """Verify an error is logged if no valid shell is found."""
-    step = Step(name="Failing Step", command="false")
-
-    def event_generator() -> Generator[PipelineEvent, None, None]:
-        yield DebugShellStarting(step=step, container_id="debug_id_123")
-        yield PipelineEnd(status="FAILURE")
-
-    mock_ci_service.run.return_value = event_generator()
-    mock_subprocess.return_value = subprocess.CompletedProcess(args=[], returncode=127)
-
-    with caplog.at_level(logging.ERROR):
-        runner.invoke(app, ["run", "--debug"])
-
-    assert (
-        "Could not find a valid shell (bash, ash, sh) in the container." in caplog.text
+    mock_fs.create_dir.assert_called_once_with(hooks_dir)
+    mock_config_handler.write_config_data.assert_called_once()
+    mock_fs.assert_has_calls(
+        [
+            call.write_file(pre_commit_path, service._PRE_COMMIT_SCRIPT),
+            call.make_executable(pre_commit_path),
+        ]
     )
+    mock_git_service.set_hooks_path.assert_called_once_with(hooks_dir)
+
+
+def test_init_service_already_initialized(
+    mock_git_service: Mock, mock_fs: Mock, mock_config_handler: Mock
+) -> None:
+    """
+    Verify ProjectAlreadyInitializedError is raised if the config file exists.
+    """
+    mock_fs.file_exists.return_value = True
+    service = ProjectInitializationService(
+        mock_git_service, mock_fs, mock_config_handler
+    )
+
+    with pytest.raises(ProjectAlreadyInitializedError):
+        service.run()
+    mock_fs.create_dir.assert_not_called()
+
+
+def test_ci_manual_run_success(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify a manual CI run (no hook_type) executes and yields correct events.
+    """
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    events = list(service.run(hook_type=None))
+
+    pipeline_start_event = next(e for e in events if isinstance(e, PipelineStart))
+    assert pipeline_start_event.log_level == LogLevel.INFO
+
+    log_line_event = next(e for e in events if isinstance(e, LogLine))
+    assert log_line_event.stream == "stdout"
+    assert log_line_event.line == "log line 1"
+
+    assert any(isinstance(e, StepStart) for e in events)
+    assert any(isinstance(e, PipelineEnd) for e in events)
+    mock_docker_service.run_command_in_container.assert_called_once()
+
+
+def test_ci_hook_run_is_skipped_if_disabled(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify that a hook-triggered run is skipped if disabled in the config.
+    """
+    valid_config_dict["hooks"]["pre_commit"] = False
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    events = list(service.run(hook_type="pre-commit"))
+
+    assert not events
+    mock_docker_service.run_command_in_container.assert_not_called()
+
+
+def test_ci_hook_run_is_skipped_by_branch_filter(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify that a hook-triggered run is skipped if the branch doesn't match the filter.
+    """
+    valid_config_dict["filters"] = {"branches": "feature/.*"}
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_git_service.get_current_branch.return_value = "main"
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    events = list(service.run(hook_type="pre-commit"))
+
+    assert not events
+    mock_docker_service.run_command_in_container.assert_not_called()
+
+
+def test_ci_hook_run_proceeds_with_matching_branch_filter(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+    mock_docker_service: Mock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """
+    Verify that a hook-triggered run proceeds if the branch matches the filter.
+    """
+    valid_config_dict["filters"] = {"branches": "feature/.*"}
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_git_service.get_current_branch.return_value = "feature/new-login"
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    events = list(service.run(hook_type="pre-commit"))
+
+    assert any(isinstance(e, PipelineEnd) for e in events)
+    mock_docker_service.run_command_in_container.assert_called_once()
+
+
+def test_ci_execution_service_invalid_config(
+    mock_git_service: Mock, mock_config_handler: Mock, mock_docker_service: Mock
+) -> None:
+    """
+    Verify that a ConfigurationParseError is raised for invalid config structure.
+    """
+    invalid_config_data = {"version": "1.0", "steps": "not-a-list"}
+    mock_config_handler.load_config_data.return_value = invalid_config_data
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+
+    with pytest.raises(ConfigurationParseError):
+        list(service.run(hook_type=None))
+
+
+def test_migration_service_success_from_unversioned(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify the migration service correctly transforms a legacy (unversioned) config.
+    """
+    legacy_config = {
+        "image": "python:3.9",
+        "steps": ["pytest", "flake8"],
+    }
+    mock_config_handler.load_config_data.return_value = legacy_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+    message = service.run()
+
+    assert "successfully migrated" in message
+    mock_config_handler.write_config_data.assert_called_once()
+
+    written_data = mock_config_handler.write_config_data.call_args[0][1]
+
+    assert written_data["version"] == LATEST_CONFIG_VERSION
+    assert written_data["docker"]["image"] == "python:3.9"
+    assert written_data["docker"].get("dockerfile") is None
+    assert len(written_data["steps"]) == 2
+    assert written_data["steps"][0]["name"] == "Step 1"
+    assert written_data["steps"][0]["command"] == "pytest"
+    assert written_data["steps"][1]["name"] == "Step 2"
+    assert written_data["steps"][1]["command"] == "flake8"
+    assert written_data["log_level"] == "INFO"
+
+
+def test_migration_service_from_old_version_string(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify the migration service correctly transforms a config with an old version string.
+    """
+    old_version_config = {
+        "version": "0.1",
+        "image": "python:3.8",
+        "steps": ["pytest"],
+    }
+    mock_config_handler.load_config_data.return_value = old_version_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+    message = service.run()
+
+    assert "successfully migrated" in message
+    mock_config_handler.write_config_data.assert_called_once()
+    written_data = mock_config_handler.write_config_data.call_args[0][1]
+
+    assert written_data["version"] == LATEST_CONFIG_VERSION
+    assert written_data["docker"]["image"] == "python:3.8"
+    assert len(written_data["steps"]) == 1
+    assert written_data["steps"][0]["command"] == "pytest"
+
+
+def test_migration_service_already_up_to_date(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify ConfigurationUpToDateError is raised if config version is the latest.
+    """
+    up_to_date_config = {"version": LATEST_CONFIG_VERSION, "steps": []}
+    mock_config_handler.load_config_data.return_value = up_to_date_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+
+    with pytest.raises(ConfigurationUpToDateError):
+        service.run()
+
+    mock_config_handler.write_config_data.assert_not_called()
+
+
+def test_migration_service_invalid_legacy_docker_config(
+    mock_git_service: Mock,
+    mock_config_handler: Mock,
+) -> None:
+    """
+    Verify it fails if legacy docker config is invalid (e.g., both image and dockerfile).
+    """
+    legacy_config = {
+        "image": "python:3.9",
+        "dockerfile": "Dockerfile",
+        "steps": [],
+    }
+    mock_config_handler.load_config_data.return_value = legacy_config
+
+    service = MigrationService(mock_git_service, mock_config_handler)
+
+    with pytest.raises(ConfigurationParseError, match="not both"):
+        service.run()

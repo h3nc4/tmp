@@ -29,3 +29,9 @@ class ProjectAlreadyInitializedError(ApplicationError):
     """Raised when trying to initialize an already initialized project."""
 
     pass
+
+
+class ConfigurationUpToDateError(ApplicationError):
+    """Raised when a migration is attempted on an up-to-date configuration."""
+
+    pass

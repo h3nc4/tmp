@@ -40,7 +40,7 @@ from rich.progress import (
 from rich.syntax import Syntax
 from rich.text import Text
 
-from hookci.application.errors import ApplicationError
+from hookci.application.errors import ApplicationError, ConfigurationUpToDateError
 from hookci.application.events import (
     DebugShellStarting,
     LogLine,
@@ -223,6 +223,11 @@ def _handle_error(e: Exception) -> None:
     # Catch typer.Exit and re-raise it to prevent it from being logged as an unexpected error.
     if isinstance(e, typer.Exit):
         raise e
+    # Handle specific "info" cases that shouldn't look like errors
+    if isinstance(e, ConfigurationUpToDateError):
+        logger.info(str(e))
+        # This is not an error, so we exit gracefully.
+        raise typer.Exit(code=0)
     if isinstance(e, (ApplicationError, InfrastructureError)):
         logger.error(f"{e}")
     else:
@@ -388,7 +393,14 @@ def migrate() -> None:
     """
     Migrates the configuration file to the latest version.
     """
-    logger.warning("The 'migrate' command is not yet implemented.")
+    try:
+        logger.info("🔎 Checking configuration for migration...")
+        service = container.migration_service
+        success_message = service.run()
+        console.print(f"\n[bold green]✅ {success_message}[/bold green]")
+
+    except Exception as e:
+        _handle_error(e)
 
 
 def main() -> None:

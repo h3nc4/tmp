@@ -20,12 +20,15 @@ Application services that orchestrate use cases.
 import re
 from pathlib import Path
 from textwrap import dedent
-from typing import Generator, Literal, Optional
+from typing import Any, Dict, Generator, Literal, Optional
 
 from pydantic import ValidationError
 
 from hookci.application import constants
-from hookci.application.errors import ProjectAlreadyInitializedError
+from hookci.application.errors import (
+    ConfigurationUpToDateError,
+    ProjectAlreadyInitializedError,
+)
 from hookci.application.events import (
     DebugShellStarting,
     ImageBuildEnd,
@@ -37,7 +40,7 @@ from hookci.application.events import (
     StepEnd,
     StepStart,
 )
-from hookci.domain.config import Configuration, Step, create_default_config
+from hookci.domain.config import Configuration, Docker, Step, create_default_config
 from hookci.infrastructure.docker import IDockerService
 from hookci.infrastructure.errors import ConfigurationParseError, DockerError
 from hookci.infrastructure.fs import IFileSystem, IGitService
@@ -333,3 +336,92 @@ class CiExecutionService:
             raise ConfigurationParseError(
                 f"Invalid configuration structure:\n{e}"
             ) from e
+
+
+class MigrationService:
+    """Service to handle the configuration migration use case."""
+
+    def __init__(
+        self,
+        git_service: IGitService,
+        config_handler: IConfigurationHandler,
+    ):
+        self._git_service = git_service
+        self._config_handler = config_handler
+
+    def run(self) -> str:
+        """
+        Executes the configuration migration logic.
+
+        Loads the configuration, transforms it from a legacy format to
+        the current format and writes it back.
+
+        Returns:
+            A success message.
+
+        Raises:
+            ConfigurationUpToDateError: If the configuration is already in the latest format.
+            ConfigurationParseError: If the configuration file is malformed.
+            ConfigurationNotFoundError: If the configuration file does not exist.
+        """
+        config_path = (
+            self._git_service.git_root
+            / constants.BASE_DIR_NAME
+            / constants.CONFIG_FILENAME
+        )
+        raw_config: Dict[str, Any] = self._config_handler.load_config_data(config_path)
+
+        config_version = str(raw_config.get("version", ""))
+        if config_version == constants.LATEST_CONFIG_VERSION:
+            raise ConfigurationUpToDateError("Configuration is already up-to-date.")
+
+        if config_version:
+            logger.info(
+                f"Old configuration version '{config_version}' detected. Migrating to v{constants.LATEST_CONFIG_VERSION}..."
+            )
+        else:
+            logger.info(
+                f"Unversioned configuration detected. Migrating to v{constants.LATEST_CONFIG_VERSION}..."
+            )
+
+        # Create a default config object to serve as a base
+        new_config = create_default_config()
+
+        # Migrate top-level docker keys
+        if "image" in raw_config or "dockerfile" in raw_config:
+            new_config.docker.image = raw_config.get("image")
+            new_config.docker.dockerfile = raw_config.get("dockerfile")
+            # Ensure the migrated docker config is valid
+            try:
+                # Pydantic will run the validator when creating a new Docker object
+                new_config.docker = Docker.model_validate(
+                    new_config.docker.model_dump()
+                )
+            except ValueError as e:
+                raise ConfigurationParseError(
+                    f"Invalid legacy docker configuration: {e}"
+                ) from e
+
+        # Migrate simple list of steps
+        raw_steps = raw_config.get("steps", [])
+        if raw_steps and isinstance(raw_steps[0], str):
+            new_config.steps = [
+                Step(name=f"Step {i+1}", command=cmd) for i, cmd in enumerate(raw_steps)
+            ]
+        elif raw_steps:
+            # If steps are not simple strings, assume they might be in the new format already but
+            # the top-level version key was missing. We just try to validate them.
+            try:
+                new_config.steps = [Step.model_validate(s) for s in raw_steps]
+            except ValidationError as e:
+                raise ConfigurationParseError(
+                    f"Could not parse 'steps' during migration: {e}"
+                ) from e
+
+        # Convert the Pydantic model back to a dict for writing
+        migrated_data = new_config.model_dump(exclude_none=True, by_alias=True)
+        migrated_data["log_level"] = new_config.log_level.value
+
+        self._config_handler.write_config_data(config_path, migrated_data)
+
+        return "Configuration successfully migrated to the latest version."

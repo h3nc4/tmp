@@ -22,6 +22,9 @@ within the application layer, such as file paths and directory names, to
 ensure consistency and ease of maintenance.
 """
 
+# The latest version of the configuration file schema.
+LATEST_CONFIG_VERSION: str = "1.0"
+
 # Base directory name for all HookCI related files within a project.
 BASE_DIR_NAME: str = ".hookci"
 

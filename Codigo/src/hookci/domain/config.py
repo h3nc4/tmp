@@ -24,6 +24,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from hookci.application.constants import LATEST_CONFIG_VERSION
+
 
 class LogLevel(str, Enum):
     """Enumeration for logging verbosity levels."""
@@ -97,7 +99,7 @@ def create_default_config() -> Configuration:
     Factory function to create a default HookCI configuration object.
     """
     return Configuration(
-        version="1.0",
+        version=LATEST_CONFIG_VERSION,
         log_level=LogLevel.INFO,
         docker=default_docker_config(),
         hooks=Hooks(pre_commit=True, pre_push=True),

@@ -26,6 +26,7 @@ from functools import cached_property
 
 from hookci.application.services import (
     CiExecutionService,
+    MigrationService,
     ProjectInitializationService,
 )
 from hookci.infrastructure.docker import DockerService, IDockerService
@@ -77,6 +78,13 @@ class Container:
             git_service=self.git_service,
             config_handler=self.config_handler,
             docker_service=self.docker_service,
+        )
+
+    @cached_property
+    def migration_service(self) -> MigrationService:
+        return MigrationService(
+            git_service=self.git_service,
+            config_handler=self.config_handler,
         )
 
 
