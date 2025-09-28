@@ -33,14 +33,14 @@ Domain --> App : docker_info
 deactivate Domain
 
 opt docker_info refere-se a um Dockerfile
-	App -> Infra : build_dockerfile()
-	activate Infra
-	Infra -> DockerSystem : build image
-	activate DockerSystem
-	DockerSystem --> Infra : image ready
-	deactivate DockerSystem
-	Infra --> App : build_success
-	deactivate Infra
+    App -> Infra : build_dockerfile()
+    activate Infra
+    Infra -> DockerSystem : build image
+    activate DockerSystem
+    DockerSystem --> Infra : image ready
+    deactivate DockerSystem
+    Infra --> App : build_success
+    deactivate Infra
 end
 
 App -> Domain : get_test_steps()
@@ -49,20 +49,20 @@ Domain --> App : test_steps_list
 deactivate Domain
 
 loop Para cada //Step//
-	App -> Infra : run_container()
-	activate Infra
-	Infra -> DockerSystem : run container
-	activate DockerSystem
-	DockerSystem --> Infra : logs, exit_code
-	deactivate DockerSystem
-	Infra --> App : step_result
-	deactivate Infra
-	alt //Step// falhou
-		App --> CLI : execution_failed, logs
-		alt //Debug// on
-			CLI --> User : Depuração
-		end
-	end
+    App -> Infra : run_container()
+    activate Infra
+    Infra -> DockerSystem : run container
+    activate DockerSystem
+    DockerSystem --> Infra : logs, exit_code
+    deactivate DockerSystem
+    Infra --> App : step_result
+    deactivate Infra
+    alt //Step// falhou
+        App --> CLI : execution_failed, logs
+        alt //Debug// on
+            CLI --> User : Depuração
+        end
+    end
 end
 
 App --> CLI : overall_result, logs

@@ -8,22 +8,22 @@ GitSystem -> Sys : run hook
 activate Sys
 
 alt Configuração válida
-	opt Dockerfile especificado
-		alt Falha no build
-			Sys --> GitSystem : Aborta operação Git
-		end
-	end
+    opt Dockerfile especificado
+        alt Falha no build
+            Sys --> GitSystem : Aborta operação Git
+        end
+    end
 
-	loop Para cada //Step//
-		alt //Step// falhou e é crítico
-			Sys --> GitSystem : Aborta operação Git
-		end
-	end
+    loop Para cada //Step//
+        alt //Step// falhou e é crítico
+            Sys --> GitSystem : Aborta operação Git
+        end
+    end
 
-	Sys --> GitSystem : Permite operação Git
+    Sys --> GitSystem : Permite operação Git
 else
-	Sys --> GitSystem : Aborta operação Git
-	deactivate Sys
+    Sys --> GitSystem : Aborta operação Git
+    deactivate Sys
 end
 
 @enduml

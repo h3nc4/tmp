@@ -2,94 +2,94 @@
 skinparam packageStyle rectangle
 
 package "Presentation (CLI)" <<Layer>> {
-	class HookciCli {
-		+ logger : Logger
-		+ main()
-		+ run_command(args)
-	}
-	interface Logger <<Interface>> {
-		+ info(message)
-		+ error(message)
-		+ debug(message)
-		+ set_level(level)
-	}
-	class ConsoleLogger implements Logger {
-	}
+    class HookciCli {
+        + logger : Logger
+        + main()
+        + run_command(args)
+    }
+    interface Logger <<Interface>> {
+        + info(message)
+        + error(message)
+        + debug(message)
+        + set_level(level)
+    }
+    class ConsoleLogger implements Logger {
+    }
 }
 
 package "Application" <<Layer>> {
-	interface ApplicationService <<Interface>> {
-		+ run()
-	}
+    interface ApplicationService <<Interface>> {
+        + run()
+    }
 
-	abstract class BaseApplicationService implements ApplicationService {
-		- conf : Configuration
-		- conf_handler : ConfigurationHandler
-	}
+    abstract class BaseApplicationService implements ApplicationService {
+        - conf : Configuration
+        - conf_handler : ConfigurationHandler
+    }
 
-	class CiExecutionService extends BaseApplicationService {
-		- docker_service : DockerService
-	}
+    class CiExecutionService extends BaseApplicationService {
+        - docker_service : DockerService
+    }
 
-	class MigrationService extends BaseApplicationService {
-	}
+    class MigrationService extends BaseApplicationService {
+    }
 
-	class ProjectInitializationService extends BaseApplicationService {
-		- git_service : GitService
-	}
+    class ProjectInitializationService extends BaseApplicationService {
+        - git_service : GitService
+    }
 }
 
 package "Domain" <<Layer>> {
-	class Configuration {
-		- image : str
-		- dockerfile : str
-		- steps : dict
-		+ validate()
-		+ get_image_info()
-		+ get_test_steps()
-	}
+    class Configuration {
+        - image : str
+        - dockerfile : str
+        - steps : dict
+        + validate()
+        + get_image_info()
+        + get_test_steps()
+    }
 
-	class TestStep {
-		- name : str
-		- command : str
-		- critical : bool
-	}
+    class TestStep {
+        - name : str
+        - command : str
+        - critical : bool
+    }
 
-	Configuration *-- "1..*" TestStep
+    Configuration *-- "1..*" TestStep
 }
 
 package "Infrastructure" <<Layer>> {
 
-	interface ConfigurationHandler <<Interface>> {
-		+ load_conf() : dict
-		+ write_def_conf()
-	}
+    interface ConfigurationHandler <<Interface>> {
+        + load_conf() : dict
+        + write_def_conf()
+    }
 
-	abstract class FileSystemService {
-		+ write_file(path, content)
-		+ file_exists(path) : bool
-		+ //--read_conf() : dict--//
-		+ //--write_conf(dict)--//
-	}
-	class YamlFileSystemService extends FileSystemService {
-	}
-	class GitService {
-		- fs_service: FileSystemService
-		+ install_hooks()
-		+ find_git_root() : str
-	}
-	class DockerService {
-		+ run_container(image, command) : str
-		+ build_dockerfile(dockerfile_path, tag)
-		+ open_debug_shell(image)
-	}
+    abstract class FileSystemService {
+        + write_file(path, content)
+        + file_exists(path) : bool
+        + //--read_conf() : dict--//
+        + //--write_conf(dict)--//
+    }
+    class YamlFileSystemService extends FileSystemService {
+    }
+    class GitService {
+        - fs_service: FileSystemService
+        + install_hooks()
+        + find_git_root() : str
+    }
+    class DockerService {
+        + run_container(image, command) : str
+        + build_dockerfile(dockerfile_path, tag)
+        + open_debug_shell(image)
+    }
 
-	class YamlConfigurationHandler implements ConfigurationHandler {
-		- fs_service: FileSystemService
-	}
+    class YamlConfigurationHandler implements ConfigurationHandler {
+        - fs_service: FileSystemService
+    }
 
-	GitService --> FileSystemService
-	YamlConfigurationHandler --> FileSystemService
+    GitService --> FileSystemService
+    YamlConfigurationHandler --> FileSystemService
 }
 
 HookciCli --> ApplicationService

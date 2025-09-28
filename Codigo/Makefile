@@ -38,8 +38,8 @@ $(PACKAGE).deb: $(SRC_FILES) debian/changelog src/hookci/_version.py
 	dpkg-buildpackage -us -uc -b
 	mv ./hookci src/hookci.py
 	mv ../$(PACKAGE)_$(VERSION)_all.deb ./$(PACKAGE).deb
-	rm -f ../$(PACKAGE)_$(VERSION)_amd64.changes ../$(PACKAGE)_$(VERSION)_amd64.buildinfo src/hookci/_version.py debian/
-	
+	rm -f ../$(PACKAGE)_$(VERSION)_amd64.changes ../$(PACKAGE)_$(VERSION)_amd64.buildinfo src/hookci/_version.py debian/changelog
+
 deb: $(PACKAGE).deb
 
 hookci: $(SRC_FILES) src/hookci/_version.py

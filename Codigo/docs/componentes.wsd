@@ -5,37 +5,37 @@ interface FileSystem
 interface CLI
 
 component "Docker Engine" as DockerEngine <<External>> {
-	DockerEngine -up- Http
+    DockerEngine -up- Http
 }
 component "OS" as OS <<External>> {
-	component "File System" as FS
-	FS -up- FileSystem
+    component "File System" as FS
+    FS -up- FileSystem
 }
 component "Git SCM" as GitSystem <<External>> {
-	GitSystem -up- CLI
+    GitSystem -up- CLI
 }
 
 package "HookCI System" {
-	component "Presentation" as _CLI {
-	}
-	component "Application Services" as App {
-	}
-	component "Domain Model" as Domain {
-	}
-	package "Infrastructure Adapters" {
-		component "YAML/File Handler" as ConfigAdapter {
-		}
-		component "Git Adapter" as GitAdapter {
-		}
-		component "Docker Adapter" as DockerAdapter {
-		}
-	}
+    component "Presentation" as _CLI {
+    }
+    component "Application Services" as App {
+    }
+    component "Domain Model" as Domain {
+    }
+    package "Infrastructure Adapters" {
+        component "YAML/File Handler" as ConfigAdapter {
+        }
+        component "Git Adapter" as GitAdapter {
+        }
+        component "Docker Adapter" as DockerAdapter {
+        }
+    }
 
-	_CLI ..> App
-	App ..> Domain
-	App ..> ConfigAdapter
-	App ..> GitAdapter
-	App ..> DockerAdapter
+    _CLI ..> App
+    App ..> Domain
+    App ..> ConfigAdapter
+    App ..> GitAdapter
+    App ..> DockerAdapter
 
 }
 

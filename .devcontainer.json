@@ -21,8 +21,7 @@
     "userEnvProbe": "interactiveShell",
     "runArgs": [
         "--privileged",
-        "-p=127.0.0.1:6080:6080",
-        "-p=127.0.0.1:50000:50000",
+        "-p=0.0.0.0:9000:9000",
         "-v",
         "/var/lib/hookci-docker:/var/lib/docker"
     ],

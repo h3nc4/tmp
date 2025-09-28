@@ -20,16 +20,16 @@ set -e
 cd "$(dirname "$0")/../"
 
 while getopts "b" opt; do
-	case "${opt}" in
-	b)
-		rebuild=1
-		shift
-		;;
-	*)
-		echo "Usage: $0 [-b]"
-		exit 1
-		;;
-	esac
+    case "${opt}" in
+    b)
+        rebuild=1
+        shift
+        ;;
+    *)
+        echo "Usage: $0 [-b]"
+        exit 1
+        ;;
+    esac
 done
 
 # defaults to pip-based build
@@ -38,7 +38,13 @@ dockerfile="${1:-"pip"}"
 
 # check if the image needs to be (re)built
 if [ -n "${rebuild}" ] || ! docker image inspect "hookci-${container_name}" >/dev/null 2>&1; then
-	docker build -t "hookci-${container_name}" -f "docker/${dockerfile}.Dockerfile" .
+    docker build -t "hookci-${container_name}" -f "docker/${dockerfile}.Dockerfile" .
 fi
 
-docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}/../:/workdir" --workdir /workdir/Codigo/ -it "hookci-${container_name}" make "$@"
+# Set interactive flags for local runs, but disable them in CI environments.
+it="-it"
+if [ -n "$CI" ]; then
+  it=""
+fi
+
+docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}/../:/workdir" --workdir /workdir/Codigo/ ${it} "hookci-${container_name}" make "$@"

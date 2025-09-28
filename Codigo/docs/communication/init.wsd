@@ -2,9 +2,9 @@
 
 actor ":Administrador" as Admin
 rectangle ":HookciCli" as CLI
-rectangle ":ProjectInitializationService" as App
+rectangle ":ProjectInitService" as App
 rectangle ":GitService" as GitSvc
-rectangle ":YamlConfigurationHandler" as CfgHandler
+rectangle ":YamlConfigHandler" as CfgHandler
 boundary "Git" as GitSystem
 boundary "config" as ConfigFile
 

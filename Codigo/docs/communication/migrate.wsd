@@ -3,7 +3,7 @@
 actor ":Administrador" as Admin
 rectangle ":HookciCli" as CLI
 rectangle ":MigrationService" as App
-rectangle ":YamlConfigurationHandler" as CfgHandler
+rectangle ":YamlConfigHandler" as CfgHandler
 boundary "config" as ConfigFile
 
 Admin -down-> CLI: 1: hookci migrate

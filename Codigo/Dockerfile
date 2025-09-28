@@ -71,6 +71,7 @@ RUN apt-get install --no-install-recommends -y -qq \
     gnupg \
     iputils-ping \
     iproute2 \
+    jq \
     less \
     man-db \
     nano \
@@ -79,7 +80,8 @@ RUN apt-get install --no-install-recommends -y -qq \
     openssh-client \
     procps \
     tree \
-    wget
+    wget \
+    yq
 
 # Install development dependencies
 RUN apt-get install --no-install-recommends -y -qq \

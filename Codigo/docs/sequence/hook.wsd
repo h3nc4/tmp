@@ -28,63 +28,63 @@ Domain --> App : validation_status
 deactivate Domain
 
 alt Configuração Válida
-	App -> Domain : get_image_info()
-	activate Domain
-	Domain --> App : docker_info
-	deactivate Domain
+    App -> Domain : get_image_info()
+    activate Domain
+    Domain --> App : docker_info
+    deactivate Domain
 
-	opt Dockerfile especificado
-		App -> Infra : build_dockerfile()
-		activate Infra
-		Infra -> DockerSystem : build image
-		activate DockerSystem
-		DockerSystem --> Infra : image ready
-		deactivate DockerSystem
-		Infra --> App : build_success
-		deactivate Infra
+    opt Dockerfile especificado
+        App -> Infra : build_dockerfile()
+        activate Infra
+        Infra -> DockerSystem : build image
+        activate DockerSystem
+        DockerSystem --> Infra : image ready
+        deactivate DockerSystem
+        Infra --> App : build_success
+        deactivate Infra
 
-		alt Falha no build
-			App --> CLI : build_error_message
-			CLI --> GitSystem : exit code != 0
-			GitSystem -> GitSystem : Aborta operação Git
-		end
-	end
+        alt Falha no build
+            App --> CLI : build_error_message
+            CLI --> GitSystem : exit code != 0
+            GitSystem -> GitSystem : Aborta operação Git
+        end
+    end
 
-	App -> Domain : get_test_steps()
-	activate Domain
-	Domain --> App : test_steps_list
-	deactivate Domain
+    App -> Domain : get_test_steps()
+    activate Domain
+    Domain --> App : test_steps_list
+    deactivate Domain
 
-	loop Para cada //Step//
-		App -> Infra : run_container()
-		activate Infra
-		Infra -> DockerSystem : run container
-		activate DockerSystem
-		DockerSystem --> Infra : logs, exit_code
-		deactivate DockerSystem
-		Infra --> App : step_result
-		deactivate Infra
+    loop Para cada //Step//
+        App -> Infra : run_container()
+        activate Infra
+        Infra -> DockerSystem : run container
+        activate DockerSystem
+        DockerSystem --> Infra : logs, exit_code
+        deactivate DockerSystem
+        Infra --> App : step_result
+        deactivate Infra
 
-		alt //Step// falhou
-			alt //Step// é crítico
-				App --> CLI : execution_failed, logs
-				CLI --> GitSystem : exit code != 0
-				GitSystem -> GitSystem : Aborta operação Git
-			else //Step// não é crítico
-				App --> CLI : step_warning, logs
-			end
-		end
-	end
+        alt //Step// falhou
+            alt //Step// é crítico
+                App --> CLI : execution_failed, logs
+                CLI --> GitSystem : exit code != 0
+                GitSystem -> GitSystem : Aborta operação Git
+            else //Step// não é crítico
+                App --> CLI : step_warning, logs
+            end
+        end
+    end
 
-	App --> CLI : execution_success, logs
-	CLI --> GitSystem : exit code 0
-	GitSystem -> GitSystem : Permite operação Git
+    App --> CLI : execution_success, logs
+    CLI --> GitSystem : exit code 0
+    GitSystem -> GitSystem : Permite operação Git
 else
-	App --> CLI : config_error_message
-	deactivate App
-	CLI --> GitSystem : exit code != 0
-	deactivate CLI
-	GitSystem -> GitSystem : Aborta operação Git
+    App --> CLI : config_error_message
+    deactivate App
+    CLI --> GitSystem : exit code != 0
+    deactivate CLI
+    GitSystem -> GitSystem : Aborta operação Git
 end
 
 @enduml

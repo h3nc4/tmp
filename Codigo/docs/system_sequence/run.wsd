@@ -7,7 +7,7 @@ participant "Sistema" as Sys
 User -> Sys : hookci run <params>
 activate Sys
 alt //Step// falhou com //Debug// on
-	Sys --> User : Depuração
+    Sys --> User : Depuração
 end
 Sys -> User : Exibe resultados e //logs//
 deactivate Sys

@@ -22,18 +22,18 @@ deactivate Infra
 App -> App : process_migration()
 
 alt Migração bem-sucedida
-	App -> Infra : write_conf()
-	activate Infra
-	Infra -> ConfigFile : write updated config
-	activate ConfigFile
-	ConfigFile --> Infra : success
-	deactivate ConfigFile
-	Infra --> App : write_success
-	deactivate Infra
-	App --> CLI : migration_success_message
+    App -> Infra : write_conf()
+    activate Infra
+    Infra -> ConfigFile : write updated config
+    activate ConfigFile
+    ConfigFile --> Infra : success
+    deactivate ConfigFile
+    Infra --> App : write_success
+    deactivate Infra
+    App --> CLI : migration_success_message
 else Migração requer atenção manual
-	App --> CLI : migration_error
-	deactivate App
+    App --> CLI : migration_error
+    deactivate App
 end
 
 CLI --> User : Exibe resultado da migração

@@ -22,27 +22,27 @@ Infra --> App : git_root_path
 deactivate Infra
 
 alt Projeto ainda não inicializado
-	App -> Infra : write_def_conf()
-	activate Infra
-	Infra -> ConfigFile : write default config
-	activate ConfigFile
-	ConfigFile --> Infra : success
-	deactivate ConfigFile
-	Infra --> App : success
-	deactivate Infra
+    App -> Infra : write_def_conf()
+    activate Infra
+    Infra -> ConfigFile : write default config
+    activate ConfigFile
+    ConfigFile --> Infra : success
+    deactivate ConfigFile
+    Infra --> App : success
+    deactivate Infra
 
-	App -> Infra : install_hooks()
-	activate Infra
-	Infra -> GitSystem : create/write hook files
-	activate GitSystem
-	GitSystem --> Infra : success
-	deactivate GitSystem
-	Infra --> App : success
-	deactivate Infra
-	App --> CLI : success
+    App -> Infra : install_hooks()
+    activate Infra
+    Infra -> GitSystem : create/write hook files
+    activate GitSystem
+    GitSystem --> Infra : success
+    deactivate GitSystem
+    Infra --> App : success
+    deactivate Infra
+    App --> CLI : success
 else Projeto já inicializado
-	App --> CLI : warning
-	deactivate App
+    App --> CLI : warning
+    deactivate App
 end
 
 CLI --> User : Exibe sucesso ou aviso

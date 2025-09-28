@@ -21,8 +21,8 @@ cd "$(dirname "$0")/../"
 PS4='$ '
 set -x
 
-poetry run ruff check . src/ tests/
+poetry run ruff check . src/ tests/ --fix
 
 mypy --strict src/ tests/
 
-poetry run pytest
+poetry run pytest --cov=src --cov-report=xml
