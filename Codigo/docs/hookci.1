@@ -1,0 +1,174 @@
+.\" Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela
+.\" This file is part of HookCI.
+.\"
+.\" HookCI is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU Affero General Public License as published
+.\" by the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" HookCI is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU Affero General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU Affero General Public License
+.\" along with HookCI. If not, see <https://www.gnu.org/licenses/>.
+.\"
+.TH hookci 1 "September 2025" "HookCI 1.0" "HookCI Manual"
+.SH NAME
+hookci \- Local Continuous Integration with Git hooks and Docker.
+.SH SYNOPSIS
+.B hookci
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]...
+.SH DESCRIPTION
+.B HookCI
+is a tool for executing Continuous Integration (CI) tasks locally. It integrates with Docker and Git hooks to validate commits and pushes, ensuring that code meets quality standards before being shared with the team.
+.P
+The main goal is to provide fast feedback to developers by running tests in an isolated Docker environment, preventing issues caused by local machine configurations. It acts as a preventive layer, ensuring that only code that passes the defined tests is integrated into the central repository.
+.P
+Configuration is managed through a simple YAML file, and the tool is operated via a dedicated Command Line Interface (CLI).
+.SH COMMANDS
+The following commands are available:
+.TP
+.B init
+Initializes HookCI in the current Git repository. This command performs two main actions:
+.RS
+.IP \(bu 2
+Creates a default configuration file at \fB.hookci/hookci.yaml\fR.
+.IP \(bu 2
+Installs and configures the necessary Git hooks in a local \fB.hookci/hooks\fR directory and sets the Git \fBcore.hooksPath\fR configuration to point to it. This avoids interfering with existing hooks.
+.RE
+.TP
+.B migrate
+Migrates an existing HookCI configuration file to the latest version. This is useful when updating the HookCI tool to a new version that introduces changes to the configuration schema.
+.TP
+.B run
+Manually executes the CI pipeline as defined in the configuration file. This is useful for testing the pipeline without triggering a Git event.
+.RS
+.SS Options
+.TP
+.BI --debug
+If a step fails, this option keeps the Docker container running and attaches an interactive shell, allowing for live debugging of the environment at the moment of failure. This option is ignored when run via a Git hook.
+.RE
+.TP
+.B --help
+Displays a help message with a list of available commands and their descriptions.
+.SH CONFIGURATION
+HookCI is configured using a YAML file located at \fB.hookci/hookci.yaml\fR in the root of your Git repository. The main keys are described below:
+.TP
+.B version (string)
+The version of the HookCI configuration schema. Used for managing migrations.
+.TP
+.B log_level (string)
+Defines the verbosity of the logs. Possible values are \fBDEBUG\fR, \fBINFO\fR, and \fBERROR\fR. Defaults to \fBINFO\fR.
+.TP
+.B docker (object)
+Contains the configuration for the Docker environment where tests will run. You must specify either \fBimage\fR or \fBdockerfile\fR, but not both.
+.RS
+.TP
+.B image (string)
+The name and tag of a pre-existing Docker image to use for running the steps (e.g., \fBpython:3.13-slim\fR).
+.TP
+.B dockerfile (string)
+The relative path to a Dockerfile within the repository. HookCI will build an image from this Dockerfile before running the steps.
+.RE
+.TP
+.B hooks (object)
+Defines which Git hooks HookCI should automatically trigger on.
+.RS
+.TP
+.B pre-commit (boolean)
+If \fBtrue\fR, the CI pipeline runs automatically on \fBgit commit\fR. Defaults to \fBtrue\fR.
+.TP
+.B pre-push (boolean)
+If \fBtrue\fR, the CI pipeline runs automatically on \fBgit push\fR. Defaults to \fBtrue\fR.
+.RE
+.TP
+.B filters (object)
+Allows for conditional execution of the pipeline based on Git context when triggered by a hook.
+.RS
+.TP
+.B branches (string)
+A regular expression to match against the current branch name. The pipeline will only run if the current branch matches the pattern (e.g., \fB"feature/.*"\fR).
+.TP
+.B commits (string)
+A regular expression to match against the commit message. The pipeline will only run if the message matches. (Note: This is a placeholder for future implementation).
+.RE
+.TP
+.B steps (list of objects)
+A sequence of steps to be executed in the CI pipeline. Each step is an object with the following keys:
+.RS
+.TP
+.B name (string, required)
+A descriptive name for the step, used in logs.
+.TP
+.B command (string, required)
+The shell command to be executed inside the Docker container.
+.TP
+.B critical (boolean)
+If \fBtrue\fR (the default), a failure in this step will stop the entire pipeline and cause the Git operation (commit/push) to be aborted. If \fBfalse\fR, a failure will only generate a warning, and the pipeline will continue to the next step.
+.TP
+.B env (object)
+A map of key-value pairs representing environment variables to be injected into the container for this specific step.
+.RE
+.SH EXAMPLES
+.SS "Initialize HookCI in a new project:"
+.RS
+.EX
+$ hookci init
+.EE
+.RE
+.SS "Run the defined CI pipeline manually:"
+.RS
+.EX
+$ hookci run
+.EE
+.RE
+.SS "Debug a failing step interactively:"
+.RS
+.EX
+$ hookci run --debug
+.EE
+.RE
+.SS "Example hookci.yaml configuration:"
+.RS
+.EX
+version: '1.0'
+log_level: INFO
+docker:
+  image: python:3.13-slim
+hooks:
+  pre-commit: true
+  pre-push: true
+filters:
+  branches: "main|develop|feature/.*"
+steps:
+  - name: "Install Dependencies"
+    command: "pip install -r requirements.txt"
+  - name: "Run Linters"
+    command: "flake8 ."
+  - name: "Run Tests"
+    command: "pytest"
+  - name: "Check Coverage"
+    command: "coverage report --fail-under=80"
+    critical: false
+    env:
+      CI: "true"
+.EE
+.RE
+.SH FILES
+.TP
+.B .hookci/hookci.yaml
+The main configuration file for the project.
+.SH SEE ALSO
+.BR git (1),
+.BR docker (1)
+.SH AUTHORS
+Gabriel Dolabela Marques
+.br
+Henrique Carvalho Almeida
+.SH COPYRIGHT
+Copyright (C) 2025 PUC Minas, Henrique Almeida, Gabriel Dolabela.
+License AGPLv3+: GNU AGPL version 3 or later <https://gnu.org/licenses/agpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

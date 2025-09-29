@@ -43,7 +43,8 @@
                 "donjayamanne.githistory",
                 "eamodio.gitlens",
                 "foxundermoon.shell-format",
-                "docker.docker"
+                "docker.docker",
+                "ban.troff"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/local/bin/python3"
