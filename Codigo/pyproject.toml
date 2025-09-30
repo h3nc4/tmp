@@ -19,6 +19,16 @@ dependencies = [
     "pydantic (>=2.11.7,<3.0.0)"
 ]
 
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -34,6 +44,7 @@ mypy = "^1.16.0"
 pytest = "^8.3.5"
 types-pyyaml = "^6.0.12.20250822"
 ruff = "^0.12.10"
+pytest-cov = "^7.0.0"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

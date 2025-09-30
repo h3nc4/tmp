@@ -8,6 +8,9 @@ build/
 hookci.spec
 Codigo/hookci
 
+.coverage
+coverage.xml
+
 *.buildinfo*
 *.changes*
 *.deb*
