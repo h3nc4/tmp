@@ -1,0 +1,50 @@
+name: Development Testing
+description: 'Run tests and linters on the codebase'
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ruff:
+    name: Lint with Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Set up image tag
+        run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
+      - name: Build docker image
+        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
+      - name: Run ruff
+        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} poetry run ruff check . src/ tests/
+
+  mypy:
+    name: Type Check with MyPy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Set up image tag
+        run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
+      - name: Build docker image
+        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
+      - name: Run mypy
+        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} mypy --strict src/ tests/
+
+  pytest:
+    name: Test with Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Set up image tag
+        run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
+      - name: Build docker image
+        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
+      - name: Run pytest
+        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} poetry run pytest

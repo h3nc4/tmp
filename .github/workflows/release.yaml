@@ -1,0 +1,68 @@
+name: Release Build
+description: 'Build JAR bundle for server release, TAR bundle for client release and Docker images'
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-debian:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Build .deb package
+        run: Codigo/scripts/dist deb
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hookci-deb
+          path: Codigo/hookci.deb
+          compression-level: 0
+          retention-days: 1
+
+  build-pyinstaller:
+    name: Build PyInstaller Executable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Build executable
+        run: Codigo/scripts/dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hookci-bin
+          path: Codigo/hookci
+          compression-level: 0
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-debian, build-pyinstaller]
+    permissions:
+      contents: write
+    steps:
+      - name: Download debian artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hookci-deb
+          path: ./
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hookci-bin
+          path: ./
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./hookci
+            ./hookci.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

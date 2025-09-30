@@ -1,0 +1,40 @@
+name: Development Build
+description: 'Build artifacts for development'
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  build-debian:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Build .deb package
+        run: Codigo/scripts/dist deb
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hookci.deb
+          path: Codigo/hookci.deb
+          compression-level: 0
+          retention-days: 1
+
+  build-pyinstaller:
+    name: Build PyInstaller Executable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Build executable
+        run: Codigo/scripts/dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hookci
+          path: Codigo/hookci
+          compression-level: 0
+          retention-days: 1
