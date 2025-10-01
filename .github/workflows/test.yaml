@@ -19,9 +19,18 @@ jobs:
       - name: Set up image tag
         run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
       - name: Build docker image
-        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_TAG }} \
+            -f Codigo/docker/ci.Dockerfile \
+            Codigo/
       - name: Run ruff
-        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} poetry run ruff check . src/ tests/
+        run: |
+          docker run --rm \
+            -v "${PWD}/Codigo:/workdir" \
+            --workdir /workdir \
+            ${{ env.IMAGE_TAG }} \
+            poetry run ruff check . src/ tests/
 
   mypy:
     name: Type Check with MyPy
@@ -32,9 +41,18 @@ jobs:
       - name: Set up image tag
         run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
       - name: Build docker image
-        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_TAG }} \
+            -f Codigo/docker/ci.Dockerfile \
+            Codigo/
       - name: Run mypy
-        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} mypy --strict src/ tests/
+        run: |
+          docker run --rm \
+            -v "${PWD}/Codigo:/workdir" \
+            --workdir /workdir \
+            ${{ env.IMAGE_TAG }} \
+            mypy --strict src/ tests/
 
   pytest:
     name: Test with Pytest
@@ -45,6 +63,36 @@ jobs:
       - name: Set up image tag
         run: echo "IMAGE_TAG=hookci-ci:${GITHUB_SHA}" >>$GITHUB_ENV
       - name: Build docker image
-        run: docker build -t ${{ env.IMAGE_TAG }} -f Codigo/docker/ci.Dockerfile Codigo/
-      - name: Run pytest
-        run: docker run --rm -v "${PWD}/Codigo:/workdir" --workdir /workdir ${{ env.IMAGE_TAG }} poetry run pytest
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_TAG }} \
+            -f Codigo/docker/ci.Dockerfile \
+            Codigo/
+      - name: Run pytest and generate coverage
+        run: |
+          docker run --rm \
+            -v "${PWD}/Codigo:/workdir" \
+            --workdir /workdir \
+            ${{ env.IMAGE_TAG }} \
+            poetry run pytest --cov=src --cov-report=xml:coverage.xml
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: Codigo/coverage.xml
+          retention-days: 1
+
+  sonarqube:
+    name: Scan with SonarQube
+    runs-on: ubuntu-latest
+    needs: pytest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: Codigo/
+      - name: Run SonarQube Scan
+        run: Codigo/scripts/sonar
