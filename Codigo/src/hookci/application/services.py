@@ -20,7 +20,7 @@ Application services that orchestrate use cases.
 import re
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Generator, Literal, Optional
+from typing import Any, Dict, Generator, Literal, Optional, Tuple
 
 from pydantic import ValidationError
 
@@ -34,6 +34,7 @@ from hookci.application.events import (
     ImageBuildEnd,
     ImageBuildStart,
     LogLine,
+    LogStream,
     PipelineEnd,
     PipelineEvent,
     PipelineStart,
@@ -213,59 +214,64 @@ class CiExecutionService:
         try:
             for step in config.steps:
                 yield StepStart(step=step)
-                exit_code = 1
-                try:
-                    command_gen = self._docker_service.exec_in_container(
+
+                exit_code = yield from self._stream_logs_and_get_exit_code(
+                    self._docker_service.exec_in_container(
                         container_id, command=step.command, env=step.env
-                    )
-                    while True:
-                        stream, log_line = next(command_gen)
-                        yield LogLine(line=log_line, stream=stream, step_name=step.name)
-                except StopIteration as e:
-                    exit_code = e.value
+                    ),
+                    step.name,
+                )
 
                 if exit_code == 0:
                     yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
-                else:
-                    if step.critical:
-                        yield StepEnd(step=step, status="FAILURE", exit_code=exit_code)
-                        yield DebugShellStarting(step=step, container_id=container_id)
-                        final_status = "FAILURE"
-                        break
-                    else:
-                        if final_status != "FAILURE":
-                            final_status = "WARNING"
-                        yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
+                    continue
+                if step.critical:
+                    yield StepEnd(step=step, status="FAILURE", exit_code=exit_code)
+                    yield DebugShellStarting(step=step, container_id=container_id)
+                    final_status = "FAILURE"
+                    break
+                if final_status != "FAILURE":
+                    final_status = "WARNING"
+                yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
+
         finally:
             logger.debug(f"Stopping and removing container: {container_id}")
             self._docker_service.stop_and_remove_container(container_id)
 
         yield PipelineEnd(status=final_status)
 
+    def _stream_logs_and_get_exit_code(
+        self,
+        log_generator: Generator[Tuple[LogStream, str], None, int],
+        step_name: str,
+    ) -> Generator[LogLine, None, int]:
+        """Consumes a log generator, yields LogLine events, and returns the exit code."""
+        exit_code = 1
+        try:
+            while True:
+                stream, log_line = next(log_generator)
+                yield LogLine(line=log_line, stream=stream, step_name=step_name)
+        except StopIteration as e:
+            exit_code = e.value if e.value is not None else 1
+        return int(exit_code)
+
     def _execute_step(
         self, step: Step, image: str, workdir: Path
     ) -> Generator[PipelineEvent, None, int]:
-        exit_code = 1
+        """Runs a single step in a transient container and returns the exit code."""
         command_gen = self._docker_service.run_command_in_container(
             image=image,
             command=step.command,
             workdir=workdir,
             env=step.env,
         )
-        try:
-            while True:
-                stream, log_line = next(command_gen)
-                yield LogLine(line=log_line, stream=stream, step_name=step.name)
-        except StopIteration as e:
-            exit_code = e.value
-        return int(exit_code)
+        exit_code = yield from self._stream_logs_and_get_exit_code(
+            command_gen, step.name
+        )
+        return exit_code
 
-    def _should_run(self, hook_type: Optional[str], config: Configuration) -> bool:
-        """Determines if the pipeline should run based on context and config."""
-        if not hook_type:
-            logger.debug("Manual run triggered. Skipping checks.")
-            return True
-
+    def _is_hook_enabled(self, hook_type: str, config: Configuration) -> bool:
+        """Checks if the specific Git hook is enabled in the configuration."""
         if hook_type == "pre-commit" and not config.hooks.pre_commit:
             logger.info("Skipping: pre-commit hook is disabled in the configuration.")
             return False
@@ -274,7 +280,14 @@ class CiExecutionService:
             logger.info("Skipping: pre-push hook is disabled in the configuration.")
             return False
 
-        if config.filters and config.filters.branches:
+        return True
+
+    def _passes_filters(self, hook_type: str, config: Configuration) -> bool:
+        """Checks if the current Git state passes the configured filters."""
+        if not config.filters:
+            return True
+
+        if config.filters.branches:
             current_branch = self._git_service.get_current_branch()
             if not re.match(config.filters.branches, current_branch):
                 logger.info(
@@ -282,6 +295,29 @@ class CiExecutionService:
                     f"filter '{config.filters.branches}'."
                 )
                 return False
+
+        if hook_type == "pre-commit" and config.filters.commits:
+            commit_message = self._git_service.get_staged_commit_message()
+            if not re.match(config.filters.commits, commit_message, re.DOTALL):
+                logger.info(
+                    "Skipping: commit message does not match "
+                    f"filter '{config.filters.commits}'."
+                )
+                return False
+
+        return True
+
+    def _should_run(self, hook_type: Optional[str], config: Configuration) -> bool:
+        """Determines if the pipeline should run based on context and config."""
+        if not hook_type:
+            logger.debug("Manual run triggered. Skipping checks.")
+            return True
+
+        if not self._is_hook_enabled(hook_type, config):
+            return False
+
+        if not self._passes_filters(hook_type, config):
+            return False
 
         logger.debug(f"Checks passed for '{hook_type}' hook. Proceeding with run.")
         return True
