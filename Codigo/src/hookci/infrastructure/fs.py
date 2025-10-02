@@ -36,7 +36,7 @@ class IFileSystem(Protocol):
     def make_executable(self, path: Path) -> None: ...
 
 
-class IGitService(Protocol):
+class IScmService(Protocol):
     """Interface for Git-related operations."""
 
     @property
@@ -66,7 +66,7 @@ class LocalFileSystem(IFileSystem):
         path.chmod(current_permissions | stat.S_IEXEC)
 
 
-class GitService(IGitService):
+class GitService(IScmService):
     """Service for interacting with Git repositories."""
 
     @cached_property

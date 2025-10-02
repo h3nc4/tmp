@@ -27,18 +27,18 @@ from functools import cached_property
 from hookci.application.services import (
     CiExecutionService,
     MigrationService,
-    ProjectInitializationService,
+    ProjectInitService,
 )
 from hookci.infrastructure.docker import DockerService, IDockerService
 from hookci.infrastructure.fs import (
     GitService,
     IFileSystem,
-    IGitService,
+    IScmService,
     LocalFileSystem,
 )
 from hookci.infrastructure.yaml_handler import (
-    IConfigurationHandler,
-    YamlConfigurationHandler,
+    IConfigHandler,
+    YamlConfigHandler,
 )
 
 
@@ -53,20 +53,20 @@ class Container:
         return LocalFileSystem()
 
     @cached_property
-    def git_service(self) -> IGitService:
-        return GitService()
+    def git_service(self) -> IScmService:
+        return GitService(fs=self.file_system)
 
     @cached_property
     def docker_service(self) -> IDockerService:
         return DockerService()
 
     @cached_property
-    def config_handler(self) -> IConfigurationHandler:
-        return YamlConfigurationHandler(fs=self.file_system)
+    def config_handler(self) -> IConfigHandler:
+        return YamlConfigHandler(fs=self.file_system)
 
     @cached_property
-    def project_init_service(self) -> ProjectInitializationService:
-        return ProjectInitializationService(
+    def project_init_service(self) -> ProjectInitService:
+        return ProjectInitService(
             git_service=self.git_service,
             fs=self.file_system,
             config_handler=self.config_handler,

@@ -43,14 +43,14 @@ from hookci.application.events import (
 from hookci.domain.config import Configuration, Docker, Step, create_default_config
 from hookci.infrastructure.docker import IDockerService
 from hookci.infrastructure.errors import ConfigurationParseError, DockerError
-from hookci.infrastructure.fs import IFileSystem, IGitService
-from hookci.infrastructure.yaml_handler import IConfigurationHandler
+from hookci.infrastructure.fs import IFileSystem, IScmService
+from hookci.infrastructure.yaml_handler import IConfigHandler
 from hookci.log import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
 
-class ProjectInitializationService:
+class ProjectInitService:
     """Service to handle the project initialization use case."""
 
     _HOOKS_DIR_NAME: str = "hooks"
@@ -77,9 +77,9 @@ class ProjectInitializationService:
 
     def __init__(
         self,
-        git_service: IGitService,
+        git_service: IScmService,
         fs: IFileSystem,
-        config_handler: IConfigurationHandler,
+        config_handler: IConfigHandler,
     ):
         self._git_service = git_service
         self._fs = fs
@@ -130,8 +130,8 @@ class CiExecutionService:
 
     def __init__(
         self,
-        git_service: IGitService,
-        config_handler: IConfigurationHandler,
+        git_service: IScmService,
+        config_handler: IConfigHandler,
         docker_service: IDockerService,
     ):
         self._git_service = git_service
@@ -343,8 +343,8 @@ class MigrationService:
 
     def __init__(
         self,
-        git_service: IGitService,
-        config_handler: IConfigurationHandler,
+        git_service: IScmService,
+        config_handler: IConfigHandler,
     ):
         self._git_service = git_service
         self._config_handler = config_handler

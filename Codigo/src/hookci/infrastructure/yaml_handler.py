@@ -27,14 +27,14 @@ from hookci.infrastructure.errors import (
 from hookci.infrastructure.fs import IFileSystem
 
 
-class IConfigurationHandler(Protocol):
+class IConfigHandler(Protocol):
     """Interface for loading and writing configuration data."""
 
     def load_config_data(self, path: Path) -> Dict[str, Any]: ...
     def write_config_data(self, path: Path, config_data: Dict[str, Any]) -> None: ...
 
 
-class YamlConfigurationHandler(IConfigurationHandler):
+class YamlConfigHandler(IConfigHandler):
     """Handles reading and writing configuration from/to a YAML file."""
 
     def __init__(self, fs: IFileSystem):
