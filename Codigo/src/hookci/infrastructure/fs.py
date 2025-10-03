@@ -21,11 +21,12 @@ import stat
 import subprocess
 from functools import cached_property
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
 
 
+@runtime_checkable
 class IFileSystem(Protocol):
     """Interface for filesystem operations."""
 
@@ -36,6 +37,7 @@ class IFileSystem(Protocol):
     def make_executable(self, path: Path) -> None: ...
 
 
+@runtime_checkable
 class IScmService(Protocol):
     """Interface for Git-related operations."""
 
@@ -43,6 +45,7 @@ class IScmService(Protocol):
     def git_root(self) -> Path: ...
     def set_hooks_path(self, hooks_path: Path) -> None: ...
     def get_current_branch(self) -> str: ...
+    def get_staged_commit_message(self) -> str: ...
 
 
 class LocalFileSystem(IFileSystem):
@@ -55,10 +58,10 @@ class LocalFileSystem(IFileSystem):
         path.mkdir(parents=True, exist_ok=True)
 
     def write_file(self, path: Path, content: str) -> None:
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
 
     def read_file(self, path: Path) -> str:
-        return path.read_text()
+        return path.read_text(encoding="utf-8")
 
     def make_executable(self, path: Path) -> None:
         """Makes a file executable, similar to `chmod +x`."""
@@ -68,6 +71,9 @@ class LocalFileSystem(IFileSystem):
 
 class GitService(IScmService):
     """Service for interacting with Git repositories."""
+
+    def __init__(self, fs: IFileSystem):
+        self._fs = fs
 
     @cached_property
     def git_root(self) -> Path:
@@ -81,6 +87,7 @@ class GitService(IScmService):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
             )
             return Path(process.stdout.strip())
         except subprocess.CalledProcessError as e:
@@ -94,6 +101,7 @@ class GitService(IScmService):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 cwd=self.git_root,  # Now uses the cached property, preventing recursion.
             )
             return process.stdout.strip()
@@ -110,3 +118,29 @@ class GitService(IScmService):
     def get_current_branch(self) -> str:
         """Gets the current active branch name."""
         return self._run_git_command("rev-parse", "--abbrev-ref", "HEAD")
+
+    def get_staged_commit_message(self) -> str:
+        """
+        Gets the staged commit message from the standard Git message file.
+
+        For a `pre-commit` hook, the commit object does not exist yet. The
+        message proposed by the user is stored in `.git/COMMIT_EDITMSG`.
+        This method reads that file to allow filtering based on its content.
+        """
+        commit_msg_path = self.git_root / ".git" / "COMMIT_EDITMSG"
+        if not self._fs.file_exists(commit_msg_path):
+            return ""
+        try:
+            content = self._fs.read_file(commit_msg_path)
+            # Filter out comment lines (starting with '#') and strip whitespace
+            lines = [
+                line
+                for line in content.splitlines()
+                if not line.strip().startswith("#")
+            ]
+            return "\n".join(lines).strip()
+        except Exception as e:
+            # Catching a generic exception is broad, but file read errors are varied.
+            raise GitCommandError(
+                f"Could not read or parse commit message file: {e}"
+            ) from e

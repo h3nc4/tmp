@@ -19,21 +19,21 @@ Docker interaction services.
 """
 import struct
 from pathlib import Path
-from typing import Dict, Generator, Literal, Optional, Protocol, Tuple
+from typing import Dict, Generator, Optional, Protocol, Tuple, runtime_checkable
 
 import docker
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.containers import Container
 
+from hookci.application.events import LogStream
 from hookci.infrastructure import constants
 from hookci.infrastructure.errors import DockerError
 from hookci.log import get_logger
 
 logger = get_logger(__name__)
 
-LogStream = Literal["stdout", "stderr"]
 
-
+@runtime_checkable
 class IDockerService(Protocol):
     """Interface for Docker operations."""
 
@@ -73,52 +73,63 @@ class DockerService(IDockerService):
                 "Could not connect to the Docker daemon. Is it running?"
             ) from e
 
+    def _parse_one_frame(
+        self, buffer: bytes
+    ) -> tuple[tuple[LogStream, str] | None, bytes]:
+        """
+        Tries to parse a single Docker log frame from the buffer.
+
+        Returns:
+            A tuple containing:
+            - The parsed (stream, content) tuple, or None if a full frame is not available.
+            - The remaining unparsed portion of the buffer.
+        """
+        if len(buffer) < 8:
+            # Not enough data for a header, but if the stream ends here,
+            # this might be a final unterminated log line. The demultiplexer handles that.
+            return None, buffer
+
+        try:
+            stream_type, length = struct.unpack(">BxxxL", buffer[:8])
+        except struct.error:
+            # Malformed header. Treat the entire buffer as a single stdout message and clear it.
+            content = buffer.decode("utf-8", errors="ignore")
+            return ("stdout", content), b""
+
+        if len(buffer) < 8 + length:
+            return None, buffer  # Not enough data for the full payload
+
+        # Full frame is available
+        content_bytes = buffer[8 : 8 + length]
+        remaining_buffer = buffer[8 + length :]
+
+        stream: LogStream = "stderr" if stream_type == 2 else "stdout"
+        content = content_bytes.decode("utf-8", errors="ignore")
+
+        return (stream, content), remaining_buffer
+
     def _demultiplex_docker_stream(
         self, stream_generator: Generator[bytes, None, None]
     ) -> Generator[Tuple[LogStream, str], None, None]:
         """
-        Parses a raw Docker log stream, demultiplexing stdout and stderr.
-        This handles streams that may chunk data arbitrarily.
+        Parses a raw Docker log stream by repeatedly processing frames from a buffer.
         """
         buffer = b""
-        while True:
-            try:
-                # Read from the generator until it's exhausted
-                chunk = next(stream_generator)
-                buffer += chunk
-            except StopIteration:
-                # If there's anything left in the buffer, it's likely an incomplete message.
-                # Treat it as stdout as a fallback.
-                if buffer:
-                    yield "stdout", buffer.decode("utf-8", errors="ignore")
-                break  # Exit the main loop
-
-            # Process as many complete frames as we have in the buffer
-            while len(buffer) >= 8:
-                header = buffer[:8]
-                try:
-                    stream_type, length = struct.unpack(">BxxxL", header)
-                except struct.error:
-                    # This indicates a malformed stream. Treat the rest of the buffer as stdout.
-                    if buffer:
-                        yield "stdout", buffer.decode("utf-8", errors="ignore")
-                    buffer = b""  # Clear buffer to prevent reprocessing
-                    break  # Exit inner loop
-
-                # Check if the full message is in the buffer
-                if len(buffer) >= 8 + length:
-                    # Extract the message content
-                    content = buffer[8 : 8 + length]
-                    # Move the buffer past the message we just processed
-                    buffer = buffer[8 + length :]
-
-                    # Stream type 2 is stderr, everything else is stdout
-                    stream_name: LogStream = "stderr" if stream_type == 2 else "stdout"
-                    yield stream_name, content.decode("utf-8", errors="ignore")
+        for chunk in stream_generator:
+            buffer += chunk
+            while True:
+                frame, new_buffer = self._parse_one_frame(buffer)
+                buffer = new_buffer
+                if frame:
+                    yield frame
                 else:
-                    # We don't have the full message yet, break the inner loop
-                    # and wait for more chunks from the stream_generator.
+                    # No more complete frames in the buffer, need more data.
                     break
+
+        # If any data remains in the buffer after the stream is exhausted,
+        # treat it as a final stdout line.
+        if buffer:
+            yield "stdout", buffer.decode("utf-8", errors="ignore")
 
     def run_command_in_container(
         self,

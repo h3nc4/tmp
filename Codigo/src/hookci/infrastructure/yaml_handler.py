@@ -18,8 +18,10 @@
 Handles serialization and deserialization of YAML configuration files.
 """
 from pathlib import Path
-from typing import Any, Dict, Protocol
+from typing import Any, Dict, Protocol, runtime_checkable
+
 import yaml
+
 from hookci.infrastructure.errors import (
     ConfigurationNotFoundError,
     ConfigurationParseError,
@@ -27,6 +29,7 @@ from hookci.infrastructure.errors import (
 from hookci.infrastructure.fs import IFileSystem
 
 
+@runtime_checkable
 class IConfigHandler(Protocol):
     """Interface for loading and writing configuration data."""
 
@@ -56,6 +59,10 @@ class YamlConfigHandler(IConfigHandler):
             return data
         except yaml.YAMLError as e:
             raise ConfigurationParseError(f"Error parsing YAML file: {e}") from e
+        except Exception as e:
+            raise ConfigurationParseError(
+                f"Error reading configuration file: {e}"
+            ) from e
 
     def write_config_data(self, path: Path, config_data: Dict[str, Any]) -> None:
         """
