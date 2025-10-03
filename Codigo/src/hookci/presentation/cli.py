@@ -23,7 +23,7 @@ from __future__ import annotations
 import subprocess
 from collections import defaultdict
 from itertools import chain
-from typing import DefaultDict, Dict, Iterable, List, Optional
+from typing import Callable, DefaultDict, Dict, Iterable, List, Optional
 
 import typer
 from rich.console import Console, Group
@@ -51,8 +51,8 @@ from hookci.application.events import (
     StepStart,
 )
 from hookci.containers import container
-from hookci.domain.config import LogLevel, Step
-from hookci.infrastructure.errors import InfrastructureError
+from hookci.domain.config import LogLevel, Step  # Strictly for type hinting
+from hookci.infrastructure.errors import InfrastructureError  # Strictly for exceptions
 from hookci.log import get_logger, setup_logging
 
 try:
@@ -137,27 +137,34 @@ class PipelineUI:
 
     def handle_event(self, event: PipelineEvent, live: Live) -> None:
         """Updates the UI based on a pipeline event."""
+        processed = False
         if isinstance(event, PipelineStart):
             self.log_level = event.log_level
             self.overall_progress.update(self.overall_task, total=event.total_steps)
+            processed = True
 
         elif isinstance(event, StepStart):
             task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
             self.step_tasks[event.step.name] = task_id
             if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
                 self._create_panel_for_step(event)
+            processed = True
 
         elif isinstance(event, LogLine):
             self.all_logs[event.step_name].append(event)
             self._update_panel_with_log(event)
+            processed = True
 
         elif isinstance(event, StepEnd):
             self._finalize_step(event)
+            processed = True
 
         elif isinstance(event, PipelineEnd):
             self._finalize_pipeline(event)
+            processed = True
 
-        live.update(self._get_display_group())
+        if processed:
+            live.update(self._get_display_group())
 
     def _create_panel_for_step(self, event: StepStart) -> None:
         command_text = Text.from_markup(
@@ -176,36 +183,35 @@ class PipelineUI:
         if self.log_level == LogLevel.INFO and self.active_info_panel:
             step_logs = "".join(log.line for log in self.all_logs[event.step_name])
             syntax = Syntax(step_logs, "bash", theme="monokai", word_wrap=True)
-            if isinstance(self.active_info_panel.renderable, Group):
-                self.active_info_panel.renderable.renderables[1] = syntax
+            renderable = self.active_info_panel.renderable
+            if isinstance(renderable, Group):
+                renderable.renderables[1] = syntax
             else:
-                self.active_info_panel.renderable = Group(
-                    self.active_info_panel.renderable, syntax
-                )
+                self.active_info_panel.renderable = Group(renderable, syntax)
 
         elif self.log_level == LogLevel.DEBUG and event.step_name in self.debug_panels:
             panel = self.debug_panels[event.step_name]
             step_logs = "".join(log.line for log in self.all_logs[event.step_name])
             syntax = Syntax(step_logs, "bash", theme="monokai", word_wrap=True)
-            if isinstance(panel.renderable, Group):
-                panel.renderable.renderables[1] = syntax
+            renderable = panel.renderable
+            if isinstance(renderable, Group):
+                renderable.renderables[1] = syntax
             else:
-                panel.renderable = Group(panel.renderable, syntax)
+                panel.renderable = Group(renderable, syntax)
 
     def _finalize_step(self, event: StepEnd) -> None:
-        task_id = self.step_tasks.get(event.step.name)
-        if task_id:
-            description = f"  - {event.step.name}"
+        step = event.step
+        task_id = self.step_tasks.get(step.name)
+        if task_id is not None:
+            description = f"  - {step.name}"
             if event.status == "SUCCESS":
                 description = f"[green]✔[/] {description}"
+                self.overall_progress.update(self.overall_task, advance=1)
             elif event.status == "FAILURE":
                 description = f"[red]✖[/] {description}"
             else:  # WARNING
                 description = f"[yellow]⚠[/] {description}"
             self.steps_progress.update(task_id, completed=1, description=description)
-
-        if event.status == "SUCCESS":
-            self.overall_progress.update(self.overall_task, advance=1)
 
         # Clear active info panel for INFO level
         if self.log_level == LogLevel.INFO:
@@ -213,15 +219,12 @@ class PipelineUI:
 
         # For failures, remove any existing debug panel and create a dedicated error panel
         if event.status == "FAILURE":
-            if (
-                self.log_level == LogLevel.DEBUG
-                and event.step.name in self.debug_panels
-            ):
-                del self.debug_panels[event.step.name]
+            if self.log_level == LogLevel.DEBUG and step.name in self.debug_panels:
+                del self.debug_panels[step.name]
 
-            log_content = "".join(log.line for log in self.all_logs[event.step.name])
+            log_content = "".join(log.line for log in self.all_logs[step.name])
             command_text = Text.from_markup(
-                f"[bold]Command:[/] [cyan]{event.step.command}[/]\n"
+                f"[bold]Command:[/] [cyan]{step.command}[/]\n"
             )
             error_group = Group(
                 command_text,
@@ -231,7 +234,7 @@ class PipelineUI:
                 Panel(
                     error_group,
                     border_style="red",
-                    title=f"Error Output: {event.step.name}",
+                    title=f"Error Output: {step.name}",
                 )
             )
 
@@ -249,9 +252,6 @@ class PipelineUI:
 
 def _handle_error(e: Exception) -> None:
     """Logs errors and exits the application."""
-    # Catch typer.Exit and re-raise it to prevent it from being logged as an unexpected error.
-    if isinstance(e, typer.Exit):
-        raise e
     # Handle specific "info" cases that shouldn't look like errors
     if isinstance(e, ConfigurationUpToDateError):
         logger.info(str(e))
@@ -295,40 +295,72 @@ def _open_interactive_shell(container_id: str, step: Step) -> None:
     logger.error("Could not find a valid shell (bash, ash, sh) in the container.")
 
 
+class DebugUI:
+    """Processes pipeline events and prints simple line-by-line output for debug mode."""
+
+    def __init__(self) -> None:
+        self.final_status = "FAILURE"
+        self.current_step: Optional[Step] = None
+        # A mapping of event types to their corresponding handler methods.
+        self.event_handlers: Dict[
+            type[PipelineEvent], Callable[[PipelineEvent], None]
+        ] = {
+            PipelineStart: self._handle_pipeline_start,
+            StepStart: self._handle_step_start,
+            LogLine: self._handle_log_line,
+            StepEnd: self._handle_step_end,
+            DebugShellStarting: self._handle_debug_shell,
+            PipelineEnd: self._handle_pipeline_end,
+        }
+
+    def handle_event(self, event: PipelineEvent) -> None:
+        """Dispatches an event to the appropriate handler."""
+        handler = self.event_handlers.get(type(event))
+        if handler:
+            handler(event)
+
+    def _handle_pipeline_start(self, event: PipelineEvent) -> None:
+        assert isinstance(event, PipelineStart)
+        console.print("[bold]🚀 Pipeline Started[/]")
+
+    def _handle_step_start(self, event: PipelineEvent) -> None:
+        assert isinstance(event, StepStart)
+        self.current_step = event.step
+        console.print(f"\n[bold]▶️ Running Step: {event.step.name}[/]")
+        console.print(f"  [cyan]Command:[/] {event.step.command}")
+
+    def _handle_log_line(self, event: PipelineEvent) -> None:
+        assert isinstance(event, LogLine)
+        stream_color = "red" if event.stream == "stderr" else "dim"
+        console.print(f"  [{stream_color}]{event.line.strip()}[/]")
+
+    def _handle_step_end(self, event: PipelineEvent) -> None:
+        assert isinstance(event, StepEnd)
+        if event.status == "SUCCESS":
+            console.print(f"[bold green]✔ Step '{event.step.name}' Succeeded[/]")
+        else:
+            style = "red" if event.status == "FAILURE" else "yellow"
+            console.print(
+                f"[bold {style}]✖ Step '{event.step.name}' Failed (Status: {event.status})[/]"
+            )
+
+    def _handle_debug_shell(self, event: PipelineEvent) -> None:
+        assert isinstance(event, DebugShellStarting)
+        _open_interactive_shell(event.container_id, event.step)
+
+    def _handle_pipeline_end(self, event: PipelineEvent) -> None:
+        assert isinstance(event, PipelineEnd)
+        self.final_status = event.status
+
+
 def _run_debug_mode(
     event_iterable: Iterable[PipelineEvent],
 ) -> str:
     """Handles pipeline execution with simple line-by-line output for debug mode."""
-    final_status = "FAILURE"
-    current_step: Optional[Step] = None
-    all_logs: DefaultDict[str, List[str]] = defaultdict(list)
-
+    ui_handler = DebugUI()
     for event in event_iterable:
-        if isinstance(event, PipelineStart):
-            console.print("[bold]🚀 Pipeline Started[/]")
-        elif isinstance(event, StepStart):
-            current_step = event.step
-            console.print(f"\n[bold]▶️ Running Step: {event.step.name}[/]")
-            console.print(f"  [cyan]Command:[/] {event.step.command}")
-        elif isinstance(event, LogLine):
-            stream_color = "red" if event.stream == "stderr" else "dim"
-            console.print(f"  [{stream_color}]{event.line.strip()}[/]")
-            if current_step:
-                all_logs[current_step.name].append(event.line)
-        elif isinstance(event, StepEnd):
-            if event.status == "SUCCESS":
-                console.print(f"[bold green]✔ Step '{event.step.name}' Succeeded[/]")
-            else:
-                style = "red" if event.status == "FAILURE" else "yellow"
-                console.print(
-                    f"[bold {style}]✖ Step '{event.step.name}' Failed (Status: {event.status})[/]"
-                )
-        elif isinstance(event, DebugShellStarting):
-            _open_interactive_shell(event.container_id, event.step)
-        elif isinstance(event, PipelineEnd):
-            final_status = event.status
-
-    return final_status
+        ui_handler.handle_event(event)
+    return ui_handler.final_status
 
 
 @app.command()
@@ -404,7 +436,6 @@ def run(
 
     except Exception as e:
         _handle_error(e)
-        return
 
     if final_status == "SUCCESS":
         console.print("\n[bold green]✅ Pipeline finished successfully![/bold green]")
