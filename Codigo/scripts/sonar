@@ -69,12 +69,10 @@ docker run \
     "${SONAR_SCAN_IMAGE}" \
     -Dsonar.host.url="${SONAR_URL}"
 
-if [ -z "${CI:-}" ]; then # Remove this check once we achieve quality gate passing
-    sleep 15
-    if ! curl -s "${SONAR_URL}/api/issues/search?componentKeys=${PROJECT_KEY}&resolved=false&ps=1" | grep -q '{"total":0,' && \
-    ! curl -s "${SONAR_URL}/api/measures/component?component=${PROJECT_KEY}&metricKeys=coverage" | grep -q '"coverage","value":"100.0"'; then
-        echo "ERROR: SonarQube analysis failed. Issues found or code coverage is not 100%." >&2
-        echo "Check the SonarQube dashboard at ${SONAR_URL} for more details." >&2
-        exit 1
-    fi
+sleep 15
+if ! curl -s "${SONAR_URL}/api/issues/search?componentKeys=${PROJECT_KEY}&resolved=false&ps=1" | grep -q '{"total":0,' && \
+   ! curl -s "${SONAR_URL}/api/measures/component?component=${PROJECT_KEY}&metricKeys=coverage" | grep -q '"coverage","value":"100.0"'; then
+    echo "ERROR: SonarQube analysis failed. Issues found or code coverage is not 100%." >&2
+    echo "Check the SonarQube dashboard at ${SONAR_URL} for more details." >&2
+    exit 1
 fi
