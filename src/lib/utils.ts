@@ -16,17 +16,9 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import path from "path"
-import tailwindcss from "@tailwindcss/vite"
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-})
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
