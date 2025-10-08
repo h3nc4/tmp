@@ -1,0 +1,41 @@
+{
+  "name": "WASudoku",
+  "build": {
+    "dockerfile": "./Dockerfile"
+  },
+  "runArgs": [
+    "-v",
+    "/etc/localtime:/etc/localtime:ro",
+    "-v",
+    "/etc/timezone:/etc/timezone:ro",
+    "--name=wasudoku-devcontainer",
+    "--network=host"
+  ],
+  "remoteUser": "wasudoku",
+  "workspaceFolder": "/wasudoku",
+  "mounts": [
+    "source=${localWorkspaceFolder}/,target=/wasudoku,type=bind",
+    "source=${env:HOME},target=/home/wasudoku,type=bind",
+    "source=/etc/profile,target=/etc/profile,type=bind,readonly",
+    "source=/etc/bash.bashrc,target=/etc/bash.bashrc,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "TERM": "${env:TERM}",
+    "TMUX": "${env:TMUX}"
+  },
+  "userEnvProbe": "interactiveShell",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "timonwong.shellcheck",
+        "DavidAnson.vscode-markdownlint",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "ms-azuretools.vscode-docker",
+        "donjayamanne.githistory",
+        "eamodio.gitlens",
+        "foxundermoon.shell-format",
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  }
+}
