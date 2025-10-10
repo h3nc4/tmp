@@ -1,0 +1,31 @@
+{
+  "name": "hookci-installer",
+  "displayName": "HookCI",
+  "description": "Automatically installs the hookci binary and configures Git hooks for the workspace.",
+  "version": "0.1.0",
+  "publisher": "HenriqueA",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/h3nc4/HookCI.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

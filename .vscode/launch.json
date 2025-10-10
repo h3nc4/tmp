@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/Codigo/extension" // This is the crucial line
+            ],
+            "outFiles": [
+                "${workspaceFolder}/Codigo/extension/out/**/*.js"
+            ],
+            "preLaunchTask": {
+                "type": "npm",
+                "script": "compile",
+                "path": "Codigo/extension/" // Tell the task runner where to find the compile script
+            }
+        }
+    ]
+}

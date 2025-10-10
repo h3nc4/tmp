@@ -18,7 +18,37 @@
 # The below variable skips squashing the image layers
 # Devcontainers do not support squashing
 ARG DEVCONTAINER
+
 ARG PYTHON_VERSION=3.13
+
+ARG NODE_VERSION="22.20.0"
+ARG NODE_DISTRO="node-v${NODE_VERSION}-linux-x64"
+
+################################################################################
+# Node.js stage
+FROM alpine:3.22 AS node-stage
+ARG NODE_VERSION
+ARG NODE_DISTRO
+
+RUN apk add gnupg tar xz
+
+########################################
+# Download and verify Node.js
+ADD "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt.asc" /tmp/
+ADD "https://github.com/nodejs/release-keys/raw/HEAD/gpg/pubring.kbx" /tmp/node-keyring.kbx
+ADD "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DISTRO}.tar.xz" /tmp/
+
+RUN gpg --batch --yes --no-default-keyring --keyring /tmp/node-keyring.kbx \
+    --trust-model always --decrypt /tmp/SHASUMS256.txt.asc >/tmp/SHASUMS256.txt && \
+    cd /tmp && grep "${NODE_DISTRO}.tar.xz" SHASUMS256.txt | sha256sum -c -
+
+########################################
+# Install Node.js to /opt/node
+RUN mkdir -p "/rootfs/opt/node" "/rootfs/usr/local/bin" && \
+    tar -xf "/tmp/${NODE_DISTRO}.tar.xz" -C "/rootfs/opt/node" --strip-components=1
+
+# Symlink node binaries to /usr/local/bin
+RUN cd "/rootfs/usr/local/bin" && ln -s ../../../opt/node/bin/* .
 
 ################################## PLANTUML BUILDER
 FROM alpine:3.22 AS plantuml-builder
@@ -148,10 +178,10 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################## LAYER SQUASHING
-FROM scratch AS squash
-COPY --from=base / /
-
 FROM ${DEVCONTAINER:-squash}
+
+COPY --from=base / /
+COPY --from=node-stage /rootfs/ /
 
 ############### FINAL ENV
 ENV LANG=en_US.UTF-8

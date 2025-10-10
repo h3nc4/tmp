@@ -23,3 +23,7 @@ DEBIAN/
 **/debian/*.substvars
 **/usr/bin/
 **/usr/share/
+
+node_modules/
+out/
+*.vsix
