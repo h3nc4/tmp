@@ -176,6 +176,10 @@ RUN apt-get install --no-install-recommends -y -qq \
   libssl-dev \
   zlib1g-dev
 
+# Install debugging tools
+RUN apt-get install --no-install-recommends -y -qq \
+  lldb
+
 ########################################
 # Create a non-root developing user and configure doas
 RUN addgroup --gid "${GID}" "${USER}"
