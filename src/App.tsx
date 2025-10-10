@@ -16,15 +16,57 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { useEffect, useState, useCallback } from 'react';
+import init, { greet } from 'wasudoku-wasm';
+
 function App() {
+  const [wasmLoaded, setWasmLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Initializes the WebAssembly module when the component mounts.
+   */
+  useEffect(() => {
+    const loadWasm = async () => {
+      try {
+        // Initialize the WASM module
+        await init();
+        setWasmLoaded(true);
+        console.log("WebAssembly module loaded successfully.");
+      } catch (e) {
+        console.error("Failed to load WebAssembly module:", e);
+        setError("Failed to load WASM module.");
+      }
+    };
+
+    loadWasm();
+  }, []);
+
+  /**
+   * Calls the `greet` function from the WASM module.
+   * This is wrapped in useCallback for potential future optimizations or dependencies.
+   */
+  const handleGreet = useCallback(() => {
+    if (wasmLoaded) {
+      greet();
+    } else {
+      alert("WASM module not loaded yet.");
+    }
+  }, [wasmLoaded]);
 
   return (
-    <>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
+      <h1 className="text-4xl font-bold mb-8">WASudoku</h1>
+      {error && <p className="text-destructive mb-4">{error}</p>}
+      <button
+        onClick={handleGreet}
+        className="px-6 py-3 bg-primary text-primary-foreground rounded-lg shadow-md hover:bg-primary/90 transition-colors duration-200"
+        disabled={!wasmLoaded}
+      >
+        {wasmLoaded ? "Click me 😎" : "Loading WASM..."}
+      </button>
+    </div>
+  );
 }
 
-export default App
+export default App;

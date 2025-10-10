@@ -1,0 +1,58 @@
+[package]
+name = "wasudoku-wasm"
+version = "0.0.0"
+authors = ["Henrique Almeida <henrique.almeida@hexagon.com>"]
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2.104"
+
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.54"
+
+#
+# Build Profiles
+#
+# These profiles control how the Rust compiler builds the crate.
+# We have separate configurations for development (fast compiles, debug info)
+# and release (slow compiles, optimized for size/speed).
+#
+
+[profile.dev]
+# Development profile: optimized for fast compilation and debugging.
+debug = true
+opt-level = 0
+
+[profile.release]
+# Release profile: optimized for a balance of speed and small binary size.
+# `wasm-pack build --release` uses this profile.
+opt-level = "s"     # Optimize for speed, but avoid optimizations that bloat binary size.
+lto = true          # Enable Link-Time Optimization for better whole-program optimization.
+codegen-units = 1   # Maximize optimization opportunities at the cost of compile time.
+panic = "abort"     # Abort on panic, which removes unwinding code and reduces binary size.
+strip = true        # Strip debug symbols from the final binary.
+
+#
+# wasm-pack metadata
+#
+# This section configures the behavior of wasm-pack, including the
+# arguments passed to the wasm-opt tool.
+#
+[package.metadata.wasm-pack.profile.release]
+# We pass the `--enable-bulk-memory` flag to wasm-opt.
+# This is necessary because modern Rust compilers emit bulk memory operations
+# by default, and wasm-opt needs to be explicitly told to handle them.
+wasm-opt = ["--enable-bulk-memory", "-O"]
