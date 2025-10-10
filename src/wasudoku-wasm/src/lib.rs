@@ -16,8 +16,11 @@
 * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+mod board;
+mod solver;
 mod utils;
 
+use board::Board;
 use wasm_bindgen::prelude::*;
 
 /// Called when the wasm module is instantiated.
@@ -29,12 +32,26 @@ pub fn main() {
     utils::set_panic_hook();
 }
 
+/// Solves a Sudoku puzzle represented as a string.
+///
+/// The input string should be 81 characters long, with numbers 1-9 representing
+/// filled cells and '.' or '0' representing empty cells.
+///
+/// ### Arguments
+///
+/// * `board_str` - A string slice representing the Sudoku board.
+///
+/// ### Returns
+///
+/// * `Ok(String)` - A string representing the solved board if a solution is found.
+/// * `Err(JsValue)` - An error if the input is invalid or the puzzle is unsolvable.
 #[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
+pub fn solve_sudoku(board_str: &str) -> Result<String, JsValue> {
+    let mut board = Board::from_str(board_str).map_err(|e| JsValue::from_str(&e))?;
 
-#[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, wasudoku-wasm!");
+    if solver::solve(&mut board) {
+        Ok(board.to_string())
+    } else {
+        Err(JsValue::from_str("No solution found for the given puzzle."))
+    }
 }
