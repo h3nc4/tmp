@@ -15,7 +15,7 @@
 # along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
 
 ################################################################################
-# A Dockerfile to build a development container for WASudoku.
+# A Dockerfile to build a CI container for WASudoku.
 
 ########################################
 # Rust versions
@@ -23,18 +23,26 @@ ARG RUST_VERSION="1.90.0"
 ARG RUST_DISTRO="rust-${RUST_VERSION}-x86_64-unknown-linux-gnu"
 ARG RUST_DISTRO_WASM="rust-std-${RUST_VERSION}-wasm32-unknown-unknown"
 ARG RUST_DISTRO_SRC="rust-src-${RUST_VERSION}"
+ARG CARGO_HOME="/opt/rust/.cargo"
 
 ########################################
 # Node.js versions
 ARG NODE_VERSION="22.20.0"
 ARG NODE_DISTRO="node-v${NODE_VERSION}-linux-x64"
 
-########################################
-# Runtime user configuration
-ARG USER="wasudoku"
-ARG UID="1000"
-ARG GID="1000"
-ARG CARGO_HOME="/home/${USER}/.local/share/cargo"
+################################################################################
+# Shared debian image
+FROM debian:trixie-slim AS debian-base
+
+# Update apt lists
+RUN apt-get update -qq
+
+RUN apt-get install --no-install-recommends -y -qq \
+  build-essential \
+  ca-certificates \
+  pkg-config \
+  libssl-dev \
+  zlib1g-dev
 
 ################################################################################
 # Shared builder image
@@ -80,31 +88,29 @@ RUN tar -xf "/tmp/${RUST_DISTRO_WASM}.tar.xz" -C "/tmp/rust-installer-wasm" --st
   cd "/tmp/rust-installer-wasm" && ./install.sh --prefix="/rootfs/opt/rust"
 
 ########################################
-# Install rust source code
-FROM rust-base AS rust-src
-ARG RUST_VERSION
-ARG RUST_DISTRO_SRC
-
-ADD "https://static.rust-lang.org/dist/${RUST_DISTRO_SRC}.tar.xz" /tmp/
-ADD "https://static.rust-lang.org/dist/${RUST_DISTRO_SRC}.tar.xz.asc" /tmp/
-
-RUN gpg --verify "/tmp/${RUST_DISTRO_SRC}.tar.xz.asc" "/tmp/${RUST_DISTRO_SRC}.tar.xz" && \
-  mkdir -p "/rootfs/opt/rust" "/tmp/rust-installer-src"
-RUN tar -xf "/tmp/${RUST_DISTRO_SRC}.tar.xz" -C "/tmp/rust-installer-src" --strip-components=1 && \
-  cd "/tmp/rust-installer-src" && ./install.sh --prefix="/rootfs/opt/rust"
-
-########################################
 #  Merge all Rust components
 FROM builder-base AS rust-stage
 
 # Copy components from each stage
 COPY --from=rust-toolchain "/rootfs/" "/rootfs/"
 COPY --from=rust-wasm "/rootfs/" "/rootfs/"
-COPY --from=rust-src  "/rootfs/" "/rootfs/"
 
 # Symlink binaries into PATH
 RUN mkdir -p "/rootfs/usr/local/bin"
 RUN cd "/rootfs/usr/local/bin" && ln -s ../../../opt/rust/bin/* .
+
+################################################################################
+# stage to install cargo dependencies
+FROM debian-base AS cargo-deps-stage
+ARG CARGO_HOME
+ENV CARGO_HOME="/rootfs/${CARGO_HOME}"
+
+COPY --from=rust-stage /rootfs/ /
+
+# Install build dependencies
+COPY scripts/wasm-deps.sh /usr/local/bin/wasm-deps
+RUN chmod +x /usr/local/bin/wasm-deps
+RUN wasm-deps
 
 ################################################################################
 # Node.js stage
@@ -132,83 +138,21 @@ RUN cd "/rootfs/usr/local/bin" && ln -s ../../../opt/node/bin/* .
 
 ################################################################################
 # Debian main stage
-FROM debian:trixie AS main
-ARG USER
-ARG UID
-ARG GID
+FROM debian-base AS main
 
-# Update apt lists
-RUN apt-get update -qq
-
-# Gen locale
-RUN apt-get install --no-install-recommends -y -qq locales && \
-  echo "en_US.UTF-8 UTF-8" >/etc/locale.gen && \
-  locale-gen en_US.UTF-8 && \
-  update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-
-# Install generic tools
-RUN apt-get install --no-install-recommends -y -qq \
-  bash-completion \
-  ca-certificates \
-  curl \
-  git \
-  gnupg \
-  iputils-ping \
-  iproute2 \
-  jq \
-  less \
-  man-db \
-  nano \
-  net-tools \
-  opendoas \
-  openssh-client \
-  procps \
-  tree \
-  wget \
-  yq
-
-# Install build tools
-RUN apt-get install --no-install-recommends -y -qq \
-  build-essential \
-  pkg-config \
-  libssl-dev \
-  zlib1g-dev
-
-# Install debugging tools
-RUN apt-get install --no-install-recommends -y -qq \
-  lldb
-
-########################################
-# Create a non-root developing user and configure doas
-RUN addgroup --gid "${GID}" "${USER}"
-RUN adduser --uid "${UID}" --gid "${GID}" \
-  --shell "/bin/bash" --disabled-password "${USER}"
-
-RUN printf "permit nopass nolog keepenv %s as root\n" "${USER}" >/etc/doas.conf && \
-  chmod 400 /etc/doas.conf && \
-  printf "%s\nset -e\n%s\n" "#!/bin/sh" "doas \$@" >/usr/local/bin/sudo && \
-  chmod a+rx /usr/local/bin/sudo
-
-########################################
 # Clean cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################################################################
-# Final squash-and-load image. Change to scratch once https://github.com/devcontainers/cli/issues/239 is resolved.
-FROM debian:trixie AS final
-ARG USER
-ARG RUST_VERSION
+# Final squash-and-load image.
+FROM scratch AS final
 ARG CARGO_HOME
-ENV USER="${USER}" \
-  RUST_VERSION="${RUST_VERSION}" \
-  CARGO_HOME="${CARGO_HOME}" \
-  PATH="/wasudoku/node_modules/.bin:${CARGO_HOME}/bin:${PATH}" \
-  LANG="en_US.UTF-8" \
-  LC_ALL="en_US.UTF-8"
+ENV PATH="/wasudoku/node_modules/.bin:${CARGO_HOME}/bin:${PATH}"
 
 COPY --from=main / /
 COPY --from=node-stage /rootfs/ /
 COPY --from=rust-stage /rootfs/ /
+COPY --from=cargo-deps-stage /rootfs/ /
 
-USER "${USER}"
+WORKDIR /usr/src/
