@@ -18,7 +18,8 @@
 
 set -e
 
-tools="wasm-pack 0.13.1"
+tools="wasm-pack 0.13.1
+wasm-opt 0.116.1"
 
 echo "$tools" | while read -r name ver; do
   if ! command -v "$name" >/dev/null 2>&1; then
