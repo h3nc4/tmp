@@ -21,6 +21,7 @@ mod solver;
 mod utils;
 
 use board::Board;
+use std::panic;
 use wasm_bindgen::prelude::*;
 
 /// Called when the wasm module is instantiated.
@@ -44,14 +45,26 @@ pub fn main() {
 /// ### Returns
 ///
 /// * `Ok(String)` - A string representing the solved board if a solution is found.
-/// * `Err(JsValue)` - An error if the input is invalid or the puzzle is unsolvable.
+/// * `Err(JsValue)` - An error if the input is invalid, the puzzle is unsolvable, or a crash occurs.
 #[wasm_bindgen]
 pub fn solve_sudoku(board_str: &str) -> Result<String, JsValue> {
+    // Parse the board.
     let mut board = Board::from_str(board_str).map_err(|e| JsValue::from_str(&e))?;
 
-    if solver::solve(&mut board) {
-        Ok(board.to_string())
-    } else {
-        Err(JsValue::from_str("No solution found for the given puzzle."))
+    let solve_result = panic::catch_unwind(move || {
+        if solver::solve(&mut board) {
+            Some(board) // Return the solved board on success
+        } else {
+            None // Indicate no solution was found
+        }
+    });
+
+    match solve_result {
+        // Solved successfully: Ok(Some(board))
+        Ok(Some(solved_board)) => Ok(solved_board.to_string()),
+        // No solution found: Ok(None)
+        Ok(None) => Err(JsValue::from_str("No solution found for the given puzzle.")),
+        // A panic was caught: Err(_)
+        Err(_) => Err(JsValue::from_str("Solver crashed due to a critical error.")),
     }
 }

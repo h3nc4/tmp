@@ -18,9 +18,17 @@
 
 use crate::board::Board;
 
+/// Represents the outcome of searching for the next cell to solve.
+enum FindResult {
+    /// The board is already solved (no empty cells).
+    Solved,
+    /// The board is in an unsolvable state (an empty cell has 0 valid moves).
+    Unsolvable,
+    /// The coordinates of the most constrained cell to try next.
+    Cell(usize, usize),
+}
+
 /// Solves the Sudoku puzzle using a backtracking algorithm.
-///
-/// This function mutates the board in place.
 ///
 /// ### Arguments
 ///
@@ -31,44 +39,74 @@ use crate::board::Board;
 /// * `true` if a solution is found.
 /// * `false` if the puzzle is unsolvable.
 pub fn solve(board: &mut Board) -> bool {
-    let find_empty = find_empty_cell(board);
+    // Find the state of the board or the next best cell to operate on.
+    match find_most_constrained_cell(board) {
+        // The board is fully solved.
+        FindResult::Solved => true,
+        // The board has reached a dead end, backtrack immediately.
+        FindResult::Unsolvable => false,
+        // Proceed with the most constrained cell.
+        FindResult::Cell(row, col) => {
+            // Iterate through only the valid numbers for this specific cell.
+            for num in 1..=9 {
+                if board.is_valid_move(row, col, num) {
+                    board.cells[row * 9 + col] = num;
 
-    let (row, col) = match find_empty {
-        Some((r, c)) => (r, c),
-        None => return true, // No empty cells, puzzle is solved
-    };
+                    if solve(board) {
+                        return true;
+                    }
 
-    for num in 1..=9 {
-        if board.is_valid_move(row, col, num) {
-            board.cells[row * 9 + col] = num;
-
-            if solve(board) {
-                return true;
+                    // Backtrack: if this path didn't work, reset the cell.
+                    board.cells[row * 9 + col] = 0;
+                }
             }
-
-            // Backtrack: if the current path didn't lead to a solution,
-            // reset the cell and try the next number.
-            board.cells[row * 9 + col] = 0;
+            // If no valid number for this cell leads to a solution, trigger backtracking.
+            false
         }
     }
-
-    false // No number works for the current cell, trigger backtracking
 }
 
-/// Finds the next empty cell (represented by `0`) in the board.
-///
-/// Traverses the board from left to right, top to bottom.
-///
-/// ### Returns
-///
-/// * `Some((row, col))` - The coordinates of the first empty cell found.
-/// * `None` - If no empty cells are found on the board.
-fn find_empty_cell(board: &Board) -> Option<(usize, usize)> {
-    board
-        .cells
-        .iter()
-        .position(|&cell| cell == 0)
-        .map(|i| (i / 9, i % 9))
+/// MRV heuristic: Finds the empty cell with the fewest valid candidates.
+fn find_most_constrained_cell(board: &Board) -> FindResult {
+    let mut best_cell: Option<(usize, usize)> = None;
+    let mut min_possibilities = 10; // Start with a value > 9
+    let mut found_empty_cell = false;
+    for i in 0..81 {
+        if board.cells[i] == 0 {
+            found_empty_cell = true;
+            let row = i / 9;
+            let col = i % 9;
+            let mut possibilities = 0;
+
+            for num in 1..=9 {
+                if board.is_valid_move(row, col, num) {
+                    possibilities += 1;
+                }
+            }
+
+            // Stop immediately if an empty cell with 0 possibilities is found.
+            if possibilities == 0 {
+                return FindResult::Unsolvable;
+            }
+
+            // Update the best cell if the current has fewer possibilities.
+            if possibilities < min_possibilities {
+                min_possibilities = possibilities;
+                best_cell = Some((row, col));
+                // Stop searching if a cell with only 1 possibility is found.
+                if min_possibilities == 1 {
+                    break;
+                }
+            }
+        }
+    }
+    if !found_empty_cell {
+        FindResult::Solved
+    } else {
+        // Return the most constrained cell found.
+        let (row, col) = best_cell.unwrap();
+        FindResult::Cell(row, col)
+    }
 }
 
 #[cfg(test)]
@@ -120,6 +158,21 @@ mod tests {
     }
 
     #[test]
+    fn test_unsolvable_puzzle_returns_false() {
+        // An unsolvable puzzle `23456789` in a row and a `1` in the box where it should be.
+        let puzzle_str =
+            "...................................123456789.....................................";
+        let mut board = Board::from_str(puzzle_str).unwrap();
+
+        // The solver should correctly determine this is unsolvable and return false.
+        let solved = solve(&mut board);
+        assert!(
+            !solved,
+            "Solver should have returned false for an unsolvable puzzle."
+        );
+    }
+
+    #[test]
     fn test_board_from_str_valid() {
         let puzzle_str =
             "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
@@ -149,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_board_from_str_conflict_in_col() {
-        // Two 6s in the first column.
+        // Two 5s in the first column.
         let puzzle_str =
             "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
         let mut chars: Vec<char> = puzzle_str.chars().collect();
