@@ -16,7 +16,9 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { useMemo, useRef, useEffect } from 'react'
 import SudokuCell from './SudokuCell'
+import { getRelatedCellIndices } from '@/lib/utils'
 
 interface SudokuGridProps {
   /** The current state of the board cells. */
@@ -25,8 +27,16 @@ interface SudokuGridProps {
   initialBoard: (number | null)[]
   /** Whether the solver is currently active. */
   isSolving: boolean
+  /** Whether the board is in a solved state. */
+  isSolved: boolean
+  /** A set of indices for cells with conflicting values. */
+  conflicts: Set<number>
+  /** The index of the currently focused cell. */
+  activeCellIndex: number | null
   /** Callback to handle changes to a cell's value. */
   onCellChange: (index: number, value: number | null) => void
+  /** Callback to set the currently focused cell. */
+  onCellFocus: (index: number | null) => void
 }
 
 /**
@@ -36,20 +46,63 @@ export function SudokuGrid({
   board,
   initialBoard,
   isSolving,
+  isSolved,
+  conflicts,
+  activeCellIndex,
   onCellChange,
+  onCellFocus,
 }: SudokuGridProps) {
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  const highlightedIndices = useMemo(() => {
+    if (activeCellIndex === null) {
+      return new Set<number>()
+    }
+    return getRelatedCellIndices(activeCellIndex)
+  }, [activeCellIndex])
+
+  // Effect to handle clicks outside the grid to deselect cells.
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (gridRef.current && !gridRef.current.contains(event.target as Node)) {
+        onCellFocus(null) // Deselect the cell
+      }
+    }
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      // Clean up the event listener
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [gridRef, onCellFocus])
+
   return (
-    <div className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg">
-      {board.map((cellValue, index) => (
-        <SudokuCell
-          key={index}
-          index={index}
-          value={cellValue}
-          isInitial={initialBoard[index] !== null}
-          isSolving={isSolving}
-          onChange={onCellChange}
-        />
-      ))}
+    <div
+      ref={gridRef}
+      className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
+    >
+      {
+        board.map((cellValue, index) => {
+          const isInitial = initialBoard[index] !== null
+          return (
+            <SudokuCell
+              key={index}
+              index={index}
+              value={cellValue}
+              board={board}
+              isInitial={isInitial}
+              isSolving={isSolving}
+              isSolved={isSolved}
+              isConflict={conflicts.has(index)}
+              isActive={activeCellIndex === index}
+              isHighlighted={highlightedIndices.has(index)}
+              onChange={onCellChange}
+              onFocus={onCellFocus}
+            />
+          )
+        })
+      }
     </div>
   )
 }

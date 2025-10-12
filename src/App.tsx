@@ -16,7 +16,8 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Eraser } from 'lucide-react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { Eraser, BrainCircuit } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
@@ -25,14 +26,56 @@ import { useSudoku } from '@/hooks/useSudoku'
 
 function App() {
   const {
-    wasmReady,
     board,
     initialBoard,
     isSolving,
+    isSolved,
+    conflicts,
+    activeCellIndex,
+    solveFailed,
+    setActiveCellIndex,
     setCellValue,
     clearBoard,
     solve,
   } = useSudoku()
+
+  const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
+  const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // This effect manages the delayed "Solving..." state to avoid UI flicker.
+  useEffect(() => {
+    if (isSolving) {
+      // If solving starts, set a timer to show the "Solving..." state after 500ms.
+      solveTimerRef.current = setTimeout(() => {
+        setIsShowingSolvingState(true)
+      }, 500)
+    } else {
+      // If solving ends (success or fail), clear any pending timer and hide the state.
+      if (solveTimerRef.current) {
+        clearTimeout(solveTimerRef.current)
+      }
+      setIsShowingSolvingState(false)
+    }
+
+    // Cleanup the timer on component unmount or when isSolving changes.
+    return () => {
+      if (solveTimerRef.current) {
+        clearTimeout(solveTimerRef.current)
+      }
+    }
+  }, [isSolving])
+
+  const isBoardEmpty = useMemo(() => board.every((cell) => cell === null), [
+    board,
+  ])
+  const isBoardFull = useMemo(() => board.every((cell) => cell !== null), [
+    board,
+  ])
+  const hasConflicts = conflicts.size > 0
+
+  const isSolveDisabled =
+    isSolving || isBoardEmpty || isBoardFull || hasConflicts || solveFailed
+  const isClearDisabled = isSolving || isBoardEmpty
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -59,7 +102,11 @@ function App() {
             board={board}
             initialBoard={initialBoard}
             isSolving={isSolving}
+            isSolved={isSolved}
+            conflicts={conflicts}
+            activeCellIndex={activeCellIndex}
             onCellChange={setCellValue}
+            onCellFocus={setActiveCellIndex}
           />
         </div>
 
@@ -67,19 +114,34 @@ function App() {
           <Button
             onClick={solve}
             className="flex-1"
-            disabled={!wasmReady || isSolving}
+            disabled={isSolveDisabled}
+            title={
+              hasConflicts
+                ? 'Cannot solve with conflicts.'
+                : isBoardFull
+                  ? 'Board is already full.'
+                  : isBoardEmpty
+                    ? 'Board is empty.'
+                    : solveFailed
+                      ? 'Solving failed. Please change the board to try again.'
+                      : 'Solve the puzzle'
+            }
           >
-            {isSolving
-              ? 'Solving...'
-              : wasmReady
-                ? 'Solve Puzzle'
-                : 'Loading Solver...'}
+            {isShowingSolvingState ? (
+              <>
+                <BrainCircuit className="mr-2 size-4 animate-pulse" />
+                Solving...
+              </>
+            ) : (
+              'Solve Puzzle'
+            )}
           </Button>
           <Button
             variant="secondary"
             onClick={clearBoard}
             className="flex-1"
-            disabled={isSolving}
+            disabled={isClearDisabled}
+            title={isBoardEmpty ? 'Board is already empty.' : 'Clear the board'}
           >
             <Eraser className="mr-2 size-4" />
             Clear Board
@@ -88,8 +150,15 @@ function App() {
       </main>
 
       <footer className="container mx-auto p-4 text-center text-sm text-muted-foreground">
-        <p>🄯 2025 Henrique Almeida.</p>
-        <p>Because knowledge should be free.</p>
+        <a
+          href="https://h3nc4.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:no-underline"
+        >
+          <p>🄯 2025 Henrique Almeida.</p>
+          <p>Because knowledge should be free.</p>
+        </a>
       </footer>
     </div>
   )
