@@ -85,15 +85,21 @@ describe('useSudoku hook', () => {
     vi.clearAllMocks()
   })
 
-  it('should initialize with an empty board', () => {
+  it('should initialize with an empty board and correct derived state', () => {
     const { result } = renderHook(() => useSudoku())
     expect(result.current.board).toEqual(Array(81).fill(null))
     expect(result.current.isSolving).toBe(false)
     expect(result.current.isSolved).toBe(false)
     expect(result.current.conflicts.size).toBe(0)
+
+    // Check derived state
+    expect(result.current.isSolveDisabled).toBe(true)
+    expect(result.current.isClearDisabled).toBe(true)
+    expect(result.current.solveButtonTitle).toBe('Board is empty.')
+    expect(result.current.clearButtonTitle).toBe('Board is already empty.')
   })
 
-  it('should set cell value and update conflicts', () => {
+  it('should set cell value and update derived state', () => {
     const { result } = renderHook(() => useSudoku())
 
     act(() => {
@@ -102,11 +108,21 @@ describe('useSudoku hook', () => {
     expect(result.current.board[0]).toBe(5)
     expect(result.current.conflicts.size).toBe(0)
 
+    // Check derived state
+    expect(result.current.isSolveDisabled).toBe(false)
+    expect(result.current.isClearDisabled).toBe(false)
+    expect(result.current.solveButtonTitle).toBe('Solve the puzzle')
+    expect(result.current.clearButtonTitle).toBe('Clear the board')
+  })
+
+  it('should update derived state when board has conflicts', () => {
+    const { result } = renderHook(() => useSudoku())
     act(() => {
-      result.current.setCellValue(8, 5) // Create a row conflict
+      result.current.setCellValue(0, 5)
+      result.current.setCellValue(1, 5) // Row conflict
     })
-    expect(result.current.board[8]).toBe(5)
-    expect(result.current.conflicts).toEqual(new Set([0, 8]))
+    expect(result.current.isSolveDisabled).toBe(true)
+    expect(result.current.solveButtonTitle).toBe('Cannot solve with conflicts.')
   })
 
   it('should not set cell value for out-of-bounds index', () => {
@@ -133,6 +149,7 @@ describe('useSudoku hook', () => {
     expect(result.current.board).toEqual(Array(81).fill(null))
     expect(result.current.conflicts.size).toBe(0)
     expect(toast.info).toHaveBeenCalledWith('Board cleared.')
+    expect(result.current.isSolveDisabled).toBe(true) // Should be disabled again
   })
 
   it('should call the solver and handle a successful solution', async () => {
@@ -163,9 +180,11 @@ describe('useSudoku hook', () => {
     expect(result.current.isSolved).toBe(true)
     expect(result.current.board).toEqual(SOLVED_BOARD_ARRAY)
     expect(toast.success).toHaveBeenCalledWith('Sudoku solved successfully!')
+    expect(result.current.isSolveDisabled).toBe(true) // Disabled because board is full
+    expect(result.current.solveButtonTitle).toBe('Board is already full.')
   })
 
-  it('should handle a solver error', async () => {
+  it('should handle a solver error and update derived state', async () => {
     const { result } = renderHook(() => useSudoku())
     await waitFor(() => expect(result.current).toBeDefined())
 
@@ -182,8 +201,11 @@ describe('useSudoku hook', () => {
     })
 
     expect(result.current.isSolving).toBe(false)
-    expect(result.current.solveFailed).toBe(true)
     expect(result.current.isSolved).toBe(false)
+    expect(result.current.isSolveDisabled).toBe(true)
+    expect(result.current.solveButtonTitle).toBe(
+      'Solving failed. Please change the board to try again.',
+    )
     expect(toast.error).toHaveBeenCalledWith(`Solving failed: ${errorMessage}`)
   })
 

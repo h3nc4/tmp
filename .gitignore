@@ -10,4 +10,4 @@ target/
 *.rs.bk
 
 # Coverage reports
-coverage-*.xml
+coverage-*.*

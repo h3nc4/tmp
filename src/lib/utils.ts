@@ -57,6 +57,26 @@ export function getRelatedCellIndices(index: number): Set<number> {
   return relatedIndices
 }
 
+const ROW_INDICES = Array.from({ length: 9 }, (_, i) =>
+  Array.from({ length: 9 }, (_, k) => i * 9 + k),
+)
+
+const COL_INDICES = Array.from({ length: 9 }, (_, i) =>
+  Array.from({ length: 9 }, (_, k) => k * 9 + i),
+)
+
+const BOX_INDICES = Array.from({ length: 9 }, (_, i) => {
+  const startRow = Math.floor(i / 3) * 3
+  const startCol = (i % 3) * 3
+  const indices: number[] = []
+  for (let rowOffset = 0; rowOffset < 3; rowOffset++) {
+    for (let colOffset = 0; colOffset < 3; colOffset++) {
+      indices.push((startRow + rowOffset) * 9 + (startCol + colOffset))
+    }
+  }
+  return indices
+})
+
 /**
  * Validates the entire Sudoku board and returns a set of indices of cells that are in conflict.
  * A conflict occurs if a number appears more than once in the same row, column, or 3x3 box.
@@ -66,7 +86,7 @@ export function getRelatedCellIndices(index: number): Set<number> {
 export function validateBoard(board: (number | null)[]): Set<number> {
   const conflicts = new Set<number>()
 
-  const checkGroup = (indices: number[]) => {
+  const checkGroup = (indices: readonly number[]) => {
     const seen = new Map<number, number[]>() // Map from number to array of indices
     for (const index of indices) {
       const value = board[index]
@@ -85,30 +105,10 @@ export function validateBoard(board: (number | null)[]): Set<number> {
     }
   }
 
-  // Check all rows
-  for (let i = 0; i < 9; i++) {
-    const rowIndices = Array.from({ length: 9 }, (_, k) => i * 9 + k)
-    checkGroup(rowIndices)
-  }
-
-  // Check all columns
-  for (let i = 0; i < 9; i++) {
-    const colIndices = Array.from({ length: 9 }, (_, k) => k * 9 + i)
-    checkGroup(colIndices)
-  }
-
-  // Check all 3x3 boxes
-  for (let i = 0; i < 9; i++) {
-    const startRow = Math.floor(i / 3) * 3
-    const startCol = (i % 3) * 3
-    const boxIndices: number[] = []
-    for (let rowOffset = 0; rowOffset < 3; rowOffset++) {
-      for (let colOffset = 0; colOffset < 3; colOffset++) {
-        boxIndices.push((startRow + rowOffset) * 9 + (startCol + colOffset))
-      }
-    }
-    checkGroup(boxIndices)
-  }
+  // Check all rows, columns, and boxes
+  ROW_INDICES.forEach(checkGroup)
+  COL_INDICES.forEach(checkGroup)
+  BOX_INDICES.forEach(checkGroup)
 
   return conflicts
 }
@@ -123,7 +123,7 @@ export function validateBoard(board: (number | null)[]): Set<number> {
  * @returns `true` if the move is valid (no immediate conflict), `false` otherwise.
  */
 export function isMoveValid(
-  board: (number | null)[],
+  board: readonly (number | null)[],
   index: number,
   value: number,
 ): boolean {

@@ -93,7 +93,7 @@ impl Board {
     /// Checks if placing a number in a given cell is valid according to Sudoku rules.
     ///
     /// A move is valid if the number does not already exist in the same row, column,
-    /// or 3x3 subgrid.
+    /// or 3x3 subgrid. This function is a critical hot path for the solver.
     pub fn is_valid_move(&self, row: usize, col: usize, num: u8) -> bool {
         // Check row
         for x in 0..9 {
@@ -130,8 +130,60 @@ impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::with_capacity(81);
         for &cell in self.cells.iter() {
-            s.push(std::char::from_digit(cell as u32, 10).unwrap_or('.'));
+            if cell == 0 {
+                s.push('.');
+            } else {
+                s.push(std::char::from_digit(cell as u32, 10).unwrap());
+            }
         }
         write!(f, "{}", s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Provides a fully solved board for testing.
+    fn solved_board() -> Board {
+        let puzzle_str =
+            "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
+        Board::from_str(puzzle_str).unwrap()
+    }
+
+    #[test]
+    fn test_is_valid_move_true_for_empty_spot() {
+        let mut board = solved_board();
+        board.cells[0] = 0; // Make top-left empty
+        assert!(board.is_valid_move(0, 0, 5));
+    }
+
+    #[test]
+    fn test_is_valid_move_false_for_row_conflict() {
+        let board = solved_board();
+        // Try to place a '3' at (0, 2), which is invalid due to '3' at (0, 1)
+        assert!(!board.is_valid_move(0, 2, 3));
+    }
+
+    #[test]
+    fn test_is_valid_move_false_for_col_conflict() {
+        let board = solved_board();
+        // Try to place a '5' at (1, 0), invalid due to '5' at (0,0)
+        assert!(!board.is_valid_move(1, 0, 5));
+    }
+
+    #[test]
+    fn test_is_valid_move_false_for_box_conflict() {
+        let board = solved_board();
+        // Try to place a '7' at (0, 2), which is invalid due to '7' at (1, 1) in the same box
+        assert!(!board.is_valid_move(0, 2, 7));
+    }
+
+    #[test]
+    fn test_display_board() {
+        let puzzle_str =
+            "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
+        let board = Board::from_str(puzzle_str).unwrap();
+        assert_eq!(board.to_string(), puzzle_str);
     }
 }

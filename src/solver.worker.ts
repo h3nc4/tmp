@@ -21,8 +21,8 @@ import init, { solve_sudoku } from 'wasudoku-wasm'
 // --- Worker State ---
 
 // A promise that resolves when the WASM module is initialized.
-// This ensures we only initialize the module once.
-const wasmReady = init()
+// It's initialized lazily on the first valid message.
+let wasmReady: Promise<unknown> | null = null
 
 // --- Event Listener ---
 
@@ -33,8 +33,17 @@ const wasmReady = init()
 self.addEventListener(
   'message',
   async (event: MessageEvent<{ boardString: string }>) => {
+    // Ignore messages from untrusted origins.
+    if (self.location && event.origin && event.origin !== self.location.origin) {
+      console.error(
+        `Message from untrusted origin '${event.origin}' ignored. Expected '${self.location.origin}'.`,
+      )
+      return
+    }
+
     try {
-      // Ensure the WASM module is loaded and ready before proceeding.
+      // Lazily initialize the WASM module on the first valid message.
+      wasmReady ??= init()
       await wasmReady
 
       const { boardString } = event.data

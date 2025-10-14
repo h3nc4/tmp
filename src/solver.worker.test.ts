@@ -33,8 +33,9 @@ const { default: init, solve_sudoku } = await import('wasudoku-wasm')
 
 describe('Solver Worker', () => {
   const mockPostMessage = vi.fn()
+  const workerOrigin = 'http://localhost:3000'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let messageHandler: ((event: MessageEvent<any>) => void) | null = null
+  let messageHandler: ((event: MessageEvent<any>) => Promise<void>) | null = null
 
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -44,33 +45,32 @@ describe('Solver Worker', () => {
     // Mock the global worker context
     vi.stubGlobal('self', {
       postMessage: mockPostMessage,
-      addEventListener: vi.fn((event, handler) => {
-        if (event === 'message') {
-          messageHandler = handler as (event: MessageEvent) => void
-        }
+      addEventListener: vi.fn((_event, handler) => {
+        messageHandler = handler as (event: MessageEvent) => Promise<void>
       }),
       removeEventListener: vi.fn(),
+      // Stub self.location for the origin check
+      location: {
+        origin: workerOrigin,
+      },
     })
 
     // Dynamically import the worker script to re-evaluate it with mocks
     await import('@/solver.worker.ts')
 
-    // Wait until the worker's script has run and attached its message handler
-    await vi.waitFor(() => {
-      if (!messageHandler) {
-        throw new Error('Message handler not yet attached by worker')
-      }
-    })
+    // Ensure that the message handler has been attached
+    if (!messageHandler) {
+      throw new Error('Message handler not attached by worker')
+    }
   })
 
-  // Helper to simulate a message being sent *to* the worker
+  // Helper to simulate a message being sent *to* the worker and await its completion
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const simulateMessage = (data: any) => {
+  const simulateMessage = (data: any, origin: string = workerOrigin) => {
     if (!messageHandler) {
-      // This should not be reached due to the waitFor in beforeEach
       throw new Error('Worker message handler not registered')
     }
-    messageHandler({ data } as MessageEvent)
+    return messageHandler({ data, origin } as MessageEvent)
   }
 
   it('should initialize WASM and solve a puzzle successfully', async () => {
@@ -78,16 +78,13 @@ describe('Solver Worker', () => {
     const solution = '1'.repeat(81)
     vi.mocked(solve_sudoku).mockReturnValue(solution)
 
-    simulateMessage({ boardString })
+    await simulateMessage({ boardString })
 
-    // Wait for async operations within the worker to complete and assertions to pass
-    await vi.waitFor(() => {
-      expect(init).toHaveBeenCalled()
-      expect(solve_sudoku).toHaveBeenCalledWith(boardString)
-      expect(mockPostMessage).toHaveBeenCalledWith({
-        type: 'solution',
-        solution,
-      })
+    expect(init).toHaveBeenCalled()
+    expect(solve_sudoku).toHaveBeenCalledWith(boardString)
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'solution',
+      solution,
     })
   })
 
@@ -98,13 +95,11 @@ describe('Solver Worker', () => {
       throw new Error(errorMessage)
     })
 
-    simulateMessage({ boardString })
+    await simulateMessage({ boardString })
 
-    await vi.waitFor(() => {
-      expect(mockPostMessage).toHaveBeenCalledWith({
-        type: 'error',
-        error: errorMessage,
-      })
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'error',
+      error: errorMessage,
     })
   })
 
@@ -116,13 +111,20 @@ describe('Solver Worker', () => {
       throw errorObject
     })
 
-    simulateMessage({ boardString })
+    await simulateMessage({ boardString })
 
-    await vi.waitFor(() => {
-      expect(mockPostMessage).toHaveBeenCalledWith({
-        type: 'error',
-        error: String(errorObject),
-      })
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'error',
+      error: String(errorObject),
     })
+  })
+
+  it('should ignore messages from a foreign origin', async () => {
+    const boardString = '.'.repeat(81)
+    await simulateMessage({ boardString }, 'http://example.com')
+
+    expect(init).not.toHaveBeenCalled()
+    expect(solve_sudoku).not.toHaveBeenCalled()
+    expect(mockPostMessage).not.toHaveBeenCalled()
   })
 })

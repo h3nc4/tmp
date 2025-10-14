@@ -72,46 +72,50 @@ pub fn solve(board: &mut Board) -> bool {
     }
 }
 
+/// Counts the number of valid moves (1-9) for a given cell.
+fn count_possibilities(board: &Board, row: usize, col: usize) -> u8 {
+    let mut possibilities = 0;
+    for num in 1..=9 {
+        if board.is_valid_move(row, col, num) {
+            possibilities += 1;
+        }
+    }
+    possibilities
+}
+
 /// MRV heuristic: Finds the empty cell with the fewest valid candidates.
 fn find_most_constrained_cell(board: &Board) -> FindResult {
     let mut best_cell: Option<(usize, usize)> = None;
     let mut min_possibilities = 10; // Start with a value > 9
-    let mut found_empty_cell = false;
+
     for i in 0..81 {
-        if board.cells[i] == 0 {
-            found_empty_cell = true;
-            let row = i / 9;
-            let col = i % 9;
-            let mut possibilities = 0;
+        if board.cells[i] != 0 {
+            continue;
+        }
 
-            for num in 1..=9 {
-                if board.is_valid_move(row, col, num) {
-                    possibilities += 1;
-                }
-            }
+        let row = i / 9;
+        let col = i % 9;
+        let possibilities = count_possibilities(board, row, col);
 
-            // Stop immediately if an empty cell with 0 possibilities is found.
-            if possibilities == 0 {
-                return FindResult::Unsolvable;
-            }
+        // Stop immediately if an empty cell with 0 possibilities is found.
+        if possibilities == 0 {
+            return FindResult::Unsolvable;
+        }
 
-            // Update the best cell if the current has fewer possibilities.
-            if possibilities < min_possibilities {
-                min_possibilities = possibilities;
-                best_cell = Some((row, col));
-                // Stop searching if a cell with only 1 possibility is found.
-                if min_possibilities == 1 {
-                    break;
-                }
+        // Update the best cell if the current has fewer possibilities.
+        if possibilities < min_possibilities {
+            min_possibilities = possibilities;
+            best_cell = Some((row, col));
+            // Stop searching if a cell with only 1 possibility is found (optimization).
+            if min_possibilities == 1 {
+                break;
             }
         }
     }
-    if !found_empty_cell {
-        FindResult::Solved
-    } else {
-        // Return the most constrained cell found.
-        let (row, col) = best_cell.unwrap();
-        FindResult::Cell(row, col)
+
+    match best_cell {
+        Some((row, col)) => FindResult::Cell(row, col),
+        None => FindResult::Solved,
     }
 }
 
@@ -145,10 +149,7 @@ mod tests {
         let mut board = Board::from_str(puzzle_str).unwrap();
         let solved = solve(&mut board);
 
-        assert!(
-            solved,
-            "The solver should find a solution for the hard puzzle."
-        );
+        assert!(solved);
         assert_eq!(board.to_string(), solution_str);
     }
 
@@ -172,10 +173,7 @@ mod tests {
 
         // The solver should correctly determine this is unsolvable and return false.
         let solved = solve(&mut board);
-        assert!(
-            !solved,
-            "Solver should have returned false for an unsolvable puzzle."
-        );
+        assert!(!solved);
     }
 
     #[test]
@@ -223,5 +221,15 @@ mod tests {
         let puzzle_str =
             "53..7....61.195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
         assert!(Board::from_str(puzzle_str).is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "Induced panic for testing")]
+    #[cfg(feature = "test-panic")]
+    fn test_induced_panic_is_triggered() {
+        let puzzle_str =
+            "123..............................................................................";
+        let mut board = Board::from_str(puzzle_str).unwrap();
+        solve(&mut board);
     }
 }

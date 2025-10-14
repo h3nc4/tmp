@@ -22,21 +22,21 @@ import { getRelatedCellIndices } from '@/lib/utils'
 
 interface SudokuGridProps {
   /** The current state of the board cells. */
-  board: (number | null)[]
+  readonly board: readonly (number | null)[]
   /** The board state before the solver was run. */
-  initialBoard: (number | null)[]
+  readonly initialBoard: readonly (number | null)[]
   /** Whether the solver is currently active. */
-  isSolving: boolean
+  readonly isSolving: boolean
   /** Whether the board is in a solved state. */
-  isSolved: boolean
+  readonly isSolved: boolean
   /** A set of indices for cells with conflicting values. */
-  conflicts: Set<number>
+  readonly conflicts: ReadonlySet<number>
   /** The index of the currently focused cell. */
-  activeCellIndex: number | null
+  readonly activeCellIndex: number | null
   /** Callback to handle changes to a cell's value. */
-  onCellChange: (index: number, value: number | null) => void
+  readonly onCellChange: (index: number, value: number | null) => void
   /** Callback to set the currently focused cell. */
-  onCellFocus: (index: number | null) => void
+  readonly onCellFocus: (index: number | null) => void
 }
 
 /**
@@ -82,27 +82,27 @@ export function SudokuGrid({
       ref={gridRef}
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
-      {
-        board.map((cellValue, index) => {
-          const isInitial = initialBoard[index] !== null
-          return (
-            <SudokuCell
-              key={index}
-              index={index}
-              value={cellValue}
-              board={board}
-              isInitial={isInitial}
-              isSolving={isSolving}
-              isSolved={isSolved}
-              isConflict={conflicts.has(index)}
-              isActive={activeCellIndex === index}
-              isHighlighted={highlightedIndices.has(index)}
-              onChange={onCellChange}
-              onFocus={onCellFocus}
-            />
-          )
-        })
-      }
+      {board.map((cellValue, index) => {
+        const isInitial = initialBoard[index] !== null
+        const row = Math.floor(index / 9)
+        const col = index % 9
+        return (
+          <SudokuCell
+            key={`sudoku-cell-${row}-${col}`}
+            index={index}
+            value={cellValue}
+            board={board}
+            isInitial={isInitial}
+            isSolving={isSolving}
+            isSolved={isSolved}
+            isConflict={conflicts.has(index)}
+            isActive={activeCellIndex === index}
+            isHighlighted={highlightedIndices.has(index)}
+            onChange={onCellChange}
+            onFocus={onCellFocus}
+          />
+        )
+      })}
     </div>
   )
 }

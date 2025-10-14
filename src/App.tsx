@@ -16,7 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Eraser, BrainCircuit } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,10 @@ function App() {
     isSolved,
     conflicts,
     activeCellIndex,
-    solveFailed,
+    isSolveDisabled,
+    isClearDisabled,
+    solveButtonTitle,
+    clearButtonTitle,
     setActiveCellIndex,
     setCellValue,
     clearBoard,
@@ -42,7 +45,7 @@ function App() {
   const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
   const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // This effect manages the delayed "Solving..." state to avoid UI flicker.
+  // This effect manages the delayed "Solving..." state to avoid UI flicker for very fast solves.
   useEffect(() => {
     if (isSolving) {
       // If solving starts, set a timer to show the "Solving..." state after 500ms.
@@ -64,18 +67,6 @@ function App() {
       }
     }
   }, [isSolving])
-
-  const isBoardEmpty = useMemo(() => board.every((cell) => cell === null), [
-    board,
-  ])
-  const isBoardFull = useMemo(() => board.every((cell) => cell !== null), [
-    board,
-  ])
-  const hasConflicts = conflicts.size > 0
-
-  const isSolveDisabled =
-    isSolving || isBoardEmpty || isBoardFull || hasConflicts || solveFailed
-  const isClearDisabled = isSolving || isBoardEmpty
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -115,17 +106,7 @@ function App() {
             onClick={solve}
             className="flex-1"
             disabled={isSolveDisabled}
-            title={
-              hasConflicts
-                ? 'Cannot solve with conflicts.'
-                : isBoardFull
-                  ? 'Board is already full.'
-                  : isBoardEmpty
-                    ? 'Board is empty.'
-                    : solveFailed
-                      ? 'Solving failed. Please change the board to try again.'
-                      : 'Solve the puzzle'
-            }
+            title={solveButtonTitle}
           >
             {isShowingSolvingState ? (
               <>
@@ -141,7 +122,7 @@ function App() {
             onClick={clearBoard}
             className="flex-1"
             disabled={isClearDisabled}
-            title={isBoardEmpty ? 'Board is already empty.' : 'Clear the board'}
+            title={clearButtonTitle}
           >
             <Eraser className="mr-2 size-4" />
             Clear Board

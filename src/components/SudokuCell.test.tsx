@@ -67,10 +67,16 @@ describe('SudokuCell component', () => {
     expect(input).toHaveValue('5')
   })
 
-  it('applies styling for an initial cell', () => {
+  it('applies styling for an initial cell and is not readonly', () => {
     render(<SudokuCell {...defaultProps} value={5} isInitial={true} />)
     const input = screen.getByRole('textbox')
     expect(input).toHaveClass('text-primary')
+    expect(input).not.toHaveAttribute('readonly')
+  })
+
+  it('is readonly when solving', () => {
+    render(<SudokuCell {...defaultProps} isSolving={true} />)
+    const input = screen.getByRole('textbox')
     expect(input).toHaveAttribute('readonly')
   })
 

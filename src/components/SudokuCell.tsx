@@ -22,27 +22,27 @@ import { cn, isMoveValid } from '@/lib/utils'
 
 interface SudokuCellProps {
   /** The current value of the cell (1-9) or null if empty. */
-  value: number | null
+  readonly value: number | null
   /** The entire board array, used for local validation. */
-  board: (number | null)[]
+  readonly board: readonly (number | null)[]
   /** The index of the cell in the board array (0-80). */
-  index: number
+  readonly index: number
   /** Whether the cell was part of the initial puzzle. */
-  isInitial: boolean
+  readonly isInitial: boolean
   /** Whether the solver is currently running. */
-  isSolving: boolean
+  readonly isSolving: boolean
   /** Whether the board is in a solved state. */
-  isSolved: boolean
+  readonly isSolved: boolean
   /** Whether this cell has a conflicting value. */
-  isConflict: boolean
+  readonly isConflict: boolean
   /** Whether this is the currently active/focused cell. */
-  isActive: boolean
+  readonly isActive: boolean
   /** Whether this cell should be highlighted as part of the active row/column/box. */
-  isHighlighted: boolean
+  readonly isHighlighted: boolean
   /** Callback function to change the cell's value. */
-  onChange: (index: number, value: number | null) => void
+  readonly onChange: (index: number, value: number | null) => void
   /** Callback function when the cell receives focus. */
-  onFocus: (index: number) => void
+  readonly onFocus: (index: number) => void
 }
 
 /**
@@ -184,7 +184,7 @@ function SudokuCell({
         // State-based styling
         isSolving && 'cursor-not-allowed bg-muted/50',
       )}
-      readOnly={isSolving || isInitial}
+      readOnly={isSolving}
       aria-label={`Sudoku cell at row ${row + 1}, column ${col + 1}`}
       aria-invalid={isConflict}
     />

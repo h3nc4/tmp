@@ -16,7 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
 import { validateBoard } from '@/lib/utils'
 import SolverWorker from '@/solver.worker?worker'
@@ -26,7 +26,8 @@ const EMPTY_BOARD = Array(BOARD_SIZE).fill(null)
 
 /**
  * A custom hook to manage the state and logic of the Sudoku board.
- * It handles board state, user input, and solver interaction via a Web Worker.
+ * It handles board state, user input, solver interaction via a Web Worker,
+ * and derives UI state like button enablement and tooltips.
  *
  * @returns An object containing the board state and functions to interact with it.
  */
@@ -74,7 +75,7 @@ export function useSudoku() {
     } catch (error) {
       console.error('Failed to initialize solver worker:', error)
       workerRef.current = null
-      toast.error('Solver functionality is unavailable.');
+      toast.error('Solver functionality is unavailable.')
     }
 
     // Terminate the worker when the component unmounts.
@@ -90,6 +91,33 @@ export function useSudoku() {
       setConflicts(validateBoard(board))
     }
   }, [board, isSolved])
+
+  const isBoardEmpty = useMemo(() => board.every((cell) => cell === null), [
+    board,
+  ])
+  const isBoardFull = useMemo(() => board.every((cell) => cell !== null), [
+    board,
+  ])
+  const hasConflicts = conflicts.size > 0
+
+  const isSolveDisabled =
+    isSolving || isBoardEmpty || isBoardFull || hasConflicts || solveFailed
+
+  const isClearDisabled = isSolving || isBoardEmpty
+
+  const solveButtonTitle = useMemo(() => {
+    if (hasConflicts) return 'Cannot solve with conflicts.'
+    if (isBoardFull) return 'Board is already full.'
+    if (isBoardEmpty) return 'Board is empty.'
+    if (solveFailed)
+      return 'Solving failed. Please change the board to try again.'
+    return 'Solve the puzzle'
+  }, [isBoardEmpty, isBoardFull, hasConflicts, solveFailed])
+
+  const clearButtonTitle = useMemo(() => {
+    if (isBoardEmpty) return 'Board is already empty.'
+    return 'Clear the board'
+  }, [isBoardEmpty])
 
   /**
    * Updates the value of a single cell on the board.
@@ -152,13 +180,19 @@ export function useSudoku() {
   }, [board])
 
   return {
+    // Board state
     board,
     initialBoard,
     isSolving,
     isSolved,
     conflicts,
     activeCellIndex,
-    solveFailed,
+    // Derived UI state
+    isSolveDisabled,
+    isClearDisabled,
+    solveButtonTitle,
+    clearButtonTitle,
+    // Actions
     setActiveCellIndex,
     setCellValue,
     clearBoard,
