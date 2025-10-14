@@ -75,28 +75,31 @@ export function useSudoku() {
     }
   }, [])
 
+  // Solve conflicts whenever the board changes, unless it's already solved.
+  useEffect(() => {
+    if (!isSolved) {
+      setConflicts(validateBoard(board))
+    }
+  }, [board, isSolved])
+
   /**
-   * Updates the value of a single cell on the board and re-validates for conflicts.
+   * Updates the value of a single cell on the board.
    * @param index - The index of the cell to update (0-80).
    * @param value - The new value (1-9) or null to clear the cell.
    */
-  const setCellValue = useCallback(
-    (index: number, value: number | null) => {
-      if (index < 0 || index >= BOARD_SIZE) return
+  const setCellValue = useCallback((index: number, value: number | null) => {
+    if (index < 0 || index >= BOARD_SIZE) return
 
-      const newBoard = [...board]
+    setBoard((prevBoard) => {
+      const newBoard = [...prevBoard]
       newBoard[index] = value
-      setBoard(newBoard)
+      return newBoard
+    })
 
-      // When user interacts, the 'solved' and 'failed' states are no longer valid.
-      setIsSolved(false)
-      setSolveFailed(false)
-
-      // Re-validate the entire board for conflicts.
-      setConflicts(validateBoard(newBoard))
-    },
-    [board],
-  )
+    // When user interacts, the 'solved' and 'failed' states are no longer valid.
+    setIsSolved(false)
+    setSolveFailed(false)
+  }, [])
 
   /**
    * Clears all cells on the board, resetting it to an empty state.
