@@ -16,6 +16,9 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/// <reference types="vitest" />
+/// <reference types="vite/client" />
+
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from 'vite'
@@ -29,6 +32,30 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "wasudoku-wasm": path.resolve(__dirname, "./src/wasudoku-wasm/pkg"),
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: 'src/test/setup.ts',
+    css: false,
+    coverage: {
+      provider: 'v8',
+      reportsDirectory: './coverage',
+      reporter: ['text', 'cobertura'],
+      reportOnFailure: true,
+      all: true,
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      exclude: [
+        'src/main.tsx',
+        'src/components/ui',
+        'src/wasudoku-wasm',
+        'src/test/setup.ts',
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/__mocks__',
+        '**/*.d.ts',
+      ],
     },
   },
 })

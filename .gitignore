@@ -8,3 +8,6 @@ build/
 pkg/
 target/
 *.rs.bk
+
+# Coverage reports
+coverage-*.xml

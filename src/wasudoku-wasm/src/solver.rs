@@ -39,6 +39,12 @@ enum FindResult {
 /// * `true` if a solution is found.
 /// * `false` if the puzzle is unsolvable.
 pub fn solve(board: &mut Board) -> bool {
+    // A test-only feature to ensure the panic boundary in `lib.rs` is covered.
+    #[cfg(feature = "test-panic")]
+    if board.cells[0] == 1 && board.cells[1] == 2 && board.cells[2] == 3 {
+        panic!("Induced panic for testing");
+    }
+
     // Find the state of the board or the next best cell to operate on.
     match find_most_constrained_cell(board) {
         // The board is fully solved.

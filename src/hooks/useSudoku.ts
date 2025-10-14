@@ -43,30 +43,39 @@ export function useSudoku() {
 
   // Initialize and terminate the Web Worker.
   useEffect(() => {
-    workerRef.current = new SolverWorker()
-    const handleWorkerMessage = (
-      event: MessageEvent<{ type: 'solution' | 'error'; solution?: string; error?: string }>,
-    ) => {
-      const { type, solution, error } = event.data
+    try {
+      workerRef.current = new SolverWorker()
 
-      if (type === 'solution' && solution) {
-        const solvedBoard = solution
-          .split('')
-          .map((char) => parseInt(char, 10))
-        setBoard(solvedBoard)
-        setIsSolved(true)
-        setConflicts(new Set())
-        setSolveFailed(false)
-        toast.success('Sudoku solved successfully!')
-      } else if (type === 'error' && error) {
-        console.error('Solver worker error:', error)
-        setSolveFailed(true)
-        toast.error(`Solving failed: ${error}`)
+      const handleWorkerMessage = (
+        event: MessageEvent<
+          { type: 'solution' | 'error'; solution?: string; error?: string }
+        >,
+      ) => {
+        const { type, solution, error } = event.data
+
+        if (type === 'solution' && solution) {
+          const solvedBoard = solution
+            .split('')
+            .map((char) => parseInt(char, 10))
+          setBoard(solvedBoard)
+          setIsSolved(true)
+          setConflicts(new Set())
+          setSolveFailed(false)
+          toast.success('Sudoku solved successfully!')
+        } else if (type === 'error' && error) {
+          console.error('Solver worker error:', error)
+          setSolveFailed(true)
+          toast.error(`Solving failed: ${error}`)
+        }
+        setIsSolving(false)
       }
-      setIsSolving(false)
-    }
 
-    workerRef.current.addEventListener('message', handleWorkerMessage)
+      workerRef.current.addEventListener('message', handleWorkerMessage)
+    } catch (error) {
+      console.error('Failed to initialize solver worker:', error)
+      workerRef.current = null
+      toast.error('Solver functionality is unavailable.');
+    }
 
     // Terminate the worker when the component unmounts.
     return () => {

@@ -18,8 +18,24 @@
 
 set -e
 
+dev_tools="cargo-llvm-cov 0.6.21"
+
 tools="wasm-pack 0.13.1
 wasm-opt 0.116.1"
+
+while getopts "d" opt; do
+  case "${opt}" in
+  d)
+    tools="$tools
+$dev_tools"
+    ;;
+  *)
+    echo "Usage: $0 [-d]
+  -d    Include development tools" >&2
+    exit 1
+    ;;
+  esac
+done
 
 echo "$tools" | while read -r name ver; do
   if ! command -v "$name" >/dev/null 2>&1; then
