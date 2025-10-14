@@ -7,13 +7,13 @@ on:
 
 jobs:
   deploy:
-    name: Build and Deploy to GitHub Pages
+    name: Build, Deploy and Release
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
     steps:
@@ -36,6 +36,12 @@ jobs:
             -v "${PWD}:/usr/src/" \
             ${{ env.IMAGE_NAME }} \
             npm run build
+      - name: Package artifact for release
+        run: tar -czvf WASudoku.tar.gz -C dist .
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: WASudoku.tar.gz
       - name: Upload production artifact
         uses: actions/upload-pages-artifact@v4
         with:
