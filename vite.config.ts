@@ -34,6 +34,9 @@ export default defineConfig({
       "wasudoku-wasm": path.resolve(__dirname, "./src/wasudoku-wasm/pkg"),
     },
   },
+  worker: {
+    format: 'es',
+  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -55,6 +58,7 @@ export default defineConfig({
         '**/*.test.tsx',
         '**/__mocks__',
         '**/*.d.ts',
+        '**/*.types.ts',
       ],
     },
   },

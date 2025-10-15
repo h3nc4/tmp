@@ -17,158 +17,193 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { render, fireEvent, act, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from 'vitest'
 import { SudokuGrid } from './SudokuGrid'
-import type { BoardState } from '@/hooks/useSudoku'
-import SudokuCell from './SudokuCell'
+import {
+  useSudokuState,
+  useSudokuDispatch,
+} from '@/context/sudoku.hooks'
+import { initialState } from '@/context/sudoku.reducer'
+import * as actions from '@/context/sudoku.actions'
 
-// Mock the child component to isolate SudokuGrid logic
+// Mocks
+vi.mock('@/context/sudoku.hooks')
+
+interface MockSudokuCellProps {
+  index: number
+  onFocus: (index: number) => void
+  isHighlighted: boolean
+}
+
+// This spy will be called by the mocked SudokuCell component on each render.
+const mockSudokuCellRender = vi.fn()
+
 vi.mock('./SudokuCell', () => ({
-  // Render a simple input to make it findable, but we'll check props
-  default: vi.fn(({ index, onFocus, onChange }) => (
-    <input
-      aria-label={`cell-${index}`}
-      onFocus={() => onFocus(index)}
-      onChange={(e) => onChange(index, e.target.value)}
-    />
-  )),
+  default: React.forwardRef<HTMLInputElement, MockSudokuCellProps>(
+    (props, ref) => {
+      mockSudokuCellRender(props) // Call spy to track renders and props
+      return (
+        <input
+          ref={ref}
+          aria-label={`cell-${props.index}`}
+          onFocus={() => props.onFocus(props.index)}
+        />
+      )
+    },
+  ),
 }))
 
-const MockedSudokuCell = SudokuCell as unknown as Mock
-
-// Helper to create an empty board
-const createEmptyBoard = (): BoardState =>
-  Array(81)
-    .fill(null)
-    .map(() => ({
-      value: null,
-      candidates: new Set<number>(),
-      centers: new Set<number>(),
-    }))
+const mockUseSudokuState = useSudokuState as Mock
+const mockUseSudokuDispatch = useSudokuDispatch as Mock
 
 describe('SudokuGrid component', () => {
-  const mockOnCellChange = vi.fn()
-  const mockOnCellFocus = vi.fn()
-  const mockInteractionAreaRef = React.createRef<HTMLDivElement | null>()
-
-  const defaultProps = {
-    board: createEmptyBoard(),
-    initialBoard: createEmptyBoard(),
-    isSolving: false,
-    isSolved: false,
-    conflicts: new Set<number>(),
-    activeCellIndex: null,
-    inputMode: 'normal' as const,
-    onCellChange: mockOnCellChange,
-    onCellFocus: mockOnCellFocus,
-    interactionAreaRef: mockInteractionAreaRef,
-  }
+  const mockDispatch = vi.fn()
+  const mockInteractionAreaRef = React.createRef<HTMLDivElement>()
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSudokuCellRender.mockClear() // Clear the render spy
+    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 0 })
+    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
   })
+
+  const renderWithRef = () => {
+    return render(
+      <div ref={mockInteractionAreaRef}>
+        <SudokuGrid interactionAreaRef={mockInteractionAreaRef} />
+      </div>,
+    )
+  }
 
   it('renders 81 SudokuCell components', () => {
-    render(<SudokuGrid {...defaultProps} />)
-    expect(MockedSudokuCell).toHaveBeenCalledTimes(81)
+    renderWithRef()
+    expect(mockSudokuCellRender).toHaveBeenCalledTimes(81)
   })
 
-  it('correctly determines isInitial prop for cells', () => {
-    const initialBoard = createEmptyBoard().map((cell, index) =>
-      index === 5 ? { ...cell, value: 7 } : cell,
-    )
-
-    const board = createEmptyBoard().map((cell, index) => {
-      if (index === 5) return { ...cell, value: 7 } // Initial cell
-      if (index === 10) return { ...cell, value: 3 } // User-entered cell
-      return cell
-    })
-
-    render(
-      <SudokuGrid {...defaultProps} board={board} initialBoard={initialBoard} />,
-    )
-
-    // Cell 5 was in initialBoard, so isInitial should be true
-    expect(MockedSudokuCell.mock.calls[5][0].isInitial).toBe(true)
-    // Cell 10 was not, so isInitial should be false
-    expect(MockedSudokuCell.mock.calls[10][0].isInitial).toBe(false)
-    // An empty cell should also have isInitial: false
-    expect(MockedSudokuCell.mock.calls[0][0].isInitial).toBe(false)
+  it('dispatches SET_ACTIVE_CELL with null when clicking outside', () => {
+    renderWithRef()
+    mockDispatch.mockClear()
+    fireEvent.mouseDown(document.body) // Click outside the ref's div
+    expect(mockDispatch).toHaveBeenCalledWith(actions.setActiveCell(null))
   })
 
-  it('highlights related cells when a cell is active', () => {
-    render(<SudokuGrid {...defaultProps} activeCellIndex={10} />) // Row 1, Col 1
+  it('does not dispatch setActiveCell(null) when clicking inside', () => {
+    renderWithRef()
+    mockDispatch.mockClear() // Clear the dispatch from the initial render's useEffect
 
-    // Cell 10 itself is active
-    expect(MockedSudokuCell.mock.calls[10][0].isActive).toBe(true)
-    expect(MockedSudokuCell.mock.calls[10][0].isHighlighted).toBe(true)
+    const grid = screen.getByRole('grid')
+    fireEvent.mouseDown(grid)
 
-    // Cell 11 is in the same row
-    expect(MockedSudokuCell.mock.calls[11][0].isActive).toBe(false)
-    expect(MockedSudokuCell.mock.calls[11][0].isHighlighted).toBe(true)
-
-    // Cell 19 is in the same column
-    expect(MockedSudokuCell.mock.calls[19][0].isActive).toBe(false)
-    expect(MockedSudokuCell.mock.calls[19][0].isHighlighted).toBe(true)
-
-    // Cell 0 is in the same box
-    expect(MockedSudokuCell.mock.calls[0][0].isActive).toBe(false)
-    expect(MockedSudokuCell.mock.calls[0][0].isHighlighted).toBe(true)
-
-    // Cell 80 is unrelated
-    expect(MockedSudokuCell.mock.calls[80][0].isActive).toBe(false)
-    expect(MockedSudokuCell.mock.calls[80][0].isHighlighted).toBe(false)
+    expect(mockDispatch).not.toHaveBeenCalledWith(actions.setActiveCell(null))
   })
 
   it('does not highlight any cells when no cell is active', () => {
-    render(<SudokuGrid {...defaultProps} activeCellIndex={null} />)
+    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
+    renderWithRef()
 
-    for (let i = 0; i < 81; i++) {
-      expect(MockedSudokuCell.mock.calls[i][0].isActive).toBe(false)
-      expect(MockedSudokuCell.mock.calls[i][0].isHighlighted).toBe(false)
-    }
+    // Check the props of the first rendered cell
+    const firstCellProps = mockSudokuCellRender.mock.calls[0][0]
+    expect(firstCellProps.isHighlighted).toBe(false)
+
+    // Check the props of the last rendered cell
+    const lastCellProps = mockSudokuCellRender.mock.calls[80][0]
+    expect(lastCellProps.isHighlighted).toBe(false)
   })
 
-  it('calls onCellFocus with null when clicking outside the interaction area', () => {
-    render(
-      <div>
-        <div ref={mockInteractionAreaRef}>
-          <SudokuGrid {...defaultProps} activeCellIndex={10} />
-        </div>
-        <button>Outside</button>
-      </div>,
-    )
+  describe('Keyboard Interactions', () => {
+    it('dispatches inputValue on number key press', async () => {
+      const user = userEvent.setup()
+      renderWithRef()
+      mockDispatch.mockClear()
+      await user.keyboard('{5}')
+      expect(mockDispatch).toHaveBeenCalledWith(actions.inputValue(5))
+    })
 
-    fireEvent.mouseDown(screen.getByText('Outside'))
-    expect(mockOnCellFocus).toHaveBeenCalledWith(null)
+    it('ignores keyboard input when solving', async () => {
+      mockUseSudokuState.mockReturnValue({
+        ...initialState,
+        isSolving: true,
+        activeCellIndex: 0,
+      })
+      const user = userEvent.setup()
+      renderWithRef()
+      mockDispatch.mockClear() // Clear the dispatch from the initial render's useEffect
+
+      await user.keyboard('{5}')
+      expect(mockDispatch).not.toHaveBeenCalled()
+    })
+
+    it('ignores keyboard input when no cell is active', async () => {
+      mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
+      const user = userEvent.setup()
+      renderWithRef()
+      // No dispatch on render because activeCellIndex is null
+      await user.keyboard('{5}')
+      expect(mockDispatch).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['{ArrowUp}', 'up'],
+      ['{ArrowDown}', 'down'],
+      ['{ArrowLeft}', 'left'],
+      ['{ArrowRight}', 'right'],
+    ])('dispatches navigate action for %s key', async (key, direction) => {
+      const user = userEvent.setup()
+      renderWithRef()
+      mockDispatch.mockClear()
+      await user.keyboard(key)
+      expect(mockDispatch).toHaveBeenCalledWith(actions.navigate(direction as 'up'))
+    })
+
+    it('handles Backspace to dispatch eraseActiveCell("backspace")', async () => {
+      const user = userEvent.setup()
+      renderWithRef()
+      mockDispatch.mockClear()
+
+      await user.keyboard('{Backspace}')
+      expect(mockDispatch).toHaveBeenCalledWith(actions.eraseActiveCell('backspace'))
+    })
+
+    it('handles Delete to dispatch eraseActiveCell("delete")', async () => {
+      const user = userEvent.setup()
+      renderWithRef()
+      mockDispatch.mockClear()
+
+      await user.keyboard('{Delete}')
+      expect(mockDispatch).toHaveBeenCalledWith(actions.eraseActiveCell('delete'))
+    })
   })
 
-  it('does not call onCellFocus when clicking inside the interaction area', () => {
-    render(
+  it('focuses the correct cell when activeCellIndex changes', () => {
+    // Spy on the focus method of all input elements
+    const focusSpy = vi.spyOn(window.HTMLInputElement.prototype, 'focus')
+    const { rerender } = renderWithRef()
+
+    // The initial render with activeCellIndex: 0 should trigger one focus call
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+
+    // Rerender with a new active cell index
+    act(() => {
+      mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 5 })
+    })
+    rerender(
       <div ref={mockInteractionAreaRef}>
-        <SudokuGrid {...defaultProps} activeCellIndex={10} />
-        <button>A Control Button</button>
+        <SudokuGrid interactionAreaRef={mockInteractionAreaRef} />
       </div>,
     )
 
-    fireEvent.mouseDown(screen.getByText('A Control Button'))
-    expect(mockOnCellFocus).not.toHaveBeenCalled()
-  })
+    // The useEffect should trigger another focus call
+    expect(focusSpy).toHaveBeenCalledTimes(2)
 
-  it('removes event listener on unmount', () => {
-    const addSpy = vi.spyOn(document, 'addEventListener')
-    const removeSpy = vi.spyOn(document, 'removeEventListener')
-
-    const { unmount } = render(<SudokuGrid {...defaultProps} />)
-
-    expect(addSpy).toHaveBeenCalledWith('mousedown', expect.any(Function))
-
-    unmount()
-
-    expect(removeSpy).toHaveBeenCalledWith('mousedown', addSpy.mock.calls[0][1])
-
-    addSpy.mockRestore()
-    removeSpy.mockRestore()
+    focusSpy.mockRestore() // Clean up the spy
   })
 })

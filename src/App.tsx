@@ -16,99 +16,33 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Eraser, BrainCircuit, Undo, Redo } from 'lucide-react'
+import { useRef, useCallback } from 'react'
+import { Eraser } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
 import { SudokuGrid } from '@/components/SudokuGrid'
-import { useSudoku, type InputMode } from '@/hooks/useSudoku'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { NumberPad } from '@/components/NumberPad'
+import {
+  useSudokuState,
+  useSudokuDispatch,
+} from './context/sudoku.hooks'
+import { SolveButton } from './components/controls/SolveButton'
+import { ClearButton } from './components/controls/ClearButton'
+import { UndoRedo } from './components/controls/UndoRedo'
+import { InputModeToggle } from './components/controls/InputModeToggle'
+import { eraseActiveCell } from './context/sudoku.actions'
 
 function App() {
-  const {
-    board,
-    initialBoard,
-    isSolving,
-    isSolved,
-    conflicts,
-    activeCellIndex,
-    inputMode,
-    isSolveDisabled,
-    isClearDisabled,
-    solveButtonTitle,
-    clearButtonTitle,
-    canUndo,
-    canRedo,
-    setActiveCellIndex,
-    setInputMode,
-    setCellValue,
-    togglePencilMark,
-    eraseCell,
-    clearBoard,
-    solve,
-    undo,
-    redo,
-  } = useSudoku()
-
-  const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
-  const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { activeCellIndex } = useSudokuState()
+  const dispatch = useSudokuDispatch()
   const interactionAreaRef = useRef<HTMLDivElement>(null)
-
-  // This effect manages the delayed "Solving..." state to avoid UI flicker for very fast solves.
-  useEffect(() => {
-    if (isSolving) {
-      // If solving starts, set a timer to show the "Solving..." state after 500ms.
-      solveTimerRef.current = setTimeout(() => {
-        setIsShowingSolvingState(true)
-      }, 500)
-    } else {
-      // If solving ends (success or fail), clear any pending timer and hide the state.
-      if (solveTimerRef.current) {
-        clearTimeout(solveTimerRef.current)
-      }
-      setIsShowingSolvingState(false)
-    }
-
-    // Cleanup the timer on component unmount or when isSolving changes.
-    return () => {
-      if (solveTimerRef.current) {
-        clearTimeout(solveTimerRef.current)
-      }
-    }
-  }, [isSolving])
 
   const handleErase = useCallback(() => {
     if (activeCellIndex !== null) {
-      eraseCell(activeCellIndex)
+      dispatch(eraseActiveCell('delete'))
     }
-  }, [activeCellIndex, eraseCell])
-
-  const handleCellChange = useCallback(
-    (index: number, value: number | null) => {
-      if (value === null) {
-        eraseCell(index)
-        return
-      }
-
-      if (inputMode === 'normal') {
-        setCellValue(index, value)
-      } else {
-        togglePencilMark(index, value, inputMode)
-      }
-    },
-    [inputMode, setCellValue, togglePencilMark, eraseCell],
-  )
-
-  const handleNumberPadClick = useCallback(
-    (value: number) => {
-      if (activeCellIndex !== null) {
-        handleCellChange(activeCellIndex, value)
-      }
-    },
-    [activeCellIndex, handleCellChange],
-  )
+  }, [activeCellIndex, dispatch])
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -134,100 +68,29 @@ function App() {
           ref={interactionAreaRef}
           className="flex w-full max-w-md flex-col gap-6 md:gap-8"
         >
-          <SudokuGrid
-            board={board}
-            initialBoard={initialBoard}
-            isSolving={isSolving}
-            isSolved={isSolved}
-            conflicts={conflicts}
-            activeCellIndex={activeCellIndex}
-            inputMode={inputMode}
-            onCellChange={handleCellChange}
-            onCellFocus={setActiveCellIndex}
-            interactionAreaRef={interactionAreaRef}
-          />
+          <SudokuGrid interactionAreaRef={interactionAreaRef} />
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-row gap-2">
-              <ToggleGroup
-                type="single"
-                value={inputMode}
-                onValueChange={(value) => {
-                  if (value) setInputMode(value as InputMode)
-                }}
-                className="flex-1"
-                aria-label="Input Mode"
-              >
-                <ToggleGroupItem value="normal" className="flex-1">
-                  Normal
-                </ToggleGroupItem>
-                <ToggleGroupItem value="candidate" className="flex-1">
-                  Candidate
-                </ToggleGroupItem>
-                <ToggleGroupItem value="center" className="flex-1">
-                  Center
-                </ToggleGroupItem>
-              </ToggleGroup>
+              <InputModeToggle />
               <Button
                 variant="outline"
                 size="icon"
-                onMouseDown={handleErase}
+                onClick={handleErase}
                 disabled={activeCellIndex === null}
                 title="Erase selected cell"
+                onMouseDown={(e) => e.preventDefault()}
               >
                 <Eraser />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={undo}
-                disabled={!canUndo}
-                title="Undo"
-              >
-                <Undo />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={redo}
-                disabled={!canRedo}
-                title="Redo"
-              >
-                <Redo />
-              </Button>
+              <UndoRedo />
             </div>
 
-            <NumberPad
-              onNumberClick={handleNumberPadClick}
-              disabled={activeCellIndex === null}
-            />
+            <NumberPad />
 
             <div className="flex w-full flex-row gap-2">
-              <Button
-                onClick={solve}
-                className="flex-1"
-                disabled={isSolveDisabled}
-                title={solveButtonTitle}
-              >
-                {isShowingSolvingState ? (
-                  <>
-                    <BrainCircuit className="mr-2 size-4 animate-pulse" />
-                    Solving...
-                  </>
-                ) : (
-                  'Solve Puzzle'
-                )}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={clearBoard}
-                className="flex-1"
-                disabled={isClearDisabled}
-                title={clearButtonTitle}
-              >
-                <Eraser className="mr-2 size-4" />
-                Clear Board
-              </Button>
+              <SolveButton />
+              <ClearButton />
             </div>
           </div>
         </div>

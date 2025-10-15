@@ -16,49 +16,50 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useMemo, useEffect } from 'react'
+import React, {
+  useMemo,
+  useEffect,
+  useCallback,
+  createRef,
+} from 'react'
 import SudokuCell from './SudokuCell'
 import { getRelatedCellIndices } from '@/lib/utils'
-import type { BoardState, InputMode } from '@/hooks/useSudoku'
+import {
+  useSudokuState,
+  useSudokuDispatch,
+} from '@/context/sudoku.hooks'
+import {
+  setActiveCell,
+  inputValue,
+  eraseActiveCell,
+  navigate,
+} from '@/context/sudoku.actions'
 
 interface SudokuGridProps {
-  /** The current state of the board cells. */
-  readonly board: BoardState
-  /** The board state before the solver was run. */
-  readonly initialBoard: BoardState
-  /** Whether the solver is currently active. */
-  readonly isSolving: boolean
-  /** Whether the board is in a solved state. */
-  readonly isSolved: boolean
-  /** A set of indices for cells with conflicting values. */
-  readonly conflicts: ReadonlySet<number>
-  /** The index of the currently focused cell. */
-  readonly activeCellIndex: number | null
-  /** The current input mode for the grid. */
-  readonly inputMode: InputMode
-  /** Callback to handle changes to a cell's value. */
-  readonly onCellChange: (index: number, value: number | null) => void
-  /** Callback to set the currently focused cell. */
-  readonly onCellFocus: (index: number | null) => void
   /** A ref to the parent element containing all interactive game components. */
   readonly interactionAreaRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
- * Renders the 9x9 Sudoku grid container and its cells.
+ * Renders the 9x9 Sudoku grid container and manages all keyboard interactions.
+ * It orchestrates focus management and dispatches actions for cell changes.
  */
-export function SudokuGrid({
-  board,
-  initialBoard,
-  isSolving,
-  isSolved,
-  conflicts,
-  activeCellIndex,
-  inputMode,
-  onCellChange,
-  onCellFocus,
-  interactionAreaRef,
-}: SudokuGridProps) {
+export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
+  const {
+    board,
+    initialBoard,
+    isSolving,
+    isSolved,
+    activeCellIndex,
+    conflicts,
+  } = useSudokuState()
+  const dispatch = useSudokuDispatch()
+
+  const cellRefs = useMemo(
+    () => Array.from({ length: 81 }, () => createRef<HTMLInputElement>()),
+    [],
+  )
+
   const highlightedIndices = useMemo(() => {
     if (activeCellIndex === null) {
       return new Set<number>()
@@ -66,49 +67,91 @@ export function SudokuGrid({
     return getRelatedCellIndices(activeCellIndex)
   }, [activeCellIndex])
 
+  // Effect to declaratively manage focus based on the activeCellIndex state.
+  useEffect(() => {
+    if (activeCellIndex !== null && cellRefs[activeCellIndex]?.current) {
+      cellRefs[activeCellIndex].current?.focus()
+    }
+  }, [activeCellIndex, cellRefs])
+
+  const handleCellFocus = useCallback(
+    (index: number) => {
+      dispatch(setActiveCell(index))
+    },
+    [dispatch],
+  )
+
+  // Centralized keyboard handler for the entire grid.
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (activeCellIndex === null || isSolving) return
+
+      const key = e.key
+      // Prevent default for keys we handle to avoid scrolling, etc.
+      if (
+        (key >= '1' && key <= '9') ||
+        ['Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)
+      ) {
+        e.preventDefault()
+      }
+
+      if (key >= '1' && key <= '9') {
+        dispatch(inputValue(parseInt(key, 10)))
+      } else if (key === 'Backspace') {
+        dispatch(eraseActiveCell('backspace'))
+      } else if (key === 'Delete') {
+        dispatch(eraseActiveCell('delete'))
+      } else if (key === 'ArrowUp') {
+        dispatch(navigate('up'))
+      } else if (key === 'ArrowDown') {
+        dispatch(navigate('down'))
+      } else if (key === 'ArrowLeft') {
+        dispatch(navigate('left'))
+      } else if (key === 'ArrowRight') {
+        dispatch(navigate('right'))
+      }
+    },
+    [activeCellIndex, isSolving, dispatch],
+  )
+
   // Effect to handle clicks outside the defined interaction area to deselect cells.
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         interactionAreaRef.current &&
         !interactionAreaRef.current.contains(event.target as Node)
       ) {
-        onCellFocus(null) // Deselect the cell
+        dispatch(setActiveCell(null)) // Deselect the cell
       }
     }
 
-    // Add event listener
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      // Clean up the event listener
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [interactionAreaRef, onCellFocus])
+  }, [interactionAreaRef, dispatch])
 
   return (
     <div
       role="grid"
+      onKeyDown={handleKeyDown}
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
       {board.map((cell, index) => {
         const isInitial = initialBoard[index]?.value != null
-        const row = Math.floor(index / 9)
-        const col = index % 9
         return (
           <SudokuCell
-            key={`sudoku-cell-${row}-${col}`}
+            ref={cellRefs[index]}
+            key={`cell-${index}`}
             index={index}
             cell={cell}
-            board={board}
             isInitial={isInitial}
             isSolving={isSolving}
             isSolved={isSolved}
             isConflict={conflicts.has(index)}
             isActive={activeCellIndex === index}
             isHighlighted={highlightedIndices.has(index)}
-            inputMode={inputMode}
-            onChange={onCellChange}
-            onFocus={onCellFocus}
+            onFocus={handleCellFocus}
           />
         )
       })}

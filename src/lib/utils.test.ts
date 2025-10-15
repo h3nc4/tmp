@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { BoardState, CellState } from '@/hooks/useSudoku'
+import type { BoardState, CellState } from '@/context/sudoku.types'
 import { getRelatedCellIndices, isMoveValid, validateBoard } from './utils'
 
 // Helper to create an empty board with the new structure
@@ -53,7 +53,7 @@ describe('Sudoku Utilities', () => {
     })
 
     it('should find a conflict in a row', () => {
-      const board = createEmptyBoard().map((cell, index) => {
+      const board = createEmptyBoard().map((cell: CellState, index: number) => {
         if (index === 0 || index === 8) return { ...cell, value: 5 }
         return cell
       })
@@ -64,7 +64,7 @@ describe('Sudoku Utilities', () => {
 
   describe('isMoveValid', () => {
     const baseBoard = createEmptyBoard()
-    const board: BoardState = baseBoard.map((cell, index) => {
+    const board: BoardState = baseBoard.map((cell: CellState, index: number) => {
       const values: { [key: number]: number } = {
         0: 5,
         1: 3,

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2025  Henrique Almeida
  * This file is part of WASudoku.

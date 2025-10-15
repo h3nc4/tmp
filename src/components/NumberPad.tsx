@@ -16,25 +16,35 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { memo } from 'react'
+import { memo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-
-interface NumberPadProps {
-  /** Callback function when a number button is clicked. */
-  readonly onNumberClick: (value: number) => void
-  /** Whether the number pad should be disabled (e.g., when no cell is active). */
-  readonly disabled: boolean
-}
+import {
+  useSudokuState,
+  useSudokuDispatch,
+} from '@/context/sudoku.hooks'
+import { inputValue } from '@/context/sudoku.actions'
 
 const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 /**
  * An on-screen number pad for touch-friendly input on mobile devices.
+ * It consumes the active cell and action dispatchers directly from the context.
  */
-export const NumberPad = memo(function NumberPad({
-  onNumberClick,
-  disabled,
-}: NumberPadProps) {
+export const NumberPad = memo(function NumberPad() {
+  const { activeCellIndex } = useSudokuState()
+  const dispatch = useSudokuDispatch()
+
+  const handleNumberClick = useCallback(
+    (value: number) => {
+      if (activeCellIndex !== null) {
+        dispatch(inputValue(value))
+      }
+    },
+    [activeCellIndex, dispatch],
+  )
+
+  const isDisabled = activeCellIndex === null
+
   return (
     <div
       className="grid grid-cols-9 gap-1 md:hidden"
@@ -46,9 +56,10 @@ export const NumberPad = memo(function NumberPad({
           variant="outline"
           size="icon"
           className="aspect-square h-auto w-full text-lg"
-          onClick={() => onNumberClick(num)}
-          disabled={disabled}
+          onClick={() => handleNumberClick(num)}
+          disabled={isDisabled}
           aria-label={`Enter number ${num}`}
+          onMouseDown={(e) => e.preventDefault()}
         >
           {num}
         </Button>

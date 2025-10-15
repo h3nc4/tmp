@@ -2,19 +2,6 @@
 
 WASudoku is a Sudoku solver that runs locally in your browser using WebAssembly.
 
-## Stack
-
-- **UI:**
-  - [React](https://react.dev/)
-  - [Vite](https://vitejs.dev/)
-  - [TypeScript](https://www.typescriptlang.org/)
-  - [Tailwind CSS](https://tailwindcss.com/)
-  - [shadcn/ui](https://ui.shadcn.com/)
-- **WebAssembly Module:**
-  - [Rust](https://www.rust-lang.org/)
-  - [wasm-pack](https://rustwasm.github.io/wasm-pack/)
-  - [wasm-bindgen](https://github.com/rustwasm/wasm-bindgen)
-
 ## Features
 
 ### Core Engine
@@ -36,3 +23,22 @@ WASudoku is a Sudoku solver that runs locally in your browser using WebAssembly.
   - **Normal:** Enter the final numbers.
   - **Candidate:** Add small "corner" notes.
   - **Center:** Add "center" notes.
+
+## Architecture
+
+The UI architecture follows the **Context + Reducer Pattern** with an emphasis on **State Domain Isolation**.
+
+This is implemented using React's built-in [useReducer](https://react.dev/reference/react/useReducer) and [useContext](https://react.dev/reference/react/useContext) hooks.
+
+## Stack
+
+- **UI:**
+  - [React](https://react.dev/)
+  - [Vite](https://vitejs.dev/)
+  - [TypeScript](https://www.typescriptlang.org/)
+  - [Tailwind CSS](https://tailwindcss.com/)
+  - [shadcn/ui](https://ui.shadcn.com/)
+- **WebAssembly Module:**
+  - [Rust](https://www.rust-lang.org/)
+  - [wasm-pack](https://drager.github.io/wasm-pack/)
+  - [wasm-bindgen](https://github.com/rustwasm/wasm-bindgen)

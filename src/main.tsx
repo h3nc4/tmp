@@ -22,6 +22,7 @@ import { ThemeProvider } from 'next-themes'
 import App from './App.tsx'
 import './index.css'
 import { Toaster } from '@/components/ui/sonner.tsx'
+import { SudokuProvider } from './context/SudokuProvider.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -30,7 +31,9 @@ createRoot(document.getElementById('root')!).render(
       defaultTheme="dark"
       storageKey="wasudoku-ui-theme"
     >
-      <App />
+      <SudokuProvider>
+        <App />
+      </SudokuProvider>
       <Toaster />
     </ThemeProvider>
   </StrictMode>,
