@@ -18,29 +18,71 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
-import { validateBoard } from '@/lib/utils'
+import { validateBoard, getRelatedCellIndices, isMoveValid } from '@/lib/utils'
 import SolverWorker from '@/solver.worker?worker'
 
 const BOARD_SIZE = 81
-const EMPTY_BOARD = Array(BOARD_SIZE).fill(null)
+
+/**
+ * Represents the state of a single cell on the Sudoku board.
+ * It can hold a definitive value or sets of pencil marks.
+ */
+export interface CellState {
+  readonly value: number | null
+  readonly candidates: ReadonlySet<number>
+  readonly centers: ReadonlySet<number>
+}
+
+export type BoardState = readonly CellState[]
+export type InputMode = 'normal' | 'candidate' | 'center'
+
+/**
+ * Creates an empty Sudoku board with the new cell state structure.
+ * @returns An array of 81 empty cell states.
+ */
+const createEmptyBoard = (): BoardState =>
+  Array(BOARD_SIZE).fill({
+    value: null,
+    candidates: new Set(),
+    centers: new Set(),
+  })
 
 /**
  * A custom hook to manage the state and logic of the Sudoku board.
  * It handles board state, user input, solver interaction via a Web Worker,
- * and derives UI state like button enablement and tooltips.
+ * undo/redo history, and derives UI state like button enablement and tooltips.
  *
  * @returns An object containing the board state and functions to interact with it.
  */
 export function useSudoku() {
-  const [board, setBoard] = useState<(number | null)[]>(EMPTY_BOARD)
-  const [initialBoard, setInitialBoard] =
-    useState<(number | null)[]>(EMPTY_BOARD)
+  const [history, setHistory] = useState([createEmptyBoard()])
+  const [historyIndex, setHistoryIndex] = useState(0)
+  const board = history[historyIndex]
+
+  const [initialBoard, setInitialBoard] = useState<BoardState>(
+    createEmptyBoard(),
+  )
   const [isSolving, setIsSolving] = useState(false)
   const [isSolved, setIsSolved] = useState(false)
   const [conflicts, setConflicts] = useState<Set<number>>(new Set())
   const [activeCellIndex, setActiveCellIndex] = useState<number | null>(null)
   const [solveFailed, setSolveFailed] = useState(false)
+  const [inputMode, setInputMode] = useState<InputMode>('normal')
   const workerRef = useRef<Worker | null>(null)
+
+  const updateBoard = useCallback(
+    (newBoard: BoardState) => {
+      const newHistory = history.slice(0, historyIndex + 1)
+      newHistory.push(newBoard)
+      setHistory(newHistory)
+      setHistoryIndex(newHistory.length - 1)
+
+      // Any user action invalidates these states
+      setIsSolved(false)
+      setSolveFailed(false)
+    },
+    [history, historyIndex],
+  )
 
   // Initialize and terminate the Web Worker.
   useEffect(() => {
@@ -48,20 +90,27 @@ export function useSudoku() {
       workerRef.current = new SolverWorker()
 
       const handleWorkerMessage = (
-        event: MessageEvent<
-          { type: 'solution' | 'error'; solution?: string; error?: string }
-        >,
+        event: MessageEvent<{
+          type: 'solution' | 'error'
+          solution?: string
+          error?: string
+        }>,
       ) => {
         const { type, solution, error } = event.data
 
         if (type === 'solution' && solution) {
-          const solvedBoard = solution
+          const solvedBoardArray = solution
             .split('')
             .map((char) => parseInt(char, 10))
-          setBoard(solvedBoard)
+
+          const newBoard = board.map((cell, index) => ({
+            ...cell,
+            value: solvedBoardArray[index],
+          }))
+
+          updateBoard(newBoard)
           setIsSolved(true)
           setConflicts(new Set())
-          setSolveFailed(false)
           toast.success('Sudoku solved successfully!')
         } else if (type === 'error' && error) {
           console.error('Solver worker error:', error)
@@ -78,78 +127,160 @@ export function useSudoku() {
       toast.error('Solver functionality is unavailable.')
     }
 
-    // Terminate the worker when the component unmounts.
     return () => {
       workerRef.current?.terminate()
       workerRef.current = null
     }
-  }, [])
+  }, [board, updateBoard])
 
-  // Solve conflicts whenever the board changes, unless it's already solved.
   useEffect(() => {
     if (!isSolved) {
       setConflicts(validateBoard(board))
     }
   }, [board, isSolved])
 
-  const isBoardEmpty = useMemo(() => board.every((cell) => cell === null), [
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
+  const isBoardEmpty = useMemo(
+    () =>
+      board.every(
+        (cell) =>
+          cell.value === null &&
+          cell.candidates.size === 0 &&
+          cell.centers.size === 0,
+      ),
+    [board],
+  )
+  const hasValues = useMemo(() => board.some((cell) => cell.value !== null), [
     board,
   ])
-  const isBoardFull = useMemo(() => board.every((cell) => cell !== null), [
+  const isBoardFull = useMemo(() => board.every((cell) => cell.value !== null), [
     board,
   ])
   const hasConflicts = conflicts.size > 0
 
   const isSolveDisabled =
-    isSolving || isBoardEmpty || isBoardFull || hasConflicts || solveFailed
+    isSolving || !hasValues || isBoardFull || hasConflicts || solveFailed
 
   const isClearDisabled = isSolving || isBoardEmpty
 
   const solveButtonTitle = useMemo(() => {
     if (hasConflicts) return 'Cannot solve with conflicts.'
     if (isBoardFull) return 'Board is already full.'
-    if (isBoardEmpty) return 'Board is empty.'
+    if (!hasValues) return 'Board is empty.'
     if (solveFailed)
       return 'Solving failed. Please change the board to try again.'
     return 'Solve the puzzle'
-  }, [isBoardEmpty, isBoardFull, hasConflicts, solveFailed])
+  }, [hasValues, isBoardFull, hasConflicts, solveFailed])
 
   const clearButtonTitle = useMemo(() => {
     if (isBoardEmpty) return 'Board is already empty.'
     return 'Clear the board'
   }, [isBoardEmpty])
 
-  /**
-   * Updates the value of a single cell on the board.
-   * @param index - The index of the cell to update (0-80).
-   * @param value - The new value (1-9) or null to clear the cell.
-   */
-  const setCellValue = useCallback((index: number, value: number | null) => {
-    if (index < 0 || index >= BOARD_SIZE) return
+  const undo = useCallback(() => {
+    if (canUndo) {
+      setHistoryIndex(historyIndex - 1)
+    }
+  }, [canUndo, historyIndex])
 
-    setBoard((prevBoard) => {
-      const newBoard = [...prevBoard]
-      newBoard[index] = value
-      return newBoard
-    })
+  const redo = useCallback(() => {
+    if (canRedo) {
+      setHistoryIndex(historyIndex + 1)
+    }
+  }, [canRedo, historyIndex])
 
-    // When user interacts, the 'solved' and 'failed' states are no longer valid.
-    setIsSolved(false)
-    setSolveFailed(false)
-  }, [])
+  const setCellValue = useCallback(
+    (index: number, value: number) => {
+      if (index < 0 || index >= BOARD_SIZE) return
 
-  /**
-   * Clears all cells on the board, resetting it to an empty state.
-   */
+      const newBoard = board.map((cell) => ({
+        value: cell.value,
+        candidates: new Set(cell.candidates),
+        centers: new Set(cell.centers),
+      }))
+
+      // Set new value and clear pencil marks in the cell
+      newBoard[index] = {
+        value,
+        candidates: new Set(),
+        centers: new Set(),
+      }
+
+      // Auto-remove pencil marks from related cells
+      const relatedIndices = getRelatedCellIndices(index)
+      relatedIndices.forEach((relatedIndex) => {
+        newBoard[relatedIndex].candidates.delete(value)
+        newBoard[relatedIndex].centers.delete(value)
+      })
+
+      updateBoard(newBoard)
+    },
+    [board, updateBoard],
+  )
+
+  const togglePencilMark = useCallback(
+    (index: number, markValue: number, mode: InputMode) => {
+      const cell = board[index]
+      if (cell.value !== null) return // Can't add marks to a filled cell
+
+      if (!isMoveValid(board, index, markValue)) {
+        toast.error(
+          `Cannot add pencil mark for ${markValue}, it conflicts with a number on the board.`,
+        )
+        return
+      }
+
+      const newBoard = board.map((c) => ({
+        value: c.value,
+        candidates: new Set(c.candidates),
+        centers: new Set(c.centers),
+      }))
+      const targetCell = newBoard[index]
+
+      if (mode === 'candidate') {
+        if (targetCell.centers.size > 0) return // Block candidate if center exists
+        targetCell.candidates.has(markValue)
+          ? targetCell.candidates.delete(markValue)
+          : targetCell.candidates.add(markValue)
+      } else if (mode === 'center') {
+        targetCell.candidates.clear() // Center replaces candidate
+        targetCell.centers.has(markValue)
+          ? targetCell.centers.delete(markValue)
+          : targetCell.centers.add(markValue)
+      }
+
+      updateBoard(newBoard)
+    },
+    [board, updateBoard],
+  )
+
+  const eraseCell = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= BOARD_SIZE) return
+
+      const newBoard = board.map((cell, i) =>
+        i === index
+          ? {
+            value: null,
+            candidates: new Set<number>(),
+            centers: new Set<number>(),
+          }
+          : cell,
+      )
+      updateBoard(newBoard)
+    },
+    [board, updateBoard],
+  )
+
   const clearBoard = useCallback(() => {
-    setBoard(EMPTY_BOARD)
-    setInitialBoard(EMPTY_BOARD)
+    updateBoard(createEmptyBoard())
+    setInitialBoard(createEmptyBoard())
     setConflicts(new Set())
-    setIsSolved(false)
-    setSolveFailed(false)
     setActiveCellIndex(null)
     toast.info('Board cleared.')
-  }, [])
+  }, [updateBoard])
 
   /**
    * Solves the current Sudoku puzzle using the Web Worker.
@@ -169,33 +300,60 @@ export function useSudoku() {
     }
 
     setIsSolving(true)
-    setIsSolved(false)
-    setSolveFailed(false)
     setInitialBoard(board)
 
-    const boardString = board.map((cell) => cell ?? '.').join('')
+    const boardString = board.map((cell) => cell.value ?? '.').join('')
 
     // Post the board to the worker to start solving.
     workerRef.current.postMessage({ boardString })
   }, [board])
 
   return {
-    // Board state
+    /** The current state of the 81 Sudoku cells. */
     board,
+    /** The board state as it was when the solver was last initiated. Used to highlight initial numbers. */
     initialBoard,
+    /** True if the solver Web Worker is currently processing a puzzle. */
     isSolving,
+    /** True if the board has been successfully solved by the solver. */
     isSolved,
+    /** A set of indices of cells that currently have conflicting values. */
     conflicts,
+    /** The index of the currently active/focused cell. */
     activeCellIndex,
-    // Derived UI state
+    /** The current input mode ('normal', 'candidate', or 'center'). */
+    inputMode,
+    /** True if the last solve attempt failed. */
+    solveFailed,
+    /** True if the solve button should be disabled. */
     isSolveDisabled,
+    /** True if the clear button should be disabled. */
     isClearDisabled,
+    /** The tooltip text for the solve button. */
     solveButtonTitle,
+    /** The tooltip text for the clear button. */
     clearButtonTitle,
-    // Actions
+    /** True if an undo operation is available. */
+    canUndo,
+    /** True if a redo operation is available. */
+    canRedo,
+    /** Sets the active cell index. */
     setActiveCellIndex,
+    /** Sets the current input mode. */
+    setInputMode,
+    /** Sets the definitive value of a cell and clears related pencil marks. */
     setCellValue,
+    /** Toggles a pencil mark (candidate or center) on a cell. */
+    togglePencilMark,
+    /** Clears all values and pencil marks from a single cell. */
+    eraseCell,
+    /** Clears the entire board and resets its state. */
     clearBoard,
+    /** Initiates the Sudoku solver via the Web Worker. */
     solve,
+    /** Reverts the board to its previous state in the history. */
+    undo,
+    /** Advances the board to the next state in the history. */
+    redo,
   }
 }

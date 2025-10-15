@@ -24,23 +24,16 @@ import { useSudoku } from './useSudoku'
 
 // --- Mocks ---
 
-// This mock setup uses vi.fn() for the worker constructor, which is more flexible
-// for testing different scenarios (e.g., initialization failure).
-
-// A variable to hold the captured message handler from addEventListener
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let messageHandler: (event: any) => void
+let messageHandler: (event: { data: any }) => void
 
-// The mock instance of the worker with spies for its methods
 const mockWorkerInstance = {
   postMessage: vi.fn(),
   addEventListener: vi.fn((_event: string, handler) => {
-    // Capture the message handler so we can simulate messages from the worker
     messageHandler = handler
   }),
   removeEventListener: vi.fn(),
   terminate: vi.fn(),
-  // Helper for tests to simulate messages FROM the worker
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   __simulateMessage(data: any) {
     if (messageHandler) {
@@ -49,13 +42,8 @@ const mockWorkerInstance = {
   },
 }
 
-// Mock the default export of the worker module
 vi.mock('@/solver.worker?worker', () => ({
-  // We cast the partial mock to 'Worker' to satisfy TypeScript in the editor.
-  // This has no effect on the runtime behavior of the passing tests.
-  default: vi
-    .fn()
-    .mockImplementation(() => mockWorkerInstance as unknown as Worker),
+  default: vi.fn().mockImplementation(() => mockWorkerInstance as unknown as Worker),
 }))
 
 vi.mock('sonner', () => ({
@@ -71,14 +59,10 @@ vi.mock('sonner', () => ({
 describe('useSudoku hook', () => {
   const SOLVED_BOARD_STRING =
     '534678912672195348198342567859761423426853791713924856961537284287419635345286179'
-  const SOLVED_BOARD_ARRAY = SOLVED_BOARD_STRING.split('').map(Number)
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Restore the default mock implementation before each test
-    vi.mocked(SolverWorker).mockImplementation(
-      () => mockWorkerInstance as unknown as Worker,
-    )
+    vi.mocked(SolverWorker).mockImplementation(() => mockWorkerInstance as unknown as Worker)
   })
 
   afterEach(() => {
@@ -87,145 +71,14 @@ describe('useSudoku hook', () => {
 
   it('should initialize with an empty board and correct derived state', () => {
     const { result } = renderHook(() => useSudoku())
-    expect(result.current.board).toEqual(Array(81).fill(null))
+    expect(result.current.board.every((c) => c.value === null)).toBe(true)
     expect(result.current.isSolving).toBe(false)
     expect(result.current.isSolved).toBe(false)
     expect(result.current.conflicts.size).toBe(0)
-
-    // Check derived state
     expect(result.current.isSolveDisabled).toBe(true)
     expect(result.current.isClearDisabled).toBe(true)
     expect(result.current.solveButtonTitle).toBe('Board is empty.')
     expect(result.current.clearButtonTitle).toBe('Board is already empty.')
-  })
-
-  it('should set cell value and update derived state', () => {
-    const { result } = renderHook(() => useSudoku())
-
-    act(() => {
-      result.current.setCellValue(0, 5)
-    })
-    expect(result.current.board[0]).toBe(5)
-    expect(result.current.conflicts.size).toBe(0)
-
-    // Check derived state
-    expect(result.current.isSolveDisabled).toBe(false)
-    expect(result.current.isClearDisabled).toBe(false)
-    expect(result.current.solveButtonTitle).toBe('Solve the puzzle')
-    expect(result.current.clearButtonTitle).toBe('Clear the board')
-  })
-
-  it('should update derived state when board has conflicts', () => {
-    const { result } = renderHook(() => useSudoku())
-    act(() => {
-      result.current.setCellValue(0, 5)
-      result.current.setCellValue(1, 5) // Row conflict
-    })
-    expect(result.current.isSolveDisabled).toBe(true)
-    expect(result.current.solveButtonTitle).toBe('Cannot solve with conflicts.')
-  })
-
-  it('should not set cell value for out-of-bounds index', () => {
-    const { result } = renderHook(() => useSudoku())
-    const initialBoard = result.current.board
-    act(() => {
-      result.current.setCellValue(81, 1)
-    })
-    expect(result.current.board).toEqual(initialBoard)
-  })
-
-  it('should clear the board', () => {
-    const { result } = renderHook(() => useSudoku())
-
-    act(() => {
-      result.current.setCellValue(0, 5)
-    })
-    expect(result.current.board[0]).toBe(5)
-
-    act(() => {
-      result.current.clearBoard()
-    })
-
-    expect(result.current.board).toEqual(Array(81).fill(null))
-    expect(result.current.conflicts.size).toBe(0)
-    expect(toast.info).toHaveBeenCalledWith('Board cleared.')
-    expect(result.current.isSolveDisabled).toBe(true) // Should be disabled again
-  })
-
-  it('should call the solver and handle a successful solution', async () => {
-    const { result } = renderHook(() => useSudoku())
-
-    act(() => {
-      result.current.setCellValue(0, 5)
-    })
-
-    act(() => {
-      result.current.solve()
-    })
-
-    expect(result.current.isSolving).toBe(true)
-    expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith({
-      boardString: '5' + '.'.repeat(80),
-    })
-
-    // Simulate a response from the worker
-    act(() => {
-      mockWorkerInstance.__simulateMessage({
-        type: 'solution',
-        solution: SOLVED_BOARD_STRING,
-      })
-    })
-
-    expect(result.current.isSolving).toBe(false)
-    expect(result.current.isSolved).toBe(true)
-    expect(result.current.board).toEqual(SOLVED_BOARD_ARRAY)
-    expect(toast.success).toHaveBeenCalledWith('Sudoku solved successfully!')
-    expect(result.current.isSolveDisabled).toBe(true) // Disabled because board is full
-    expect(result.current.solveButtonTitle).toBe('Board is already full.')
-  })
-
-  it('should handle a solver error and update derived state', async () => {
-    const { result } = renderHook(() => useSudoku())
-    await waitFor(() => expect(result.current).toBeDefined())
-
-    act(() => {
-      result.current.setCellValue(0, 1)
-      result.current.solve()
-    })
-    expect(result.current.isSolving).toBe(true)
-
-    // Simulate an error from the worker
-    const errorMessage = 'No solution found'
-    act(() => {
-      mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage })
-    })
-
-    expect(result.current.isSolving).toBe(false)
-    expect(result.current.isSolved).toBe(false)
-    expect(result.current.isSolveDisabled).toBe(true)
-    expect(result.current.solveButtonTitle).toBe(
-      'Solving failed. Please change the board to try again.',
-    )
-    expect(toast.error).toHaveBeenCalledWith(`Solving failed: ${errorMessage}`)
-  })
-
-  it('should not call solver if there are conflicts', () => {
-    const { result } = renderHook(() => useSudoku())
-
-    act(() => {
-      result.current.setCellValue(0, 5)
-      result.current.setCellValue(1, 5)
-    })
-    expect(result.current.conflicts.size).toBe(2)
-
-    act(() => {
-      result.current.solve()
-    })
-
-    expect(result.current.isSolving).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(
-      'Cannot solve with conflicts. Please correct the cells.',
-    )
   })
 
   it('should terminate worker on unmount', () => {
@@ -235,19 +88,281 @@ describe('useSudoku hook', () => {
   })
 
   it('should handle case where worker fails to initialize', () => {
-    // Mock the constructor to throw an error for this test only
     vi.mocked(SolverWorker).mockImplementationOnce(() => {
       throw new Error('Worker initialization failed')
     })
-
-    // Thanks to the try/catch block in the hook, this will no longer crash.
     const { result } = renderHook(() => useSudoku())
+    act(() => result.current.solve())
+    expect(toast.error).toHaveBeenCalledWith('Solver functionality is unavailable.')
+  })
 
-    // The workerRef will be null. Now, test the public API's guard clause.
-    act(() => {
-      result.current.solve()
+  describe('Board and Cell Manipulation', () => {
+    it('should set a cell value and clear its own pencil marks', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      act(() => result.current.togglePencilMark(0, 2, 'candidate'))
+      expect(result.current.board[0].candidates.size).toBe(2)
+
+      act(() => result.current.setCellValue(0, 5))
+      expect(result.current.board[0].value).toBe(5)
+      expect(result.current.board[0].candidates.size).toBe(0)
+      expect(result.current.board[0].centers.size).toBe(0)
     })
 
-    expect(toast.error).toHaveBeenCalledWith('Solver worker is not available.')
+    it('should clear related pencil marks when a value is set', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(1, 5, 'candidate'))
+      act(() => result.current.togglePencilMark(9, 5, 'candidate'))
+      expect(result.current.board[1].candidates.has(5)).toBe(true)
+      expect(result.current.board[9].candidates.has(5)).toBe(true)
+
+      act(() => result.current.setCellValue(0, 5))
+      expect(result.current.board[0].value).toBe(5)
+      expect(result.current.board[1].candidates.has(5)).toBe(false)
+      expect(result.current.board[9].candidates.has(5)).toBe(false)
+    })
+
+    it('should do nothing when setCellValue is called with an invalid index', () => {
+      const { result } = renderHook(() => useSudoku())
+      const initialBoard = result.current.board
+      act(() => result.current.setCellValue(-1, 5))
+      expect(result.current.board).toBe(initialBoard)
+      act(() => result.current.setCellValue(81, 5))
+      expect(result.current.board).toBe(initialBoard)
+    })
+
+    it('should erase a cell value and its pencil marks', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 5))
+      act(() => result.current.togglePencilMark(1, 3, 'candidate'))
+      expect(result.current.board[0].value).toBe(5)
+
+      act(() => result.current.eraseCell(0))
+      expect(result.current.board[0].value).toBe(null)
+      expect(result.current.board[0].candidates.size).toBe(0)
+      expect(result.current.board[1].candidates.has(3)).toBe(true)
+    })
+
+    it('should do nothing when eraseCell is called with an invalid index', () => {
+      const { result } = renderHook(() => useSudoku())
+      const initialBoard = result.current.board
+      act(() => result.current.eraseCell(-1))
+      expect(result.current.board).toBe(initialBoard)
+      act(() => result.current.eraseCell(81))
+      expect(result.current.board).toBe(initialBoard)
+    })
+
+    it('should clear the entire board and reset state', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => {
+        result.current.setCellValue(0, 5)
+        result.current.setActiveCellIndex(0)
+      })
+      expect(result.current.board[0].value).toBe(5)
+
+      act(() => result.current.clearBoard())
+      expect(result.current.board.every((c) => c.value === null)).toBe(true)
+      expect(result.current.activeCellIndex).toBe(null)
+      expect(result.current.conflicts.size).toBe(0)
+      expect(toast.info).toHaveBeenCalledWith('Board cleared.')
+    })
+  })
+
+  describe('Pencil Marks', () => {
+    it('should add and remove candidate marks', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      expect(result.current.board[0].candidates.has(1)).toBe(true)
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      expect(result.current.board[0].candidates.has(1)).toBe(false)
+    })
+
+    it('should add and remove center marks', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(0, 1, 'center'))
+      expect(result.current.board[0].centers.has(1)).toBe(true)
+      act(() => result.current.togglePencilMark(0, 1, 'center'))
+      expect(result.current.board[0].centers.has(1)).toBe(false)
+    })
+
+    it('should not add marks to a cell with a value', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 5))
+      const boardBefore = result.current.board
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      expect(result.current.board).toBe(boardBefore)
+    })
+
+    it('should show an error for conflicting pencil marks', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(1, 5))
+      act(() => result.current.togglePencilMark(0, 5, 'candidate'))
+      expect(toast.error).toHaveBeenCalledWith('Cannot add pencil mark for 5, it conflicts with a number on the board.')
+      expect(result.current.board[0].candidates.has(5)).toBe(false)
+    })
+
+    it('should clear candidate marks when adding a center mark', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      expect(result.current.board[0].candidates.size).toBe(1)
+      act(() => result.current.togglePencilMark(0, 5, 'center'))
+      expect(result.current.board[0].candidates.size).toBe(0)
+      expect(result.current.board[0].centers.has(5)).toBe(true)
+    })
+
+    it('should prevent adding candidate marks if center marks exist', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.togglePencilMark(0, 5, 'center'))
+      const boardBefore = result.current.board
+      act(() => result.current.togglePencilMark(0, 1, 'candidate'))
+      expect(result.current.board).toBe(boardBefore)
+    })
+  })
+
+  describe('Undo/Redo', () => {
+    it('should undo and redo board changes', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 1))
+      const stateAfterOneMove = result.current.board
+      act(() => result.current.setCellValue(1, 2))
+      expect(result.current.board[1].value).toBe(2)
+
+      act(() => result.current.undo())
+      expect(result.current.board).toEqual(stateAfterOneMove)
+      expect(result.current.canRedo).toBe(true)
+
+      act(() => result.current.redo())
+      expect(result.current.board[1].value).toBe(2)
+      expect(result.current.canRedo).toBe(false)
+    })
+
+    it('should not undo/redo past history boundaries', () => {
+      const { result } = renderHook(() => useSudoku())
+      const initialBoard = result.current.board
+      act(() => result.current.setCellValue(0, 1))
+      expect(result.current.board).not.toBe(initialBoard)
+
+      act(() => result.current.redo())
+      expect(result.current.canRedo).toBe(false)
+      expect(result.current.board[0].value).toBe(1)
+
+      act(() => result.current.undo())
+      expect(result.current.board).toEqual(initialBoard)
+      expect(result.current.canUndo).toBe(false)
+
+      act(() => result.current.undo())
+      expect(result.current.board).toEqual(initialBoard)
+    })
+  })
+
+  describe('Solver Interaction', () => {
+    it('should not call solver if there are conflicts', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 5))
+      act(() => result.current.setCellValue(1, 5))
+      expect(result.current.conflicts.size).toBe(2)
+
+      act(() => result.current.solve())
+      expect(result.current.isSolving).toBe(false)
+      expect(toast.error).toHaveBeenCalledWith('Cannot solve with conflicts. Please correct the cells.')
+    })
+
+    it('should call the solver and handle a successful solution', async () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 5))
+      act(() => result.current.solve())
+
+      expect(result.current.isSolving).toBe(true)
+      expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith({ boardString: '5' + '.'.repeat(80) })
+
+      act(() => mockWorkerInstance.__simulateMessage({ type: 'solution', solution: SOLVED_BOARD_STRING }))
+
+      expect(result.current.isSolving).toBe(false)
+      expect(result.current.isSolved).toBe(true)
+      expect(result.current.board[0].value).toBe(5)
+      expect(toast.success).toHaveBeenCalledWith('Sudoku solved successfully!')
+    })
+
+    it('should handle a solver error', async () => {
+      const { result } = renderHook(() => useSudoku())
+      await waitFor(() => expect(result.current).toBeDefined())
+      act(() => {
+        result.current.setCellValue(0, 1)
+        result.current.solve()
+      })
+      expect(result.current.isSolving).toBe(true)
+
+      const errorMessage = 'No solution found'
+      act(() => mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage }))
+
+      expect(result.current.isSolving).toBe(false)
+      expect(result.current.isSolved).toBe(false)
+      expect(result.current.solveFailed).toBe(true)
+      expect(toast.error).toHaveBeenCalledWith(`Solving failed: ${errorMessage}`)
+    })
+  })
+
+  describe('Derived State and Logic', () => {
+    it('should update conflicts when board changes', () => {
+      const { result } = renderHook(() => useSudoku())
+      expect(result.current.conflicts.size).toBe(0)
+      act(() => result.current.setCellValue(0, 5))
+      expect(result.current.conflicts.size).toBe(0)
+      act(() => result.current.setCellValue(1, 5))
+      expect(result.current.conflicts).toEqual(new Set([0, 1]))
+      act(() => result.current.eraseCell(1))
+      expect(result.current.conflicts.size).toBe(0)
+    })
+
+    it('should correctly calculate isClearDisabled and clearButtonTitle', () => {
+      const { result } = renderHook(() => useSudoku())
+      expect(result.current.isClearDisabled).toBe(true)
+      expect(result.current.clearButtonTitle).toBe('Board is already empty.')
+
+      act(() => result.current.setCellValue(0, 1))
+      expect(result.current.isClearDisabled).toBe(false)
+      expect(result.current.clearButtonTitle).toBe('Clear the board')
+
+      act(() => result.current.solve())
+      expect(result.current.isSolving).toBe(true)
+      expect(result.current.isClearDisabled).toBe(true)
+    })
+
+    it('should correctly calculate isSolveDisabled and solveButtonTitle for all states', () => {
+      const { result } = renderHook(() => useSudoku())
+      expect(result.current.isSolveDisabled).toBe(true)
+      expect(result.current.solveButtonTitle).toBe('Board is empty.')
+
+      act(() => result.current.setCellValue(0, 1))
+      expect(result.current.isSolveDisabled).toBe(false)
+      expect(result.current.solveButtonTitle).toBe('Solve the puzzle')
+
+      act(() => result.current.setCellValue(1, 1))
+      expect(result.current.isSolveDisabled).toBe(true)
+      expect(result.current.solveButtonTitle).toBe('Cannot solve with conflicts.')
+
+      act(() => result.current.eraseCell(1))
+      act(() => result.current.solve())
+      act(() => mockWorkerInstance.__simulateMessage({ type: 'error', error: 'failed' }))
+      expect(result.current.solveFailed).toBe(true)
+      expect(result.current.isSolveDisabled).toBe(true)
+      expect(result.current.solveButtonTitle).toBe('Solving failed. Please change the board to try again.')
+
+      act(() => result.current.setCellValue(2, 2))
+      expect(result.current.solveFailed).toBe(false)
+      expect(result.current.isSolveDisabled).toBe(false)
+    })
+
+    it('should update solve button title to "Board is already full" when solved', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => result.current.setCellValue(0, 5))
+      act(() => result.current.solve())
+      act(() => mockWorkerInstance.__simulateMessage({ type: 'solution', solution: SOLVED_BOARD_STRING }))
+
+      expect(result.current.isSolved).toBe(true)
+      expect(result.current.conflicts.size).toBe(0)
+      expect(result.current.isSolveDisabled).toBe(true)
+      expect(result.current.solveButtonTitle).toBe('Board is already full.')
+    })
   })
 })

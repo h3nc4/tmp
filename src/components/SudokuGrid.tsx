@@ -19,12 +19,13 @@
 import { useMemo, useRef, useEffect } from 'react'
 import SudokuCell from './SudokuCell'
 import { getRelatedCellIndices } from '@/lib/utils'
+import type { BoardState, InputMode } from '@/hooks/useSudoku'
 
 interface SudokuGridProps {
   /** The current state of the board cells. */
-  readonly board: readonly (number | null)[]
+  readonly board: BoardState
   /** The board state before the solver was run. */
-  readonly initialBoard: readonly (number | null)[]
+  readonly initialBoard: BoardState
   /** Whether the solver is currently active. */
   readonly isSolving: boolean
   /** Whether the board is in a solved state. */
@@ -33,6 +34,8 @@ interface SudokuGridProps {
   readonly conflicts: ReadonlySet<number>
   /** The index of the currently focused cell. */
   readonly activeCellIndex: number | null
+  /** The current input mode for the grid. */
+  readonly inputMode: InputMode
   /** Callback to handle changes to a cell's value. */
   readonly onCellChange: (index: number, value: number | null) => void
   /** Callback to set the currently focused cell. */
@@ -49,6 +52,7 @@ export function SudokuGrid({
   isSolved,
   conflicts,
   activeCellIndex,
+  inputMode,
   onCellChange,
   onCellFocus,
 }: SudokuGridProps) {
@@ -80,17 +84,18 @@ export function SudokuGrid({
   return (
     <div
       ref={gridRef}
+      role="grid"
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
-      {board.map((cellValue, index) => {
-        const isInitial = initialBoard[index] !== null
+      {board.map((cell, index) => {
+        const isInitial = initialBoard[index]?.value != null
         const row = Math.floor(index / 9)
         const col = index % 9
         return (
           <SudokuCell
             key={`sudoku-cell-${row}-${col}`}
             index={index}
-            value={cellValue}
+            cell={cell}
             board={board}
             isInitial={isInitial}
             isSolving={isSolving}
@@ -98,6 +103,7 @@ export function SudokuGrid({
             isConflict={conflicts.has(index)}
             isActive={activeCellIndex === index}
             isHighlighted={highlightedIndices.has(index)}
+            inputMode={inputMode}
             onChange={onCellChange}
             onFocus={onCellFocus}
           />

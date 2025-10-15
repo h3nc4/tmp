@@ -16,8 +16,9 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+import type { BoardState } from '@/hooks/useSudoku'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -83,13 +84,13 @@ const BOX_INDICES = Array.from({ length: 9 }, (_, i) => {
  * @param board - The Sudoku board array.
  * @returns A Set of indices of all cells involved in a conflict.
  */
-export function validateBoard(board: (number | null)[]): Set<number> {
+export function validateBoard(board: BoardState): Set<number> {
   const conflicts = new Set<number>()
 
   const checkGroup = (indices: readonly number[]) => {
     const seen = new Map<number, number[]>() // Map from number to array of indices
     for (const index of indices) {
-      const value = board[index]
+      const value = board[index].value
       if (value !== null) {
         if (!seen.has(value)) {
           seen.set(value, [])
@@ -123,7 +124,7 @@ export function validateBoard(board: (number | null)[]): Set<number> {
  * @returns `true` if the move is valid (no immediate conflict), `false` otherwise.
  */
 export function isMoveValid(
-  board: readonly (number | null)[],
+  board: BoardState,
   index: number,
   value: number,
 ): boolean {
@@ -133,7 +134,7 @@ export function isMoveValid(
   // Check row for conflict
   for (let i = 0; i < 9; i++) {
     const peerIndex = row * 9 + i
-    if (peerIndex !== index && board[peerIndex] === value) {
+    if (peerIndex !== index && board[peerIndex].value === value) {
       return false
     }
   }
@@ -141,7 +142,7 @@ export function isMoveValid(
   // Check column for conflict
   for (let i = 0; i < 9; i++) {
     const peerIndex = i * 9 + col
-    if (peerIndex !== index && board[peerIndex] === value) {
+    if (peerIndex !== index && board[peerIndex].value === value) {
       return false
     }
   }
@@ -152,7 +153,7 @@ export function isMoveValid(
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 3; j++) {
       const peerIndex = (startRow + i) * 9 + (startCol + j)
-      if (peerIndex !== index && board[peerIndex] === value) {
+      if (peerIndex !== index && board[peerIndex].value === value) {
         return false
       }
     }

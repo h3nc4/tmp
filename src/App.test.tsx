@@ -16,194 +16,246 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { useSudoku } from './hooks/useSudoku'
+import { ModeToggle } from './components/mode-toggle'
 
 // --- Mocks ---
 
-// This mock captures the worker instance so tests can simulate messages from it.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let mockWorkerInstance: any
-vi.mock('@/solver.worker?worker', () => {
-  class MockWorker {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onmessage: ((event: any) => void) | null = null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    postMessageListeners: any[] = []
-    constructor() {
-      mockWorkerInstance = this
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    addEventListener(event: string, listener: any) {
-      if (event === 'message') this.onmessage = listener
-    }
-
-    removeEventListener() {
-      // no-op
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    postMessage(data: any) {
-      this.postMessageListeners.forEach((l) => l(data))
-    }
-
-    terminate() {
-      // no-op
-    }
-
-    // Helper for tests to simulate messages FROM the worker
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    __simulateMessage(data: any) {
-      if (this.onmessage) this.onmessage({ data })
-    }
-
-    // Helper for tests to listen for messages posted TO the worker
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    __addPostMessageListener(listener: any) {
-      this.postMessageListeners.push(listener)
-    }
-  }
-  return { default: MockWorker }
-})
-
-vi.mock('sonner', () => ({
-  Toaster: () => null, // Mock the Toaster component to avoid rendering it
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
+// Mock child components to prevent their complex logic from affecting App tests
+vi.mock('./components/SudokuGrid', () => ({
+  SudokuGrid: vi.fn(
+    ({ onCellFocus, onCellChange, activeCellIndex, inputMode }) => (
+      <div data-testid="sudoku-grid">
+        <input
+          aria-label="mock-cell-0"
+          onFocus={() => onCellFocus(0)}
+          onChange={(e) => {
+            const value = e.target.value ? parseInt(e.target.value) : null
+            onCellChange(0, value)
+          }}
+        />
+        <p>Active Cell: {String(activeCellIndex)}</p>
+        <p>Input Mode: {inputMode}</p>
+      </div>
+    ),
+  ),
 }))
+
+vi.mock('./components/mode-toggle', () => ({
+  ModeToggle: vi.fn(() => (
+    <button aria-label="Toggle Theme">Theme Toggle</button>
+  )),
+}))
+
+// Mock the main hook
+vi.mock('./hooks/useSudoku', () => ({
+  useSudoku: vi.fn(),
+}))
+
+const mockUseSudoku = useSudoku as Mock
 
 // --- Tests ---
 
-describe('App component (Integration)', () => {
+describe('App component', () => {
+  const mockSetInputMode = vi.fn()
+  const mockSetActiveCellIndex = vi.fn()
+  const mockSetCellValue = vi.fn()
+  const mockTogglePencilMark = vi.fn()
+  const mockEraseCell = vi.fn()
+  const mockClearBoard = vi.fn()
+  const mockSolve = vi.fn()
+  const mockUndo = vi.fn()
+  const mockRedo = vi.fn()
+
+  const defaultHookValues = {
+    board: [],
+    initialBoard: [],
+    isSolving: false,
+    isSolved: false,
+    conflicts: new Set(),
+    activeCellIndex: null,
+    inputMode: 'normal',
+    isSolveDisabled: true,
+    isClearDisabled: true,
+    solveButtonTitle: 'Board is empty.',
+    clearButtonTitle: 'Board is already empty.',
+    canUndo: false,
+    canRedo: false,
+    setInputMode: mockSetInputMode,
+    setActiveCellIndex: mockSetActiveCellIndex,
+    setCellValue: mockSetCellValue,
+    togglePencilMark: mockTogglePencilMark,
+    eraseCell: mockEraseCell,
+    clearBoard: mockClearBoard,
+    solve: mockSolve,
+    undo: mockUndo,
+    redo: mockRedo,
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
-    mockWorkerInstance = null
+    mockUseSudoku.mockReturnValue(defaultHookValues)
   })
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('renders with solve and clear buttons disabled initially', () => {
+  it('renders the main layout correctly', () => {
     render(<App />)
-    const solveButton = screen.getByRole('button', { name: /solve puzzle/i })
-    const clearButton = screen.getByRole('button', { name: /clear board/i })
-    expect(solveButton).toBeDisabled()
-    expect(solveButton).toHaveAttribute('title', 'Board is empty.')
-    expect(clearButton).toBeDisabled()
-    expect(clearButton).toHaveAttribute('title', 'Board is already empty.')
+    expect(
+      screen.getByRole('heading', { name: /wasudoku/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('sudoku-grid')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /github repository/i }),
+    ).toHaveAttribute('href', 'https://github.com/h3nc4/WASudoku')
+    expect(ModeToggle).toHaveBeenCalled()
+    expect(
+      screen.getByRole('link', { name: /henrique almeida/i }),
+    ).toHaveAttribute('href', 'https://h3nc4.com')
   })
 
-  it('allows user to input numbers and clear the board', async () => {
+  it('handles grid interactions: focus and cell change', async () => {
     const user = userEvent.setup()
     render(<App />)
+    const mockCell = screen.getByLabelText('mock-cell-0')
 
-    const cells = screen.getAllByRole('textbox')
-    const clearButton = screen.getByRole('button', { name: /clear board/i })
+    // Test focusing
+    await user.click(mockCell)
+    expect(mockSetActiveCellIndex).toHaveBeenCalledWith(0)
 
-    expect(clearButton).toBeDisabled()
+    // Test cell change in normal mode
+    await user.type(mockCell, '5')
+    expect(mockSetCellValue).toHaveBeenCalledWith(0, 5)
 
-    await user.type(cells[0], '5')
-    expect(cells[0]).toHaveValue('5')
-    expect(clearButton).not.toBeDisabled()
-
-    await user.click(clearButton)
-    expect(cells[0]).toHaveValue('')
+    // Test clearing cell
+    await user.clear(mockCell)
+    expect(mockEraseCell).toHaveBeenCalledWith(0)
   })
 
-  it('prevents solving with conflicts and solves a valid board', async () => {
+  it('handles cell change in candidate mode', async () => {
     const user = userEvent.setup()
-    const postMessageSpy = vi.fn()
+    mockUseSudoku.mockReturnValue({
+      ...defaultHookValues,
+      inputMode: 'candidate',
+    })
+    render(<App />)
+    const mockCell = screen.getByLabelText('mock-cell-0')
+
+    await user.type(mockCell, '3')
+    expect(mockTogglePencilMark).toHaveBeenCalledWith(0, 3, 'candidate')
+  })
+
+  it('handles cell change in center mode', async () => {
+    const user = userEvent.setup()
+    mockUseSudoku.mockReturnValue({
+      ...defaultHookValues,
+      inputMode: 'center',
+    })
+    render(<App />)
+    const mockCell = screen.getByLabelText('mock-cell-0')
+
+    await user.type(mockCell, '8')
+    expect(mockTogglePencilMark).toHaveBeenCalledWith(0, 8, 'center')
+  })
+
+  it('changes input mode when toggle group is clicked', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('radio', { name: 'Candidate' }))
+    expect(mockSetInputMode).toHaveBeenCalledWith('candidate')
+  })
+
+  it('calls eraseCell when erase button is clicked and a cell is active', async () => {
+    const user = userEvent.setup()
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, activeCellIndex: 0 })
     render(<App />)
 
-    await waitFor(() => {
-      expect(mockWorkerInstance).toBeDefined()
-      mockWorkerInstance.__addPostMessageListener(postMessageSpy)
+    const eraseButton = screen.getByRole('button', {
+      name: 'Erase selected cell',
     })
+    await user.click(eraseButton)
+    expect(mockEraseCell).toHaveBeenCalledWith(0)
+  })
 
-    const cells = screen.getAllByRole('textbox')
-    const solveButton = screen.getByRole('button', { name: /solve puzzle/i })
+  it('disables erase button when no cell is active', () => {
+    render(<App />)
+    expect(
+      screen.getByRole('button', { name: 'Erase selected cell' }),
+    ).toBeDisabled()
+  })
 
-    // Create a conflict
-    await user.type(cells[0], '1')
-    await user.type(cells[1], '1')
-
-    expect(solveButton).toBeDisabled()
-    expect(solveButton).toHaveAttribute('title', 'Cannot solve with conflicts.')
-
-    // Fix the conflict
-    await user.click(cells[1])
-    await user.keyboard('{Backspace}')
-    await user.type(cells[1], '2')
-    expect(solveButton).not.toBeDisabled()
-
-    // Solve
-    await user.click(solveButton)
-
-    // Check for "Solving..." state with delay
-    await waitFor(
-      () => {
-        expect(screen.getByText(/solving.../i)).toBeInTheDocument()
-      },
-      { timeout: 600 },
-    ) // Timeout > 500ms delay in component
-
-    expect(postMessageSpy).toHaveBeenCalledWith({
-      boardString: '12' + '.'.repeat(79),
+  it('calls undo and redo functions when buttons are clicked', async () => {
+    const user = userEvent.setup()
+    mockUseSudoku.mockReturnValue({
+      ...defaultHookValues,
+      canUndo: true,
+      canRedo: true,
     })
+    render(<App />)
 
-    // Simulate successful solve from worker, wrapping the state update in act()
-    const solution = '123456789'.repeat(9)
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(mockUndo).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Redo' }))
+    expect(mockRedo).toHaveBeenCalled()
+  })
+
+  it('calls solve and clear functions when buttons are clicked', async () => {
+    const user = userEvent.setup()
+    mockUseSudoku.mockReturnValue({
+      ...defaultHookValues,
+      isSolveDisabled: false,
+      isClearDisabled: false,
+    })
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Solve Puzzle' }))
+    expect(mockSolve).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Clear Board' }))
+    expect(mockClearBoard).toHaveBeenCalled()
+  })
+
+  it('shows "Solving..." state after a delay', () => {
+    vi.useFakeTimers()
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, isSolving: true })
+    render(<App />)
+
+    expect(screen.queryByText('Solving...')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Solve Puzzle' }),
+    ).toBeInTheDocument()
+
     act(() => {
-      mockWorkerInstance.__simulateMessage({ type: 'solution', solution })
+      vi.advanceTimersByTime(500)
     })
 
-    // Wait for the UI to reflect the solved state, specifically for the
-    // "Solving..." text to disappear, which confirms the state change has rendered.
-    await waitFor(() => {
-      expect(screen.queryByText(/solving.../i)).not.toBeInTheDocument()
-    })
-
-    // Now that the UI is stable, assert the final state of the board and controls.
-    expect(cells[80]).toHaveValue('9')
-    expect(solveButton).toBeDisabled()
-    expect(solveButton).toHaveAttribute('title', 'Board is already full.')
+    expect(screen.getByText('Solving...')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /solving/i }),
+    ).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
-  it('handles solver failure and allows re-solving after board change', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-    await waitFor(() => expect(mockWorkerInstance).toBeDefined())
-    const cells = screen.getAllByRole('textbox')
-    const solveButton = screen.getByRole('button', { name: /solve puzzle/i })
+  it('clears solving state immediately if solving finishes before delay', () => {
+    vi.useFakeTimers()
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, isSolving: true })
+    const { rerender } = render(<App />)
 
-    // Input a puzzle and try to solve
-    await user.type(cells[0], '1')
-    await user.click(solveButton)
-
-    // Simulate failure
-    const errorMessage = 'No solution found'
     act(() => {
-      mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage })
+      vi.advanceTimersByTime(300)
     })
 
-    // Button should be disabled due to failure
-    await waitFor(() => {
-      expect(solveButton).toBeDisabled()
-    })
-    expect(solveButton).toHaveAttribute(
-      'title',
-      'Solving failed. Please change the board to try again.',
-    )
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, isSolving: false })
+    rerender(<App />)
 
-    // Change the board, which should re-enable the button
-    await user.type(cells[1], '2')
-    expect(solveButton).not.toBeDisabled()
+    act(() => {
+      vi.runAllTimers()
+    })
+
+    expect(screen.queryByText('Solving...')).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 })

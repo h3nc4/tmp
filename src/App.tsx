@@ -16,13 +16,14 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useState, useEffect, useRef } from 'react'
-import { Eraser, BrainCircuit } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Eraser, BrainCircuit, Undo, Redo } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
 import { SudokuGrid } from '@/components/SudokuGrid'
-import { useSudoku } from '@/hooks/useSudoku'
+import { useSudoku, type InputMode } from '@/hooks/useSudoku'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 function App() {
   const {
@@ -32,14 +33,22 @@ function App() {
     isSolved,
     conflicts,
     activeCellIndex,
+    inputMode,
     isSolveDisabled,
     isClearDisabled,
     solveButtonTitle,
     clearButtonTitle,
+    canUndo,
+    canRedo,
     setActiveCellIndex,
+    setInputMode,
     setCellValue,
+    togglePencilMark,
+    eraseCell,
     clearBoard,
     solve,
+    undo,
+    redo,
   } = useSudoku()
 
   const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
@@ -67,6 +76,28 @@ function App() {
       }
     }
   }, [isSolving])
+
+  const handleErase = useCallback(() => {
+    if (activeCellIndex !== null) {
+      eraseCell(activeCellIndex)
+    }
+  }, [activeCellIndex, eraseCell])
+
+  const handleCellChange = useCallback(
+    (index: number, value: number | null) => {
+      if (value === null) {
+        eraseCell(index)
+        return
+      }
+
+      if (inputMode === 'normal') {
+        setCellValue(index, value)
+      } else {
+        togglePencilMark(index, value, inputMode)
+      }
+    },
+    [inputMode, setCellValue, togglePencilMark, eraseCell],
+  )
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -96,37 +127,88 @@ function App() {
             isSolved={isSolved}
             conflicts={conflicts}
             activeCellIndex={activeCellIndex}
-            onCellChange={setCellValue}
+            inputMode={inputMode}
+            onCellChange={handleCellChange}
             onCellFocus={setActiveCellIndex}
           />
         </div>
 
-        <div className="flex w-full max-w-md flex-row gap-2">
-          <Button
-            onClick={solve}
-            className="flex-1"
-            disabled={isSolveDisabled}
-            title={solveButtonTitle}
-          >
-            {isShowingSolvingState ? (
-              <>
-                <BrainCircuit className="mr-2 size-4 animate-pulse" />
-                Solving...
-              </>
-            ) : (
-              'Solve Puzzle'
-            )}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={clearBoard}
-            className="flex-1"
-            disabled={isClearDisabled}
-            title={clearButtonTitle}
-          >
-            <Eraser className="mr-2 size-4" />
-            Clear Board
-          </Button>
+        <div className="flex w-full max-w-md flex-col gap-2">
+          <div className="flex flex-row gap-2">
+            <ToggleGroup
+              type="single"
+              value={inputMode}
+              onValueChange={(value) => {
+                if (value) setInputMode(value as InputMode)
+              }}
+              className="flex-1"
+              aria-label="Input Mode"
+            >
+              <ToggleGroupItem value="normal" className="flex-1">
+                Normal
+              </ToggleGroupItem>
+              <ToggleGroupItem value="candidate" className="flex-1">
+                Candidate
+              </ToggleGroupItem>
+              <ToggleGroupItem value="center" className="flex-1">
+                Center
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button
+              variant="outline"
+              size="icon"
+              onMouseDown={handleErase}
+              disabled={activeCellIndex === null}
+              title="Erase selected cell"
+            >
+              <Eraser />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo"
+            >
+              <Undo />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo"
+            >
+              <Redo />
+            </Button>
+          </div>
+          <div className="flex w-full flex-row gap-2">
+            <Button
+              onClick={solve}
+              className="flex-1"
+              disabled={isSolveDisabled}
+              title={solveButtonTitle}
+            >
+              {isShowingSolvingState ? (
+                <>
+                  <BrainCircuit className="mr-2 size-4 animate-pulse" />
+                  Solving...
+                </>
+              ) : (
+                'Solve Puzzle'
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={clearBoard}
+              className="flex-1"
+              disabled={isClearDisabled}
+              title={clearButtonTitle}
+            >
+              <Eraser className="mr-2 size-4" />
+              Clear Board
+            </Button>
+          </div>
         </div>
       </main>
 
