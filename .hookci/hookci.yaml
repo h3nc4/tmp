@@ -1,0 +1,20 @@
+version: '1.0'
+log_level: INFO
+docker:
+  dockerfile: Codigo/Dockerfile
+hooks:
+  pre_commit: true
+  pre_push: true
+steps:
+- name: Lint
+  command: cd Codigo; poetry run ruff check . src/ tests/
+  critical: true
+  env: {}
+- name: Type Check
+  command: cd Codigo; mypy --strict src/ tests/
+  critical: true
+  env: {}
+- name: Test
+  command: cd Codigo; poetry run pytest --cov=src --cov-report=xml:coverage.xml
+  critical: true
+  env: {}

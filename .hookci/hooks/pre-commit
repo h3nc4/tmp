@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# HookCI pre-commit hook
+
+exec hookci run --hook-type pre-commit

@@ -15,9 +15,6 @@
 # along with HookCI.  If not, see <https://www.gnu.org/licenses/>.
 
 ################################## FROM ARGUMENTS
-# The below variable skips squashing the image layers
-# Devcontainers do not support squashing
-ARG DEVCONTAINER
 
 ARG PYTHON_VERSION=3.13
 
@@ -178,7 +175,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################## LAYER SQUASHING
-FROM ${DEVCONTAINER:-squash}
+FROM busybox:1.36.0-musl AS final
 
 COPY --from=base / /
 COPY --from=node-stage /rootfs/ /

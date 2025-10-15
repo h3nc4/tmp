@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# HookCI pre-push hook
+
+exec hookci run --hook-type pre-push
