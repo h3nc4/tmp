@@ -20,4 +20,4 @@
 VERSION=${1#v}
 sed -i 's/"version": ".*"/"version": "'"$VERSION"'"/' package.json
 sed -i 's/sonar.projectVersion=.*/sonar.projectVersion='"$VERSION"'/' sonar-project.properties
-sed -i 's/version = ".*"/version = "'"$VERSION"'"/' src/wasudoku-wasm/Cargo.toml
+sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' src/wasudoku-wasm/Cargo.toml
