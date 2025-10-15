@@ -160,7 +160,7 @@ function SudokuCell({
         id={`cell-${index}`}
         type="text"
         pattern="\d*"
-        inputMode="numeric"
+        inputMode="none"
         value={cell.value === null ? '' : String(cell.value)}
         onChange={handleChange}
         onFocus={handleFocus}

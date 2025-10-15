@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import SolverWorker from '@/solver.worker?worker'
 import { useSudoku } from './useSudoku'
+import type { BoardState } from './useSudoku'
 
 // --- Mocks ---
 
@@ -54,6 +55,28 @@ vi.mock('sonner', () => ({
   },
 }))
 
+const localStorageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem(key: string) {
+      return store[key] || null
+    },
+    setItem(key: string, value: string) {
+      store[key] = value.toString()
+    },
+    removeItem(key: string) {
+      delete store[key]
+    },
+    clear() {
+      store = {}
+    },
+  }
+})()
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+})
+
 // --- Tests ---
 
 describe('useSudoku hook', () => {
@@ -61,6 +84,7 @@ describe('useSudoku hook', () => {
     '534678912672195348198342567859761423426853791713924856961537284287419635345286179'
 
   beforeEach(() => {
+    localStorageMock.clear()
     vi.clearAllMocks()
     vi.mocked(SolverWorker).mockImplementation(() => mockWorkerInstance as unknown as Worker)
   })
@@ -363,6 +387,106 @@ describe('useSudoku hook', () => {
       expect(result.current.conflicts.size).toBe(0)
       expect(result.current.isSolveDisabled).toBe(true)
       expect(result.current.solveButtonTitle).toBe('Board is already full.')
+    })
+  })
+
+  describe('Local Storage Persistence', () => {
+    const LOCAL_STORAGE_KEY = 'wasudoku-game-state'
+
+    // Helper to create a board with one cell filled
+    const createTestBoard = (): BoardState =>
+      Array(81)
+        .fill(null)
+        .map((_, i) => ({
+          value: i === 0 ? 5 : null,
+          candidates: new Set<number>(),
+          centers: new Set<number>(),
+        }))
+
+    // Custom replacer to handle Set serialization
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const replacer = (_key: string, value: any) => {
+      if (value instanceof Set) {
+        return { __dataType: 'Set', value: [...value] }
+      }
+      return value
+    }
+
+    it('should load initial state from local storage', () => {
+      const savedBoard = createTestBoard()
+      const savedState = {
+        history: [savedBoard],
+        historyIndex: 0,
+      }
+      localStorageMock.setItem(LOCAL_STORAGE_KEY, JSON.stringify(savedState, replacer))
+
+      const { result } = renderHook(() => useSudoku())
+
+      expect(result.current.board).toEqual(savedBoard)
+      expect(result.current.board[0].value).toBe(5)
+    })
+
+    it('should save state to local storage on board change', () => {
+      const setItemSpy = vi.spyOn(localStorageMock, 'setItem')
+      const { result } = renderHook(() => useSudoku())
+
+      act(() => {
+        result.current.setCellValue(0, 5)
+      })
+
+      expect(setItemSpy).toHaveBeenCalledTimes(2) // 1 for initial render, 1 for update
+      const savedData = JSON.parse(setItemSpy.mock.calls[1][1])
+      expect(savedData.historyIndex).toBe(1)
+      expect(savedData.history[1][0].value).toBe(5)
+      setItemSpy.mockRestore()
+    })
+
+    it('should save the new empty state after clearing the board', () => {
+      const { result } = renderHook(() => useSudoku())
+      act(() => {
+        result.current.setCellValue(0, 5)
+      })
+
+      const setItemSpy = vi.spyOn(localStorageMock, 'setItem')
+      act(() => {
+        result.current.clearBoard()
+      })
+
+      expect(setItemSpy).toHaveBeenCalledTimes(1) // Only sees the call from clearBoard
+      const savedData = JSON.parse(setItemSpy.mock.calls[0][1])
+      expect(savedData.historyIndex).toBe(2)
+      expect(savedData.history[2].every((c: { value: null }) => c.value === null)).toBe(true)
+      setItemSpy.mockRestore()
+    })
+
+    it('should initialize with a default state if local storage contains invalid JSON', () => {
+      localStorageMock.setItem(LOCAL_STORAGE_KEY, '{"invalid": json}')
+      const { result } = renderHook(() => useSudoku())
+      expect(result.current.board.every((c) => c.value === null)).toBe(true)
+    })
+
+    it('should not crash if saving to local storage fails', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+      const setItemSpy = vi.spyOn(localStorageMock, 'setItem').mockImplementation(() => {
+        throw new Error('Storage is full')
+      })
+
+      const { result } = renderHook(() => useSudoku())
+
+      act(() => {
+        result.current.setCellValue(0, 5)
+      })
+
+      expect(setItemSpy).toThrow('Storage is full')
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to save game state to local storage:',
+        expect.any(Error),
+      )
+      // The hook should still function correctly
+      expect(result.current.board[0].value).toBe(5)
+
+      consoleErrorSpy.mockRestore()
+      setItemSpy.mockRestore()
     })
   })
 })

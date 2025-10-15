@@ -24,6 +24,7 @@ import { ModeToggle } from '@/components/mode-toggle'
 import { SudokuGrid } from '@/components/SudokuGrid'
 import { useSudoku, type InputMode } from '@/hooks/useSudoku'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { NumberPad } from '@/components/NumberPad'
 
 function App() {
   const {
@@ -53,6 +54,7 @@ function App() {
 
   const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
   const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const interactionAreaRef = useRef<HTMLDivElement>(null)
 
   // This effect manages the delayed "Solving..." state to avoid UI flicker for very fast solves.
   useEffect(() => {
@@ -99,6 +101,15 @@ function App() {
     [inputMode, setCellValue, togglePencilMark, eraseCell],
   )
 
+  const handleNumberPadClick = useCallback(
+    (value: number) => {
+      if (activeCellIndex !== null) {
+        handleCellChange(activeCellIndex, value)
+      }
+    },
+    [activeCellIndex, handleCellChange],
+  )
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="container mx-auto flex items-center justify-between p-4">
@@ -118,8 +129,11 @@ function App() {
         </div>
       </header>
 
-      <main className="container mx-auto flex flex-1 flex-col items-center justify-center gap-6 p-4 md:gap-8">
-        <div className="w-full max-w-md">
+      <main className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
+        <div
+          ref={interactionAreaRef}
+          className="flex w-full max-w-md flex-col gap-6 md:gap-8"
+        >
           <SudokuGrid
             board={board}
             initialBoard={initialBoard}
@@ -130,84 +144,91 @@ function App() {
             inputMode={inputMode}
             onCellChange={handleCellChange}
             onCellFocus={setActiveCellIndex}
+            interactionAreaRef={interactionAreaRef}
           />
-        </div>
 
-        <div className="flex w-full max-w-md flex-col gap-2">
-          <div className="flex flex-row gap-2">
-            <ToggleGroup
-              type="single"
-              value={inputMode}
-              onValueChange={(value) => {
-                if (value) setInputMode(value as InputMode)
-              }}
-              className="flex-1"
-              aria-label="Input Mode"
-            >
-              <ToggleGroupItem value="normal" className="flex-1">
-                Normal
-              </ToggleGroupItem>
-              <ToggleGroupItem value="candidate" className="flex-1">
-                Candidate
-              </ToggleGroupItem>
-              <ToggleGroupItem value="center" className="flex-1">
-                Center
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <Button
-              variant="outline"
-              size="icon"
-              onMouseDown={handleErase}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-row gap-2">
+              <ToggleGroup
+                type="single"
+                value={inputMode}
+                onValueChange={(value) => {
+                  if (value) setInputMode(value as InputMode)
+                }}
+                className="flex-1"
+                aria-label="Input Mode"
+              >
+                <ToggleGroupItem value="normal" className="flex-1">
+                  Normal
+                </ToggleGroupItem>
+                <ToggleGroupItem value="candidate" className="flex-1">
+                  Candidate
+                </ToggleGroupItem>
+                <ToggleGroupItem value="center" className="flex-1">
+                  Center
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <Button
+                variant="outline"
+                size="icon"
+                onMouseDown={handleErase}
+                disabled={activeCellIndex === null}
+                title="Erase selected cell"
+              >
+                <Eraser />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={undo}
+                disabled={!canUndo}
+                title="Undo"
+              >
+                <Undo />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={redo}
+                disabled={!canRedo}
+                title="Redo"
+              >
+                <Redo />
+              </Button>
+            </div>
+
+            <NumberPad
+              onNumberClick={handleNumberPadClick}
               disabled={activeCellIndex === null}
-              title="Erase selected cell"
-            >
-              <Eraser />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={undo}
-              disabled={!canUndo}
-              title="Undo"
-            >
-              <Undo />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={redo}
-              disabled={!canRedo}
-              title="Redo"
-            >
-              <Redo />
-            </Button>
-          </div>
-          <div className="flex w-full flex-row gap-2">
-            <Button
-              onClick={solve}
-              className="flex-1"
-              disabled={isSolveDisabled}
-              title={solveButtonTitle}
-            >
-              {isShowingSolvingState ? (
-                <>
-                  <BrainCircuit className="mr-2 size-4 animate-pulse" />
-                  Solving...
-                </>
-              ) : (
-                'Solve Puzzle'
-              )}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={clearBoard}
-              className="flex-1"
-              disabled={isClearDisabled}
-              title={clearButtonTitle}
-            >
-              <Eraser className="mr-2 size-4" />
-              Clear Board
-            </Button>
+            />
+
+            <div className="flex w-full flex-row gap-2">
+              <Button
+                onClick={solve}
+                className="flex-1"
+                disabled={isSolveDisabled}
+                title={solveButtonTitle}
+              >
+                {isShowingSolvingState ? (
+                  <>
+                    <BrainCircuit className="mr-2 size-4 animate-pulse" />
+                    Solving...
+                  </>
+                ) : (
+                  'Solve Puzzle'
+                )}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={clearBoard}
+                className="flex-1"
+                disabled={isClearDisabled}
+                title={clearButtonTitle}
+              >
+                <Eraser className="mr-2 size-4" />
+                Clear Board
+              </Button>
+            </div>
           </div>
         </div>
       </main>

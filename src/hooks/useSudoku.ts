@@ -22,6 +22,7 @@ import { validateBoard, getRelatedCellIndices, isMoveValid } from '@/lib/utils'
 import SolverWorker from '@/solver.worker?worker'
 
 const BOARD_SIZE = 81
+const LOCAL_STORAGE_KEY = 'wasudoku-game-state'
 
 /**
  * Represents the state of a single cell on the Sudoku board.
@@ -36,6 +37,12 @@ export interface CellState {
 export type BoardState = readonly CellState[]
 export type InputMode = 'normal' | 'candidate' | 'center'
 
+/** The shape of the game state object saved to local storage. */
+interface SavedGameState {
+  history: BoardState[]
+  historyIndex: number
+}
+
 /**
  * Creates an empty Sudoku board with the new cell state structure.
  * @returns An array of 81 empty cell states.
@@ -47,6 +54,81 @@ const createEmptyBoard = (): BoardState =>
     centers: new Set(),
   })
 
+// --- Persistence Functions ---
+
+/**
+ * Custom JSON replacer to handle serializing `Set` objects.
+ * @param _key - The key being serialized.
+ * @param value - The value to serialize.
+ * @returns A serializable representation of the value.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function replacer(_key: string, value: any) {
+  if (value instanceof Set) {
+    return {
+      __dataType: 'Set',
+      value: [...value],
+    }
+  }
+  return value
+}
+
+/**
+ * Custom JSON reviver to handle deserializing `Set` objects.
+ * @param _key - The key being revived.
+ * @param value - The value to revive.
+ * @returns The revived value, with `Set` objects restored.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function reviver(_key: string, value: any) {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    value.__dataType === 'Set' &&
+    Array.isArray(value.value)
+  ) {
+    return new Set(value.value)
+  }
+  return value
+}
+
+/**
+ * Loads the game state from local storage.
+ * @returns The saved game state or null if not found or invalid.
+ */
+function loadGameState(): SavedGameState | null {
+  try {
+    const savedStateJSON = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+    if (savedStateJSON) {
+      const savedState = JSON.parse(savedStateJSON, reviver) as SavedGameState
+      // Basic validation to ensure the loaded data has the expected structure.
+      if (
+        savedState &&
+        Array.isArray(savedState.history) &&
+        typeof savedState.historyIndex === 'number'
+      ) {
+        return savedState
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load game state from local storage:', error)
+  }
+  return null
+}
+
+/**
+ * Saves the game state to local storage.
+ * @param state - The game state to save.
+ */
+function saveGameState(state: SavedGameState) {
+  try {
+    const stateJSON = JSON.stringify(state, replacer)
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, stateJSON)
+  } catch (error) {
+    console.error('Failed to save game state to local storage:', error)
+  }
+}
+
 /**
  * A custom hook to manage the state and logic of the Sudoku board.
  * It handles board state, user input, solver interaction via a Web Worker,
@@ -55,8 +137,14 @@ const createEmptyBoard = (): BoardState =>
  * @returns An object containing the board state and functions to interact with it.
  */
 export function useSudoku() {
-  const [history, setHistory] = useState([createEmptyBoard()])
-  const [historyIndex, setHistoryIndex] = useState(0)
+  // Load state from localStorage on initial render only.
+  const [initialState] = useState(() => {
+    const savedState = loadGameState()
+    return savedState || { history: [createEmptyBoard()], historyIndex: 0 }
+  })
+
+  const [history, setHistory] = useState(initialState.history)
+  const [historyIndex, setHistoryIndex] = useState(initialState.historyIndex)
   const board = history[historyIndex]
 
   const [initialBoard, setInitialBoard] = useState<BoardState>(
@@ -83,6 +171,11 @@ export function useSudoku() {
     },
     [history, historyIndex],
   )
+
+  // Save the current game state to local storage whenever it changes.
+  useEffect(() => {
+    saveGameState({ history, historyIndex })
+  }, [history, historyIndex])
 
   // Initialize and terminate the Web Worker.
   useEffect(() => {

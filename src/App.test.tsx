@@ -45,6 +45,20 @@ vi.mock('./components/SudokuGrid', () => ({
   ),
 }))
 
+vi.mock('./components/NumberPad', () => ({
+  NumberPad: vi.fn(({ onNumberClick, disabled }) => (
+    <div data-testid="number-pad">
+      <button
+        disabled={disabled}
+        onClick={() => onNumberClick(7)}
+        aria-label="Enter number 7"
+      >
+        7
+      </button>
+    </div>
+  )),
+}))
+
 vi.mock('./components/mode-toggle', () => ({
   ModeToggle: vi.fn(() => (
     <button aria-label="Toggle Theme">Theme Toggle</button>
@@ -101,12 +115,13 @@ describe('App component', () => {
     mockUseSudoku.mockReturnValue(defaultHookValues)
   })
 
-  it('renders the main layout correctly', () => {
+  it('renders the main layout correctly, including NumberPad', () => {
     render(<App />)
     expect(
       screen.getByRole('heading', { name: /wasudoku/i }),
     ).toBeInTheDocument()
     expect(screen.getByTestId('sudoku-grid')).toBeInTheDocument()
+    expect(screen.getByTestId('number-pad')).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /github repository/i }),
     ).toHaveAttribute('href', 'https://github.com/h3nc4/WASudoku')
@@ -257,5 +272,24 @@ describe('App component', () => {
 
     expect(screen.queryByText('Solving...')).not.toBeInTheDocument()
     vi.useRealTimers()
+  })
+
+  it('handles input from the number pad', async () => {
+    const user = userEvent.setup()
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, activeCellIndex: 0 })
+    render(<App />)
+
+    const padButton = screen.getByRole('button', { name: 'Enter number 7' })
+    await user.click(padButton)
+
+    // It should call handleCellChange, which in 'normal' mode calls setCellValue
+    expect(mockSetCellValue).toHaveBeenCalledWith(0, 7)
+  })
+
+  it('disables the number pad when no cell is active', () => {
+    mockUseSudoku.mockReturnValue({ ...defaultHookValues, activeCellIndex: null })
+    render(<App />)
+    const padButton = screen.getByRole('button', { name: 'Enter number 7' })
+    expect(padButton).toBeDisabled()
   })
 })

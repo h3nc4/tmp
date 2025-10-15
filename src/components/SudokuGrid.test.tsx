@@ -16,6 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { SudokuGrid } from './SudokuGrid'
@@ -49,6 +50,7 @@ const createEmptyBoard = (): BoardState =>
 describe('SudokuGrid component', () => {
   const mockOnCellChange = vi.fn()
   const mockOnCellFocus = vi.fn()
+  const mockInteractionAreaRef = React.createRef<HTMLDivElement | null>()
 
   const defaultProps = {
     board: createEmptyBoard(),
@@ -60,6 +62,7 @@ describe('SudokuGrid component', () => {
     inputMode: 'normal' as const,
     onCellChange: mockOnCellChange,
     onCellFocus: mockOnCellFocus,
+    interactionAreaRef: mockInteractionAreaRef,
   }
 
   beforeEach(() => {
@@ -127,11 +130,13 @@ describe('SudokuGrid component', () => {
     }
   })
 
-  it('calls onCellFocus with null when clicking outside the grid', () => {
+  it('calls onCellFocus with null when clicking outside the interaction area', () => {
     render(
       <div>
+        <div ref={mockInteractionAreaRef}>
+          <SudokuGrid {...defaultProps} activeCellIndex={10} />
+        </div>
         <button>Outside</button>
-        <SudokuGrid {...defaultProps} activeCellIndex={10} />
       </div>,
     )
 
@@ -139,10 +144,15 @@ describe('SudokuGrid component', () => {
     expect(mockOnCellFocus).toHaveBeenCalledWith(null)
   })
 
-  it('does not call onCellFocus with null when clicking inside the grid', () => {
-    render(<SudokuGrid {...defaultProps} activeCellIndex={10} />)
-    const gridContainer = screen.getByRole('grid')
-    fireEvent.mouseDown(gridContainer)
+  it('does not call onCellFocus when clicking inside the interaction area', () => {
+    render(
+      <div ref={mockInteractionAreaRef}>
+        <SudokuGrid {...defaultProps} activeCellIndex={10} />
+        <button>A Control Button</button>
+      </div>,
+    )
+
+    fireEvent.mouseDown(screen.getByText('A Control Button'))
     expect(mockOnCellFocus).not.toHaveBeenCalled()
   })
 

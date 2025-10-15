@@ -16,7 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import SudokuCell from './SudokuCell'
 import { getRelatedCellIndices } from '@/lib/utils'
 import type { BoardState, InputMode } from '@/hooks/useSudoku'
@@ -40,6 +40,8 @@ interface SudokuGridProps {
   readonly onCellChange: (index: number, value: number | null) => void
   /** Callback to set the currently focused cell. */
   readonly onCellFocus: (index: number | null) => void
+  /** A ref to the parent element containing all interactive game components. */
+  readonly interactionAreaRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -55,9 +57,8 @@ export function SudokuGrid({
   inputMode,
   onCellChange,
   onCellFocus,
+  interactionAreaRef,
 }: SudokuGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null)
-
   const highlightedIndices = useMemo(() => {
     if (activeCellIndex === null) {
       return new Set<number>()
@@ -65,10 +66,13 @@ export function SudokuGrid({
     return getRelatedCellIndices(activeCellIndex)
   }, [activeCellIndex])
 
-  // Effect to handle clicks outside the grid to deselect cells.
+  // Effect to handle clicks outside the defined interaction area to deselect cells.
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (gridRef.current && !gridRef.current.contains(event.target as Node)) {
+      if (
+        interactionAreaRef.current &&
+        !interactionAreaRef.current.contains(event.target as Node)
+      ) {
         onCellFocus(null) // Deselect the cell
       }
     }
@@ -79,11 +83,10 @@ export function SudokuGrid({
       // Clean up the event listener
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [gridRef, onCellFocus])
+  }, [interactionAreaRef, onCellFocus])
 
   return (
     <div
-      ref={gridRef}
       role="grid"
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >

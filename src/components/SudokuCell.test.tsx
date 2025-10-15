@@ -77,11 +77,12 @@ describe('SudokuCell component', () => {
   })
 
   describe('Rendering and Visual States', () => {
-    it('renders an empty input with correct aria-label', () => {
+    it('renders an empty input with correct aria-label and inputMode="none"', () => {
       render(<SudokuCell {...defaultProps} />)
       const input = screen.getByLabelText(/Sudoku cell at row 2, column 2/)
       expect(input).toBeInTheDocument()
       expect(input).toHaveValue('')
+      expect(input).toHaveAttribute('inputMode', 'none')
     })
 
     it('renders a cell with a definitive value', () => {
