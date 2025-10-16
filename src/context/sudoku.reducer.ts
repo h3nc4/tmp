@@ -18,7 +18,12 @@
 
 import type { SudokuAction } from './sudoku.actions.types'
 import type { BoardState, SudokuState, SavedGameState } from './sudoku.types'
-import { getRelatedCellIndices, validateBoard, isMoveValid } from '@/lib/utils'
+import {
+  getRelatedCellIndices,
+  validateBoard,
+  isMoveValid,
+  areBoardsEqual,
+} from '@/lib/utils'
 
 const BOARD_SIZE = 81
 const LOCAL_STORAGE_KEY = 'wasudoku-game-state'
@@ -152,12 +157,14 @@ export function sudokuReducer(
       const { value } = action
 
       if (state.inputMode === 'normal') {
-        const nextState = sudokuReducer(
-          baseState,
-          { type: 'SET_CELL_VALUE', index: state.activeCellIndex, value },
-        )
-        // Auto-advance focus if the move was valid
+        const nextState = sudokuReducer(baseState, {
+          type: 'SET_CELL_VALUE',
+          index: state.activeCellIndex,
+          value,
+        })
+        // Auto-advance focus if the move was valid and changed the board state
         if (
+          nextState !== state && // Check if the state actually changed
           isMoveValid(state.board, state.activeCellIndex, value) &&
           state.activeCellIndex < 80
         ) {
@@ -226,6 +233,10 @@ export function sudokuReducer(
         newBoard[relatedIndex].centers.delete(action.value)
       })
 
+      if (areBoardsEqual(state.board, newBoard)) {
+        return state
+      }
+
       const newHistory = state.history.slice(0, state.historyIndex + 1)
       newHistory.push(newBoard)
 
@@ -240,6 +251,10 @@ export function sudokuReducer(
     }
 
     case 'TOGGLE_PENCIL_MARK': {
+      if (state.board[action.index].value !== null) {
+        return state
+      }
+
       const newBoard = state.board.map((c) => ({
         value: c.value,
         candidates: new Set(c.candidates),
@@ -284,6 +299,11 @@ export function sudokuReducer(
             centers: new Set(cell.centers),
           },
       )
+
+      if (areBoardsEqual(state.board, newBoard)) {
+        return state
+      }
+
       const newHistory = state.history.slice(0, state.historyIndex + 1)
       newHistory.push(newBoard)
 
@@ -299,6 +319,10 @@ export function sudokuReducer(
 
     case 'CLEAR_BOARD': {
       const newBoard = createEmptyBoard()
+      if (areBoardsEqual(state.board, newBoard)) {
+        return state
+      }
+
       const newHistory = [
         ...state.history.slice(0, state.historyIndex + 1),
         newBoard,

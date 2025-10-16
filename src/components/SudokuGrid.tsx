@@ -36,16 +36,13 @@ import {
   setHighlightedValue,
 } from '@/context/sudoku.actions'
 
-interface SudokuGridProps {
-  /** A ref to the parent element containing all interactive game components. */
-  readonly interactionAreaRef: React.RefObject<HTMLDivElement | null>
-}
+interface SudokuGridProps { }
 
 /**
  * Renders the 9x9 Sudoku grid container and manages all keyboard interactions.
  * It orchestrates focus management and dispatches actions for cell changes.
  */
-export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
+export function SudokuGrid({ }: SudokuGridProps) {
   const {
     board,
     initialBoard,
@@ -118,28 +115,22 @@ export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
     [activeCellIndex, isSolving, dispatch],
   )
 
-  // Effect to handle clicks outside the defined interaction area to deselect cells.
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        interactionAreaRef.current &&
-        !interactionAreaRef.current.contains(event.target as Node)
-      ) {
-        dispatch(setActiveCell(null)) // Deselect the cell
-        dispatch(setHighlightedValue(null)) // Clear number highlight
+  // Effect to handle focus leaving the grid entirely.
+  const handleGridBlur = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      // If the element receiving focus is not a cell within this grid, deselect.
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+        dispatch(setActiveCell(null))
       }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [interactionAreaRef, dispatch])
+    },
+    [dispatch],
+  )
 
   return (
     <div
       role="grid"
       onKeyDown={handleKeyDown}
+      onBlur={handleGridBlur}
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
       {board.map((cell, index) => {

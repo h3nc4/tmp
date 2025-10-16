@@ -81,6 +81,23 @@ describe('sudokuReducer', () => {
         expect(newState.board[0].value).toBe(5)
         expect(newState.activeCellIndex).toBe(0) // Did not advance
       })
+
+      it('should not create history entry if input does not change board state', () => {
+        let state: SudokuState = {
+          ...initialState,
+          board: initialState.board.map((c, i) => (i === 1 ? { ...c, value: 5 } : c)),
+          activeCellIndex: 0,
+        }
+        // First invalid input of 5 in cell 0. This creates a history entry.
+        let newState = sudokuReducer(state, { type: 'INPUT_VALUE', value: 5 })
+        expect(newState.board[0].value).toBe(5)
+        expect(newState.conflicts.size).toBe(2)
+        const historyLength = newState.history.length
+
+        // Second identical invalid input. Should not create a history entry.
+        newState = sudokuReducer(newState, { type: 'INPUT_VALUE', value: 5 })
+        expect(newState.history.length).toBe(historyLength)
+      })
     })
 
     describe('NAVIGATE', () => {
@@ -191,6 +208,22 @@ describe('sudokuReducer', () => {
         expect(newState.solveFailed).toBe(false)
       })
 
+      it('should return original state if value is already set', () => {
+        const stateWithValue = sudokuReducer(initialState, {
+          type: 'SET_CELL_VALUE',
+          index: 0,
+          value: 5,
+        })
+        const historyLength = stateWithValue.history.length
+        const newState = sudokuReducer(stateWithValue, {
+          type: 'SET_CELL_VALUE',
+          index: 0,
+          value: 5,
+        })
+        expect(newState).toBe(stateWithValue)
+        expect(newState.history.length).toBe(historyLength)
+      })
+
       it('should clear related pencil marks (candidates and centers)', () => {
         const state: SudokuState = {
           ...initialState,
@@ -267,6 +300,23 @@ describe('sudokuReducer', () => {
         expect(newState.board[0].candidates.has(1)).toBe(false)
       })
 
+      it('should not add a pencil mark if the cell has a value', () => {
+        const stateWithValue = sudokuReducer(initialState, {
+          type: 'SET_CELL_VALUE',
+          index: 0,
+          value: 5,
+        })
+        const action: SudokuAction = {
+          type: 'TOGGLE_PENCIL_MARK',
+          index: 0,
+          value: 1,
+          mode: 'candidate',
+        }
+        const newState = sudokuReducer(stateWithValue, action)
+        expect(newState).toBe(stateWithValue)
+        expect(newState.board[0].candidates.has(1)).toBe(false)
+      })
+
       it('should clear candidates when adding a center mark', () => {
         const stateWithCandidates = sudokuReducer(initialState, {
           type: 'TOGGLE_PENCIL_MARK',
@@ -320,10 +370,16 @@ describe('sudokuReducer', () => {
         }
         const action: SudokuAction = { type: 'ERASE_CELL', index: 0 }
         const newState = sudokuReducer(state, action)
-        expect(newState.board[0].value).toBe(null)
+        expect(newState.board[0].value).toBeNull()
         expect(newState.board[0].candidates.size).toBe(0)
         expect(newState.board[0].centers.size).toBe(0)
         expect(newState.historyIndex).toBe(2)
+      })
+
+      it('should return original state if cell is already empty', () => {
+        const state = sudokuReducer(initialState, { type: 'ERASE_CELL', index: 0 })
+        expect(state).toBe(initialState)
+        expect(state.history.length).toBe(1)
       })
     })
 
@@ -343,6 +399,12 @@ describe('sudokuReducer', () => {
         // History should now be [initial, move, clear]
         expect(newState.history).toHaveLength(3)
         expect(newState.history[2]).toEqual(createEmptyBoard())
+      })
+
+      it('should return original state if board is already empty', () => {
+        const state = sudokuReducer(initialState, { type: 'CLEAR_BOARD' })
+        expect(state).toBe(initialState)
+        expect(state.history.length).toBe(1)
       })
     })
 

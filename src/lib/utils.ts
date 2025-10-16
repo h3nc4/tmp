@@ -161,3 +161,36 @@ export function isMoveValid(
 
   return true
 }
+
+/**
+ * Compares two board states for equality.
+ * @param boardA The first board state.
+ * @param boardB The second board state.
+ * @returns `true` if the boards are identical, `false` otherwise.
+ */
+export function areBoardsEqual(
+  boardA: BoardState,
+  boardB: BoardState,
+): boolean {
+  if (boardA === boardB) return true
+  if (boardA.length !== boardB.length) return false
+
+  for (let i = 0; i < boardA.length; i++) {
+    const cellA = boardA[i]
+    const cellB = boardB[i]
+
+    if (cellA.value !== cellB.value) return false
+    if (cellA.candidates.size !== cellB.candidates.size) return false
+    if (cellA.centers.size !== cellB.centers.size) return false
+
+    for (const cand of cellA.candidates) {
+      if (!cellB.candidates.has(cand)) return false
+    }
+
+    for (const cent of cellA.centers) {
+      if (!cellB.centers.has(cent)) return false
+    }
+  }
+
+  return true
+}

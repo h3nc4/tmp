@@ -18,7 +18,12 @@
 
 import { describe, expect, it } from 'vitest'
 import type { BoardState, CellState } from '@/context/sudoku.types'
-import { getRelatedCellIndices, isMoveValid, validateBoard } from './utils'
+import {
+  areBoardsEqual,
+  getRelatedCellIndices,
+  isMoveValid,
+  validateBoard,
+} from './utils'
 
 // Helper to create an empty board with the new structure
 const createEmptyCell = (): CellState => ({
@@ -26,8 +31,7 @@ const createEmptyCell = (): CellState => ({
   candidates: new Set(),
   centers: new Set(),
 })
-const createEmptyBoard = (): BoardState =>
-  Array(81).fill(0).map(createEmptyCell)
+const createEmptyBoard = (): BoardState => Array(81).fill(0).map(createEmptyCell)
 
 describe('Sudoku Utilities', () => {
   describe('getRelatedCellIndices', () => {
@@ -98,6 +102,69 @@ describe('Sudoku Utilities', () => {
     it('should return false for a move that conflicts with the box', () => {
       // Placing a 6 in cell 2 (row 0, col 2) conflicts with cell 9
       expect(isMoveValid(board, 2, 6)).toBe(false)
+    })
+  })
+
+  describe('areBoardsEqual', () => {
+    it('should return true for identical boards', () => {
+      const board1 = createEmptyBoard()
+      const board2 = createEmptyBoard()
+      expect(areBoardsEqual(board1, board2)).toBe(true)
+    })
+
+    it('should return true for the same board instance', () => {
+      const board1 = createEmptyBoard()
+      expect(areBoardsEqual(board1, board1)).toBe(true)
+    })
+
+    it('should return false for boards of different lengths', () => {
+      const board1 = createEmptyBoard()
+      const board2 = createEmptyBoard().slice(0, 80)
+      expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+
+    it('should return false for boards with different values', () => {
+      const board1 = createEmptyBoard()
+      const board2 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, value: 5 } : cell,
+      )
+      expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+
+    it('should return false for boards with different candidates', () => {
+      const board1 = createEmptyBoard()
+      const board2 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, candidates: new Set([1]) } : cell,
+      )
+      expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+
+    it('should return false for boards with different centers', () => {
+      const board1 = createEmptyBoard()
+      const board2 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, centers: new Set([1]) } : cell,
+      )
+      expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+
+    it('should return false for boards with different candidate set contents but same size', () => {
+      const board1 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, candidates: new Set([1]) } : cell,
+      )
+      const board2 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, candidates: new Set([2]) } : cell,
+      )
+      expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+
+    it('should return false for boards with different center set contents but same size', () => {
+      const board1 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, centers: new Set([1]) } : cell,
+      )
+      const board2 = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, centers: new Set([2]) } : cell,
+      )
+      expect(areBoardsEqual(board1, board2)).toBe(false)
     })
   })
 })

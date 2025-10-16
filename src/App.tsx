@@ -16,7 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useRef, useCallback } from 'react'
+import { useCallback } from 'react'
 import { Eraser } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,6 @@ import { eraseActiveCell } from './context/sudoku.actions'
 function App() {
   const { activeCellIndex } = useSudokuState()
   const dispatch = useSudokuDispatch()
-  const interactionAreaRef = useRef<HTMLDivElement>(null)
 
   const handleErase = useCallback(() => {
     if (activeCellIndex !== null) {
@@ -64,11 +63,8 @@ function App() {
       </header>
 
       <main className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
-        <div
-          ref={interactionAreaRef}
-          className="flex w-full max-w-md flex-col gap-6 md:gap-8"
-        >
-          <SudokuGrid interactionAreaRef={interactionAreaRef} />
+        <div className="flex w-full max-w-md flex-col gap-6 md:gap-8">
+          <SudokuGrid />
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-row gap-2">
