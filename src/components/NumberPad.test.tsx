@@ -16,7 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   describe,
@@ -31,7 +31,8 @@ import {
   useSudokuState,
   useSudokuDispatch,
 } from '@/context/sudoku.hooks'
-import { initialState } from '@/context/sudoku.reducer'
+import { initialState, createEmptyBoard } from '@/context/sudoku.reducer'
+import type { SudokuState } from '@/context/sudoku.types'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
@@ -48,19 +49,22 @@ describe('NumberPad component', () => {
     mockUseSudokuDispatch.mockReturnValue(mockDispatch)
   })
 
-  it('renders 9 number buttons', () => {
+  it('renders 9 number buttons with their main number', () => {
     render(<NumberPad />)
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(9)
-    expect(
-      screen.getByRole('button', { name: 'Enter number 1' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Enter number 9' }),
-    ).toBeInTheDocument()
+
+    for (let i = 1; i <= 9; i++) {
+      const button = screen.getByRole('button', { name: `Enter number ${i}` })
+      const mainNumber = within(button).getByText(String(i), {
+        selector: 'span.text-lg',
+      })
+      expect(mainNumber).toBeInTheDocument()
+      expect(mainNumber).toHaveClass('text-lg')
+    }
   })
 
-  it('dispatches inputValue with the correct value when a cell is active', async () => {
+  it('dispatches inputValue and setHighlightedValue when a cell is active', async () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 10 })
     render(<NumberPad />)
@@ -69,33 +73,75 @@ describe('NumberPad component', () => {
     await user.click(button5)
 
     expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'SET_HIGHLIGHTED_VALUE',
+      value: 5,
+    })
+    expect(mockDispatch).toHaveBeenCalledWith({
       type: 'INPUT_VALUE',
       value: 5,
     })
   })
 
-  it('does not dispatch if no cell is active', async () => {
+  it('dispatches only setHighlightedValue if no cell is active', async () => {
     const user = userEvent.setup()
-    render(<NumberPad />)
+    render(<NumberPad />) // activeCellIndex is null
+
     const button5 = screen.getByRole('button', { name: 'Enter number 5' })
     await user.click(button5)
-    expect(mockDispatch).not.toHaveBeenCalled()
-  })
 
-  it('disables all buttons when no cell is active', () => {
-    render(<NumberPad />) // Initial state has activeCellIndex: null
-    const buttons = screen.getAllByRole('button')
-    buttons.forEach((button) => {
-      expect(button).toBeDisabled()
+    expect(mockDispatch).toHaveBeenCalledOnce()
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'SET_HIGHLIGHTED_VALUE',
+      value: 5,
     })
   })
 
-  it('enables all buttons when a cell is active', () => {
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 0 })
+  it('disables a number button if that number is on the board 9 times', () => {
+    const fullBoard = createEmptyBoard().map(() => ({
+      ...initialState.board[0],
+      value: 3,
+    }))
+    const state: SudokuState = { ...initialState, board: fullBoard }
+    mockUseSudokuState.mockReturnValue(state)
     render(<NumberPad />)
-    const buttons = screen.getAllByRole('button')
-    buttons.forEach((button) => {
-      expect(button).not.toBeDisabled()
-    })
+
+    expect(
+      screen.getByRole('button', { name: 'Enter number 3' }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Enter number 4' }),
+    ).not.toBeDisabled()
+  })
+
+  it('displays the remaining count for an incomplete number', () => {
+    // 7 threes on the board, so 2 remaining
+    const partialBoard = createEmptyBoard().map((cell, i) => ({
+      ...cell,
+      value: i < 7 ? 3 : null,
+    }))
+    const state: SudokuState = { ...initialState, board: partialBoard }
+    mockUseSudokuState.mockReturnValue(state)
+    render(<NumberPad />)
+
+    const button3 = screen.getByRole('button', { name: 'Enter number 3' })
+    const count = within(button3).getByText('2')
+    expect(count).toBeInTheDocument()
+    expect(count).toHaveClass('text-muted-foreground')
+  })
+
+  it('does not display a count for a complete number', () => {
+    // 9 threes on the board
+    const fullBoard = createEmptyBoard().map(() => ({
+      ...initialState.board[0],
+      value: 3,
+    }))
+    const state: SudokuState = { ...initialState, board: fullBoard }
+    mockUseSudokuState.mockReturnValue(state)
+    render(<NumberPad />)
+
+    const button3 = screen.getByRole('button', { name: 'Enter number 3' })
+    expect(button3).toBeDisabled()
+    const counterSpan = button3.querySelector('span.absolute')
+    expect(counterSpan).not.toBeInTheDocument()
   })
 })

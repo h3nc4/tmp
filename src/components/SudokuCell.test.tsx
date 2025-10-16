@@ -32,6 +32,7 @@ describe('SudokuCell component', () => {
     isConflict: false,
     isActive: false,
     isHighlighted: false,
+    isNumberHighlighted: false,
     onFocus: mockOnFocus,
   }
 
@@ -97,6 +98,19 @@ describe('SudokuCell component', () => {
     it('applies correct background for a highlighted (but not active) cell', () => {
       render(<SudokuCell {...defaultProps} isHighlighted isActive={false} />)
       expect(screen.getByTestId('cell-background')).toHaveClass('bg-sky-100 dark:bg-sky-900/60')
+    })
+
+    it('applies correct background for a number-highlighted cell', () => {
+      render(
+        <SudokuCell
+          {...defaultProps}
+          isNumberHighlighted
+          cell={{ ...defaultProps.cell, value: 5 }}
+        />,
+      )
+      expect(screen.getByTestId('cell-background')).toHaveClass(
+        'bg-amber-100/70 dark:bg-amber-900/40',
+      )
     })
 
     it('applies correct background when solving', () => {

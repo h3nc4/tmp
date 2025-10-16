@@ -63,6 +63,7 @@ export const initialState: SudokuState = {
   isSolved: false,
   solveFailed: false,
   activeCellIndex: null,
+  highlightedValue: null,
   inputMode: 'normal',
   lastError: null,
   ...getDerivedBoardState(createEmptyBoard()),
@@ -136,6 +137,7 @@ export function sudokuReducer(
     'SET_ACTIVE_CELL',
     'SET_INPUT_MODE',
     'CLEAR_ERROR',
+    'SET_HIGHLIGHTED_VALUE',
   ].includes(action.type)
 
   const baseState = {
@@ -310,6 +312,7 @@ export function sudokuReducer(
         historyIndex: state.historyIndex + 1,
         isSolved: false,
         activeCellIndex: null,
+        highlightedValue: null,
         ...getDerivedBoardState(newBoard),
       }
     }
@@ -375,14 +378,24 @@ export function sudokuReducer(
         solveFailed: true,
       }
 
-    case 'SET_ACTIVE_CELL':
-      return { ...baseState, activeCellIndex: action.index }
+    case 'SET_ACTIVE_CELL': {
+      const newHighlightedValue =
+        action.index !== null ? state.board[action.index].value : null
+      return {
+        ...baseState,
+        activeCellIndex: action.index,
+        highlightedValue: newHighlightedValue,
+      }
+    }
 
     case 'SET_INPUT_MODE':
       return { ...baseState, inputMode: action.mode }
 
     case 'CLEAR_ERROR':
       return { ...state, lastError: null }
+
+    case 'SET_HIGHLIGHTED_VALUE':
+      return { ...baseState, highlightedValue: action.value }
 
     default:
       return state

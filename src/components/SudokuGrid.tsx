@@ -33,6 +33,7 @@ import {
   inputValue,
   eraseActiveCell,
   navigate,
+  setHighlightedValue,
 } from '@/context/sudoku.actions'
 
 interface SudokuGridProps {
@@ -51,6 +52,7 @@ export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
     isSolving,
     isSolved,
     activeCellIndex,
+    highlightedValue,
     conflicts,
   } = useSudokuState()
   const dispatch = useSudokuDispatch()
@@ -96,7 +98,9 @@ export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
       }
 
       if (key >= '1' && key <= '9') {
-        dispatch(inputValue(parseInt(key, 10)))
+        const value = parseInt(key, 10)
+        dispatch(inputValue(value))
+        dispatch(setHighlightedValue(value))
       } else if (key === 'Backspace') {
         dispatch(eraseActiveCell('backspace'))
       } else if (key === 'Delete') {
@@ -122,6 +126,7 @@ export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
         !interactionAreaRef.current.contains(event.target as Node)
       ) {
         dispatch(setActiveCell(null)) // Deselect the cell
+        dispatch(setHighlightedValue(null)) // Clear number highlight
       }
     }
 
@@ -151,6 +156,9 @@ export function SudokuGrid({ interactionAreaRef }: SudokuGridProps) {
             isConflict={conflicts.has(index)}
             isActive={activeCellIndex === index}
             isHighlighted={highlightedIndices.has(index)}
+            isNumberHighlighted={
+              cell.value !== null && cell.value === highlightedValue
+            }
             onFocus={handleCellFocus}
           />
         )

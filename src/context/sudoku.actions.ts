@@ -32,6 +32,7 @@ import type {
   SetActiveCellAction,
   SetInputModeAction,
   ClearErrorAction,
+  SetHighlightedValueAction,
 } from './sudoku.actions.types'
 import type { BoardState, InputMode } from './sudoku.types'
 
@@ -135,4 +136,12 @@ export const setInputMode = (mode: InputMode): SetInputModeAction => ({
 /** Creates an action to clear the last error message. */
 export const clearError = (): ClearErrorAction => ({
   type: 'CLEAR_ERROR',
+})
+
+/** Creates an action to set the highlighted number value. */
+export const setHighlightedValue = (
+  value: number | null,
+): SetHighlightedValueAction => ({
+  type: 'SET_HIGHLIGHTED_VALUE',
+  value,
 })

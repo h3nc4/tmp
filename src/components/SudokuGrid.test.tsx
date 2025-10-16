@@ -42,6 +42,7 @@ interface MockSudokuCellProps {
   index: number
   onFocus: (index: number) => void
   isHighlighted: boolean
+  isNumberHighlighted: boolean
 }
 
 // This spy will be called by the mocked SudokuCell component on each render.
@@ -89,21 +90,22 @@ describe('SudokuGrid component', () => {
     expect(mockSudokuCellRender).toHaveBeenCalledTimes(81)
   })
 
-  it('dispatches SET_ACTIVE_CELL with null when clicking outside', () => {
+  it('dispatches SET_ACTIVE_CELL and SET_HIGHLIGHTED_VALUE with null when clicking outside', () => {
     renderWithRef()
     mockDispatch.mockClear()
     fireEvent.mouseDown(document.body) // Click outside the ref's div
     expect(mockDispatch).toHaveBeenCalledWith(actions.setActiveCell(null))
+    expect(mockDispatch).toHaveBeenCalledWith(actions.setHighlightedValue(null))
   })
 
-  it('does not dispatch setActiveCell(null) when clicking inside', () => {
+  it('does not dispatch when clicking inside', () => {
     renderWithRef()
     mockDispatch.mockClear() // Clear the dispatch from the initial render's useEffect
 
     const grid = screen.getByRole('grid')
     fireEvent.mouseDown(grid)
 
-    expect(mockDispatch).not.toHaveBeenCalledWith(actions.setActiveCell(null))
+    expect(mockDispatch).not.toHaveBeenCalled()
   })
 
   it('does not highlight any cells when no cell is active', () => {
@@ -117,6 +119,25 @@ describe('SudokuGrid component', () => {
     // Check the props of the last rendered cell
     const lastCellProps = mockSudokuCellRender.mock.calls[80][0]
     expect(lastCellProps.isHighlighted).toBe(false)
+  })
+
+  it('passes isNumberHighlighted correctly', () => {
+    const boardWithValues = initialState.board.map((cell, index) => ({
+      ...cell,
+      value: index % 9 + 1,
+    }))
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      board: boardWithValues,
+      highlightedValue: 5,
+    })
+    renderWithRef()
+
+    const cell4Props = mockSudokuCellRender.mock.calls[4][0] // cell 4 has value 5
+    expect(cell4Props.isNumberHighlighted).toBe(true)
+
+    const cell5Props = mockSudokuCellRender.mock.calls[5][0] // cell 5 has value 6
+    expect(cell5Props.isNumberHighlighted).toBe(false)
   })
 
   describe('Keyboard Interactions', () => {

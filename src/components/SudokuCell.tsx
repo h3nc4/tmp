@@ -39,6 +39,8 @@ interface SudokuCellProps {
   readonly isActive: boolean
   /** Whether this cell should be highlighted as part of the active row/column/box. */
   readonly isHighlighted: boolean
+  /** Whether this cell's number matches the globally highlighted number. */
+  readonly isNumberHighlighted: boolean
   /** Callback function when the cell receives focus (e.g., via click). */
   readonly onFocus: (index: number) => void
 }
@@ -59,6 +61,7 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>(
       isConflict,
       isActive,
       isHighlighted,
+      isNumberHighlighted,
       onFocus,
     },
     ref,
@@ -78,6 +81,9 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>(
           className={cn(
             'pointer-events-none absolute inset-0 z-0 flex size-full items-center justify-center',
             isHighlighted && !isActive && 'bg-sky-100 dark:bg-sky-900/60',
+            isNumberHighlighted &&
+            !isActive &&
+            'bg-amber-100/70 dark:bg-amber-900/40',
             isActive && 'bg-sky-200 dark:bg-sky-800/80',
             isConflict && '!bg-destructive/20',
             isSolving && 'cursor-not-allowed bg-muted/50',
@@ -112,6 +118,9 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>(
             isInitial
               ? 'text-primary font-bold'
               : cell.value !== null && 'text-foreground',
+            isNumberHighlighted &&
+            !isInitial &&
+            'font-bold text-amber-600 dark:text-amber-400',
             isSolverResult && 'text-sky-600 dark:text-sky-400',
             col % 3 === 2 && col !== 8 && 'border-r-2 border-r-primary',
             row % 3 === 2 && row !== 8 && 'border-b-2 border-b-primary',

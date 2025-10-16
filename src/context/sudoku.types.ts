@@ -47,6 +47,8 @@ export interface SudokuState {
   readonly solveFailed: boolean
   /** The index of the currently active/focused cell. */
   readonly activeCellIndex: number | null
+  /** The number value to be highlighted across the board, or null. */
+  readonly highlightedValue: number | null
   /** The current input mode ('normal', 'candidate', or 'center'). */
   readonly inputMode: InputMode
   /** A set of indices for cells with conflicting values. */

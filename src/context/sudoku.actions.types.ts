@@ -109,6 +109,12 @@ export interface ClearErrorAction {
   type: 'CLEAR_ERROR'
 }
 
+/** Action to set the number that should be highlighted across the board. */
+export interface SetHighlightedValueAction {
+  type: 'SET_HIGHLIGHTED_VALUE'
+  value: number | null
+}
+
 /** A union of all possible actions that can be dispatched to the sudokuReducer. */
 export type SudokuAction =
   | InputValueAction
@@ -126,3 +132,4 @@ export type SudokuAction =
   | SetActiveCellAction
   | SetInputModeAction
   | ClearErrorAction
+  | SetHighlightedValueAction

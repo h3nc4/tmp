@@ -121,4 +121,12 @@ describe('Sudoku Action Creators', () => {
     const expectedAction: SudokuAction = { type: 'CLEAR_ERROR' }
     expect(actions.clearError()).toEqual(expectedAction)
   })
+
+  it('should create a SET_HIGHLIGHTED_VALUE action', () => {
+    const expectedAction: SudokuAction = {
+      type: 'SET_HIGHLIGHTED_VALUE',
+      value: 8,
+    }
+    expect(actions.setHighlightedValue(8)).toEqual(expectedAction)
+  })
 })

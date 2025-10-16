@@ -16,26 +16,39 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   useSudokuState,
   useSudokuDispatch,
 } from '@/context/sudoku.hooks'
-import { inputValue } from '@/context/sudoku.actions'
+import { inputValue, setHighlightedValue } from '@/context/sudoku.actions'
 
 const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 /**
- * An on-screen number pad for touch-friendly input on mobile devices.
- * It consumes the active cell and action dispatchers directly from the context.
+ * An on-screen number pad for touch-friendly input. It displays a counter
+ * for each number, indicating how many are left to be placed.
  */
 export const NumberPad = memo(function NumberPad() {
-  const { activeCellIndex } = useSudokuState()
+  const { board, activeCellIndex } = useSudokuState()
   const dispatch = useSudokuDispatch()
+
+  const numberCounts = useMemo(() => {
+    const counts = new Array(10).fill(0)
+    for (const cell of board) {
+      if (cell.value !== null) {
+        counts[cell.value]++
+      }
+    }
+    return counts
+  }, [board])
 
   const handleNumberClick = useCallback(
     (value: number) => {
+      // Always highlight the number that was tapped
+      dispatch(setHighlightedValue(value))
+      // Only input the value if a cell is active
       if (activeCellIndex !== null) {
         dispatch(inputValue(value))
       }
@@ -43,27 +56,37 @@ export const NumberPad = memo(function NumberPad() {
     [activeCellIndex, dispatch],
   )
 
-  const isDisabled = activeCellIndex === null
-
   return (
     <div
-      className="grid grid-cols-9 gap-1 md:hidden"
+      className="grid grid-cols-9 gap-1"
       aria-label="On-screen number pad"
     >
-      {NUMBERS.map((num) => (
-        <Button
-          key={`pad-${num}`}
-          variant="outline"
-          size="icon"
-          className="aspect-square h-auto w-full text-lg"
-          onClick={() => handleNumberClick(num)}
-          disabled={isDisabled}
-          aria-label={`Enter number ${num}`}
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {num}
-        </Button>
-      ))}
+      {NUMBERS.map((num) => {
+        const remaining = 9 - numberCounts[num]
+        const isComplete = remaining <= 0
+
+        return (
+          <Button
+            key={`pad-${num}`}
+            variant="outline"
+            size="icon"
+            className="aspect-square h-auto w-full"
+            onClick={() => handleNumberClick(num)}
+            disabled={isComplete}
+            aria-label={`Enter number ${num}`}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <div className="relative flex size-full items-center justify-center">
+              <span className="text-lg font-medium">{num}</span>
+              {!isComplete && (
+                <span className="absolute bottom-1 right-1.5 text-[0.6rem] text-muted-foreground">
+                  {remaining}
+                </span>
+              )}
+            </div>
+          </Button>
+        )
+      })}
     </div>
   )
 })

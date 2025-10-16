@@ -334,11 +334,12 @@ describe('sudokuReducer', () => {
           index: 0,
           value: 5,
         })
-        state = { ...state, activeCellIndex: 0 }
+        state = { ...state, activeCellIndex: 0, highlightedValue: 5 }
         const action: SudokuAction = { type: 'CLEAR_BOARD' }
         const newState = sudokuReducer(state, action)
         expect(newState.board).toEqual(createEmptyBoard())
         expect(newState.activeCellIndex).toBe(null)
+        expect(newState.highlightedValue).toBe(null)
         // History should now be [initial, move, clear]
         expect(newState.history).toHaveLength(3)
         expect(newState.history[2]).toEqual(createEmptyBoard())
@@ -421,12 +422,34 @@ describe('sudokuReducer', () => {
     })
 
     describe('UI Actions', () => {
-      it('should set active cell index', () => {
-        const newState = sudokuReducer(initialState, {
+      it('should set active cell index and highlighted value', () => {
+        let stateWithValue = sudokuReducer(initialState, {
+          type: 'SET_CELL_VALUE',
+          index: 10,
+          value: 7,
+        })
+        stateWithValue = { ...stateWithValue, highlightedValue: null } // reset highlight
+
+        const newState = sudokuReducer(stateWithValue, {
           type: 'SET_ACTIVE_CELL',
           index: 10,
         })
         expect(newState.activeCellIndex).toBe(10)
+        expect(newState.highlightedValue).toBe(7)
+      })
+
+      it('should set active cell to null and clear highlighted value', () => {
+        const stateWithActiveCell: SudokuState = {
+          ...initialState,
+          activeCellIndex: 10,
+          highlightedValue: 7,
+        }
+        const newState = sudokuReducer(stateWithActiveCell, {
+          type: 'SET_ACTIVE_CELL',
+          index: null,
+        })
+        expect(newState.activeCellIndex).toBe(null)
+        expect(newState.highlightedValue).toBe(null)
       })
 
       it('should set input mode', () => {
@@ -441,6 +464,14 @@ describe('sudokuReducer', () => {
         const stateWithError: SudokuState = { ...initialState, lastError: 'Some error' }
         const newState = sudokuReducer(stateWithError, { type: 'CLEAR_ERROR' })
         expect(newState.lastError).toBeNull()
+      })
+
+      it('should set the highlighted value', () => {
+        const newState = sudokuReducer(initialState, {
+          type: 'SET_HIGHLIGHTED_VALUE',
+          value: 5,
+        })
+        expect(newState.highlightedValue).toBe(5)
       })
     })
 
