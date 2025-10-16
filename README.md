@@ -14,6 +14,7 @@ WASudoku is a Sudoku solver that runs locally in your browser using WebAssembly.
 - **Keyboard Navigation:** Use arrow keys to navigate between cells, and Backspace/Delete to clear. Typing or deleting a number moves focus to the next/previous cell.
 - **Number Pad:** An on-screen number pad allows users on mobile devices to input numbers easily.
 - **Local Storage:** The game state, including the board and undo/redo history, is saved in local storage.
+- **Installable (PWA):** The app can be installed on your device for an offline experience.
 
 ### Gameplay Features
 
