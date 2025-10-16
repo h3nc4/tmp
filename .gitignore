@@ -11,3 +11,7 @@ target/
 
 # Coverage reports
 coverage-*.*
+
+# Android
+android.keystore
+licenses/
