@@ -19,10 +19,12 @@
 pub mod board;
 pub mod logical_solver;
 pub mod solver;
+pub mod types;
 mod utils;
 
 use board::Board;
 use std::panic;
+use types::SolveResult;
 use wasm_bindgen::prelude::*;
 
 /// Called when the wasm module is instantiated.
@@ -34,11 +36,11 @@ pub fn main() {
     utils::set_panic_hook();
 }
 
-/// Solves a Sudoku puzzle represented as a string.
+/// Solves a Sudoku puzzle and returns the logical steps taken.
 ///
 /// This function employs a hybrid strategy. It first applies logical solving
-/// techniques (like naked/hidden singles) to reduce the puzzle. If the puzzle
-/// is not fully solved by logic, it seamlessly falls back to a high-speed
+/// techniques to generate a series of human-readable steps. If the puzzle
+/// is not fully solved by logic, it falls back to a high-speed
 /// backtracking algorithm to find the final solution.
 ///
 /// ### Arguments
@@ -47,41 +49,42 @@ pub fn main() {
 ///
 /// ### Returns
 ///
-/// * `Ok(String)` - A string representing the solved board if a solution is found.
+/// * `Ok(JsValue)` - A serialized `SolveResult` object containing the steps and an optional final solution string.
 /// * `Err(JsValue)` - An error if the input is invalid, the puzzle is unsolvable, or a crash occurs.
 #[wasm_bindgen]
-pub fn solve_sudoku(board_str: &str) -> Result<String, JsValue> {
-    // 1. Initial parsing and validation remains the same.
+pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
     let initial_board = Board::from_str(board_str).map_err(|e| JsValue::from_str(&e))?;
 
-    // 2. The entire solving process, including logic and backtracking, is wrapped
-    //    to catch any potential panics for safe error reporting to JavaScript.
     let solve_result = panic::catch_unwind(move || {
-        // 3. Attempt to solve with logical techniques first.
-        let mut logical_board = logical_solver::LogicalBoard::from_board(&initial_board);
-        logical_solver::solve(&mut logical_board);
+        let (steps, mut board_after_logic) = logical_solver::solve_with_steps(&initial_board);
 
-        // 4. Create a board suitable for the backtracking solver from the result.
-        let mut board_after_logic = Board {
-            cells: logical_board.cells,
+        // If logic was not sufficient, fall back to the backtracking algorithm.
+        let final_solution = if board_after_logic.cells.contains(&0) {
+            if solver::solve(&mut board_after_logic) {
+                Some(board_after_logic.to_string()) // Solved with backtracking.
+            } else {
+                // This case indicates the logical steps led to an unsolvable state,
+                // or the original puzzle was unsolvable.
+                return None;
+            }
+        } else {
+            // Logic was sufficient, the final board state is the solution.
+            Some(board_after_logic.to_string())
         };
 
-        // 5. Check if logic was sufficient. A solved board has no empty (0) cells.
-        if !board_after_logic.cells.contains(&0) {
-            return Some(board_after_logic);
-        }
-
-        // 6. If not fully solved, fall back to the backtracking algorithm.
-        if solver::solve(&mut board_after_logic) {
-            Some(board_after_logic) // Solved with backtracking.
-        } else {
-            None // No solution found even with backtracking.
-        }
+        Some(SolveResult {
+            steps,
+            solution: final_solution,
+        })
     });
 
     match solve_result {
-        Ok(Some(solved_board)) => Ok(solved_board.to_string()),
-        Ok(None) => Err(JsValue::from_str("No solution found for the given puzzle.")),
-        Err(_) => Err(JsValue::from_str("Solver crashed due to a critical error.")),
+        Ok(Some(result)) => Ok(serde_wasm_bindgen::to_value(&result).unwrap()),
+        Ok(None) => Err(JsValue::from_str(
+            "No solution found for the given puzzle.",
+        )),
+        Err(_) => Err(JsValue::from_str(
+            "Solver crashed due to a critical error.",
+        )),
     }
 }

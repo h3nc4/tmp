@@ -29,9 +29,13 @@ fn test_solve_sudoku_valid_puzzle() {
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
     let solution_str =
         "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
-    let result = solve_sudoku(puzzle_str);
-    assert!(result.is_ok(), "Expected a valid solution");
-    assert_eq!(result.unwrap(), solution_str);
+    let result = solve_sudoku(puzzle_str).unwrap();
+    let solve_result: wasudoku_wasm::types::SolveResult =
+        serde_wasm_bindgen::from_value(result).unwrap();
+
+    assert!(solve_result.solution.is_some(), "Expected a solution");
+    assert_eq!(solve_result.solution.unwrap(), solution_str);
+    assert!(!solve_result.steps.is_empty(), "Expected logical steps");
 }
 
 #[wasm_bindgen_test]

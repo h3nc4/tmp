@@ -19,6 +19,7 @@
 use wasudoku_wasm::board::Board;
 use wasudoku_wasm::logical_solver::{self, LogicalBoard};
 use wasudoku_wasm::solver;
+use wasudoku_wasm::types::Elimination;
 
 /// Helper to create a `LogicalBoard` from a string for testing.
 fn board_from_str(s: &str) -> LogicalBoard {
@@ -46,20 +47,31 @@ fn test_candidate_initialization() {
 }
 
 #[test]
-fn test_naked_single_detection() {
-    // Using the puzzle provided by the user, which is solvable by simple logic.
-    // One of the first steps in solving this puzzle is identifying that
-    // cell (0,0) must be 3. We test if our solver reaches this conclusion.
+fn test_naked_single_step_generation() {
+    // This puzzle's first logical move is a naked single.
     let puzzle_str =
         "...2..7...5..96832.8.7....641.....78.2..745..7.31854....2531..4.3164..5...9...61.";
-    let mut board = board_from_str(puzzle_str);
+    let initial_board = Board::from_str(puzzle_str).unwrap();
+    let (steps, _) = logical_solver::solve_with_steps(&initial_board);
 
-    // Initially, the cell is empty.
-    assert_eq!(board.cells[0], 0);
+    assert!(!steps.is_empty());
+    let first_step = &steps[0];
+    assert_eq!(first_step.technique, "NakedSingle");
+    assert_eq!(first_step.placements.len(), 1);
+    let placement = &first_step.placements[0];
+    assert_eq!(placement.index, 9);
+    assert_eq!(placement.value, 1);
 
-    // After applying logic, cell (0,0) should be filled with 3.
-    logical_solver::solve(&mut board);
-    assert_eq!(board.cells[0], 3);
+    // Check that eliminations were correctly identified.
+    // Placing 1 at index 9 (R1C0) should eliminate 1 from its peers in the same box, like index 0.
+    let has_elimination_for_cell_0 = first_step
+        .eliminations
+        .iter()
+        .any(|e| e.index == 0 && e.value == 1);
+    assert!(
+        has_elimination_for_cell_0,
+        "Expected elimination of 1 at index 0"
+    );
 }
 
 #[test]
@@ -67,24 +79,33 @@ fn test_hidden_single_detection_in_box() {
     // A puzzle where the first logical step is a hidden single.
     let puzzle_str =
         ".38.917.571...38.9...78.3419738526148649175325213..9781..67..83386.29.57..7.38.96";
-    let mut board = board_from_str(puzzle_str);
+    let initial_board = Board::from_str(puzzle_str).unwrap();
+    let (steps, _) = logical_solver::solve_with_steps(&initial_board);
 
-    logical_solver::solve(&mut board);
+    assert!(!steps.is_empty());
+    let first_step = &steps[0];
+    assert_eq!(first_step.technique, "HiddenSingle");
+    assert_eq!(first_step.placements.len(), 1);
+    let placement = &first_step.placements[0];
+    assert_eq!(placement.index, 0);
+    assert_eq!(placement.value, 4);
 
-    assert_eq!(board.cells[0], 4);
+    // Check that eliminations were correctly identified.
+    // Placing 4 at index 0 should eliminate other candidates from cell 0 (2, 6).
+    let elims: Vec<&Elimination> = first_step
+        .eliminations
+        .iter()
+        .filter(|e| e.index == 0)
+        .collect();
+    assert_eq!(elims.len(), 2, "Expected 2 eliminations from cell 0");
+    assert!(elims.iter().any(|e| e.value == 2));
+    assert!(elims.iter().any(|e| e.value == 6));
 }
 
-/// Replicates the hybrid solving logic from `lib.rs` for native testing,
-/// avoiding any WASM/JS-specific code.
+/// Replicates the hybrid solving logic from `lib.rs` for native testing.
 fn solve_natively(puzzle_str: &str) -> Option<Board> {
-    // Use `?` to gracefully handle parsing errors for invalid puzzle strings.
     let initial_board = Board::from_str(puzzle_str).ok()?;
-    let mut logical_board = LogicalBoard::from_board(&initial_board);
-    logical_solver::solve(&mut logical_board);
-
-    let mut board_after_logic = Board {
-        cells: logical_board.cells,
-    };
+    let (_, mut board_after_logic) = logical_solver::solve_with_steps(&initial_board);
 
     if !board_after_logic.cells.contains(&0) {
         return Some(board_after_logic);
@@ -113,7 +134,6 @@ fn test_hybrid_solver_logic_solves_puzzle() {
 #[test]
 fn test_hybrid_solver_falls_back_to_backtracking() {
     // A very hard puzzle that the current logical solver cannot finish.
-    // It will make some progress, then the backtracking solver must finish the job.
     let puzzle_str =
         "8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..";
     let solution_str =
