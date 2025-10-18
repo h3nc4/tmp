@@ -194,3 +194,30 @@ export function areBoardsEqual(
 
   return true
 }
+
+/**
+ * Calculates the initial set of possible candidates for every cell on the board.
+ * @param board The board state with initial values.
+ * @returns An array where each element is a Set of candidates for that cell, or null if the cell is filled.
+ */
+export function calculateCandidates(
+  board: BoardState,
+): Array<Set<number> | null> {
+  const candidates: Array<Set<number> | null> = Array(81)
+    .fill(null)
+    .map(() => new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+
+  for (let i = 0; i < 81; i++) {
+    const cellValue = board[i].value
+    if (cellValue !== null) {
+      candidates[i] = null // Cell is filled
+      const peers = getRelatedCellIndices(i)
+      peers.forEach((peerIndex) => {
+        if (peerIndex !== i) {
+          candidates[peerIndex]?.delete(cellValue)
+        }
+      })
+    }
+  }
+  return candidates
+}

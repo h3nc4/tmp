@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest'
 import type { BoardState, CellState } from '@/context/sudoku.types'
 import {
   areBoardsEqual,
+  calculateCandidates,
   getRelatedCellIndices,
   isMoveValid,
   validateBoard,
@@ -165,6 +166,40 @@ describe('Sudoku Utilities', () => {
         i === 0 ? { ...cell, centers: new Set([2]) } : cell,
       )
       expect(areBoardsEqual(board1, board2)).toBe(false)
+    })
+  })
+
+  describe('calculateCandidates', () => {
+    it('should return a full set for empty cells on an empty board', () => {
+      const board = createEmptyBoard()
+      const candidates = calculateCandidates(board)
+      const allNumbers = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9])
+      expect(candidates[0]).toEqual(allNumbers)
+      expect(candidates[80]).toEqual(allNumbers)
+    })
+
+    it('should return null for filled cells', () => {
+      const board = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, value: 5 } : cell,
+      )
+      const candidates = calculateCandidates(board)
+      expect(candidates[0]).toBeNull()
+    })
+
+    it('should eliminate candidates from peers of a filled cell', () => {
+      const board = createEmptyBoard().map((cell, i) =>
+        i === 0 ? { ...cell, value: 5 } : cell,
+      )
+      const candidates = calculateCandidates(board)
+
+      // Cell 1 (same row) should not have 5 as a candidate
+      expect(candidates[1]?.has(5)).toBe(false)
+      // Cell 9 (same column) should not have 5 as a candidate
+      expect(candidates[9]?.has(5)).toBe(false)
+      // Cell 10 (same box) should not have 5 as a candidate
+      expect(candidates[10]?.has(5)).toBe(false)
+      // Cell 80 (not a peer) should still have 5 as a candidate
+      expect(candidates[80]?.has(5)).toBe(true)
     })
   })
 })

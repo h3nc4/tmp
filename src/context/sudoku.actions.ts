@@ -17,9 +17,6 @@
  */
 
 import type {
-  InputValueAction,
-  NavigateAction,
-  EraseActiveCellAction,
   SetCellValueAction,
   TogglePencilMarkAction,
   EraseCellAction,
@@ -33,34 +30,13 @@ import type {
   SetInputModeAction,
   ClearErrorAction,
   SetHighlightedValueAction,
+  ViewSolverStepAction,
+  ExitVisualizationAction,
 } from './sudoku.actions.types'
-import type { BoardState, InputMode } from './sudoku.types'
-
-// --- High-Level User Intent Actions ---
-
-/** Creates an action to input a value into the active cell. */
-export const inputValue = (value: number): InputValueAction => ({
-  type: 'INPUT_VALUE',
-  value,
-})
-
-/** Creates an action to navigate the grid from the active cell. */
-export const navigate = (
-  direction: 'up' | 'down' | 'left' | 'right',
-): NavigateAction => ({
-  type: 'NAVIGATE',
-  direction,
-})
-
-/** Creates an action to erase the active cell. */
-export const eraseActiveCell = (
-  mode: 'delete' | 'backspace',
-): EraseActiveCellAction => ({
-  type: 'ERASE_ACTIVE_CELL',
-  mode,
-})
+import type { InputMode, SolveResult } from './sudoku.types'
 
 // --- Internal State Management Actions ---
+// These action creators produce direct mutation commands for the reducer.
 
 /** Creates an action to set the definitive value of a cell. */
 export const setCellValue = (
@@ -111,9 +87,9 @@ export const solveStart = (): SolveStartAction => ({
 })
 
 /** Creates an action to signal a successful solve. */
-export const solveSuccess = (solution: BoardState): SolveSuccessAction => ({
+export const solveSuccess = (result: SolveResult): SolveSuccessAction => ({
   type: 'SOLVE_SUCCESS',
-  solution,
+  result,
 })
 
 /** Creates an action to signal a failed solve attempt. */
@@ -145,3 +121,15 @@ export const setHighlightedValue = (
   type: 'SET_HIGHLIGHTED_VALUE',
   value,
 })
+
+/** Creates an action to view a specific step from the solver. */
+export const viewSolverStep = (index: number): ViewSolverStepAction => ({
+  type: 'VIEW_SOLVER_STEP',
+  index,
+})
+
+/** Creates an action to exit visualization mode and return to playing. */
+export const exitVisualization = (): ExitVisualizationAction => ({
+  type: 'EXIT_VISUALIZATION',
+})
+

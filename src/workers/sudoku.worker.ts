@@ -18,13 +18,8 @@
 
 import init, { solve_sudoku } from 'wasudoku-wasm'
 
-// --- Worker State ---
-
-// A promise that resolves when the WASM module is initialized.
-// It's initialized lazily on the first valid message.
-let wasmReady: Promise<unknown> | null = null
-
-// --- Core Logic ---
+// Initialize the WASM module when the worker is created.
+const wasmReady = init()
 
 /**
  * Handles incoming messages, runs the solver, and posts the result back.
@@ -45,15 +40,14 @@ export async function handleMessage(
   }
 
   try {
-    // Lazily initialize the WASM module on the first valid message.
-    wasmReady ??= init()
     await wasmReady
 
     const { boardString } = event.data
-    const solution = solve_sudoku(boardString)
+    // solve_sudoku returns a JsValue which needs to be parsed.
+    const result = solve_sudoku(boardString)
 
     // Post the successful solution back to the main thread.
-    self.postMessage({ type: 'solution', solution })
+    self.postMessage({ type: 'solution', result })
   } catch (error) {
     // If the solver throws an error (e.g., invalid input, no solution, crash),
     // capture it and post it back to the main thread for graceful handling.
@@ -61,8 +55,6 @@ export async function handleMessage(
     self.postMessage({ type: 'error', error: errorMessage })
   }
 }
-
-// --- Event Listener ---
 
 // Attach the handler to the 'message' event in the worker's global scope.
 self.addEventListener('message', handleMessage)

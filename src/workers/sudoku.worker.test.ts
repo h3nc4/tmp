@@ -73,42 +73,42 @@ describe('Sudoku Worker Logic', () => {
     return handleMessage(event)
   }
 
-  it('should attach the message handler on module load', () => {
+  it('should attach the message handler and initialize WASM on module load', () => {
     expect(mockAddEventListener).toHaveBeenCalledOnce()
     expect(mockAddEventListener).toHaveBeenCalledWith('message', handleMessage)
+    expect(init).toHaveBeenCalledOnce()
   })
 
-  it('should initialize WASM lazily and solve a puzzle successfully', async () => {
+  it('should solve a puzzle successfully on the first message', async () => {
     const boardString = '.'.repeat(81)
-    const solution = '1'.repeat(81)
-    solve_sudoku.mockReturnValue(solution)
+    const result = { steps: [], solution: '1'.repeat(81) }
+    solve_sudoku.mockReturnValue(result)
 
     await simulateMessage({ boardString })
 
+    expect(solve_sudoku).toHaveBeenCalledWith(boardString)
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'solution',
+      result,
+    })
+  })
+
+  it('should not re-initialize the WASM module on subsequent calls', async () => {
+    // First call
+    await simulateMessage({ boardString: '.'.repeat(81) })
+
+    // Second call
+    const boardString = '1'.repeat(81)
+    const result = { steps: [], solution: '2'.repeat(81) }
+    solve_sudoku.mockReturnValue(result)
+    await simulateMessage({ boardString })
+
+    // init() should have only been called once when the module was first loaded
     expect(init).toHaveBeenCalledOnce()
     expect(solve_sudoku).toHaveBeenCalledWith(boardString)
     expect(mockPostMessage).toHaveBeenCalledWith({
       type: 'solution',
-      solution,
-    })
-  })
-
-  it('should use the already initialized WASM module on subsequent calls', async () => {
-    // First call to ensure initialization
-    await simulateMessage({ boardString: '.'.repeat(81) })
-    init.mockClear() // Clear the init mock for the next assertion
-
-    const boardString = '1'.repeat(81)
-    const solution = '2'.repeat(81)
-    solve_sudoku.mockReturnValue(solution)
-
-    await simulateMessage({ boardString })
-
-    expect(init).not.toHaveBeenCalled()
-    expect(solve_sudoku).toHaveBeenCalledWith(boardString)
-    expect(mockPostMessage).toHaveBeenCalledWith({
-      type: 'solution',
-      solution,
+      result,
     })
   })
 

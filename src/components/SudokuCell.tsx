@@ -43,6 +43,8 @@ interface SudokuCellProps {
   readonly isNumberHighlighted: boolean
   /** Callback function when the cell receives focus (e.g., via click). */
   readonly onFocus: (index: number) => void
+  /** For visualization, a set of candidates eliminated in the current step. */
+  readonly eliminatedCandidates?: ReadonlySet<number>
 }
 
 /**
@@ -63,6 +65,7 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>(
       isHighlighted,
       isNumberHighlighted,
       onFocus,
+      eliminatedCandidates,
     },
     ref,
   ) => {
@@ -93,6 +96,7 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>(
             <PencilMarks
               candidates={cell.candidates}
               centers={cell.centers}
+              eliminations={eliminatedCandidates}
             />
           )}
         </div>

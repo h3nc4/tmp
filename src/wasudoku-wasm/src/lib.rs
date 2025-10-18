@@ -41,7 +41,7 @@ pub fn main() {
 /// This function employs a hybrid strategy. It first applies logical solving
 /// techniques to generate a series of human-readable steps. If the puzzle
 /// is not fully solved by logic, it falls back to a high-speed
-/// backtracking algorithm to find the final solution.
+/// backtracking algorithm to find the solution.
 ///
 /// ### Arguments
 ///
@@ -49,7 +49,7 @@ pub fn main() {
 ///
 /// ### Returns
 ///
-/// * `Ok(JsValue)` - A serialized `SolveResult` object containing the steps and an optional final solution string.
+/// * `Ok(JsValue)` - A serialized `SolveResult` object containing the steps and an optional solution string.
 /// * `Err(JsValue)` - An error if the input is invalid, the puzzle is unsolvable, or a crash occurs.
 #[wasm_bindgen]
 pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
@@ -80,11 +80,7 @@ pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
 
     match solve_result {
         Ok(Some(result)) => Ok(serde_wasm_bindgen::to_value(&result).unwrap()),
-        Ok(None) => Err(JsValue::from_str(
-            "No solution found for the given puzzle.",
-        )),
-        Err(_) => Err(JsValue::from_str(
-            "Solver crashed due to a critical error.",
-        )),
+        Ok(None) => Err(JsValue::from_str("No solution found for the given puzzle.")),
+        Err(_) => Err(JsValue::from_str("Solver crashed due to a critical error.")),
     }
 }

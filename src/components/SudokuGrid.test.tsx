@@ -28,21 +28,22 @@ import {
   type Mock,
 } from 'vitest'
 import { SudokuGrid } from './SudokuGrid'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
-import * as actions from '@/context/sudoku.actions'
+import type { SudokuState, CellState } from '@/context/sudoku.types'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
+vi.mock('@/hooks/useSudokuActions')
 
 interface MockSudokuCellProps {
   index: number
   onFocus: (index: number) => void
   isHighlighted: boolean
   isNumberHighlighted: boolean
+  cell: CellState
+  eliminatedCandidates?: ReadonlySet<number>
 }
 
 // This spy will be called by the mocked SudokuCell component on each render.
@@ -64,16 +65,27 @@ vi.mock('./SudokuCell', () => ({
 }))
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('SudokuGrid component', () => {
-  const mockDispatch = vi.fn()
+  const mockActions = {
+    setActiveCell: vi.fn(),
+    inputValue: vi.fn(),
+    eraseActiveCell: vi.fn(),
+    navigate: vi.fn(),
+    setHighlightedValue: vi.fn(),
+  }
+  const defaultState: SudokuState = {
+    ...initialState,
+    activeCellIndex: 0,
+    visualizationBoard: initialState.board, // ensure it's not null
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockSudokuCellRender.mockClear() // Clear the render spy
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 0 })
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuState.mockReturnValue(defaultState)
+    mockUseSudokuActions.mockReturnValue(mockActions)
   })
 
   it('renders 81 SudokuCell components', () => {
@@ -81,18 +93,44 @@ describe('SudokuGrid component', () => {
     expect(mockSudokuCellRender).toHaveBeenCalledTimes(81)
   })
 
-  it('dispatches SET_ACTIVE_CELL with null when the grid loses focus', () => {
+  it('does not render if displayBoard is null', () => {
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      gameMode: 'visualizing',
+      visualizationBoard: null,
+    })
+    const { container } = render(<SudokuGrid />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('calls setActiveCell when a cell is focused in playing mode', () => {
+    render(<SudokuGrid />)
+    const cell10 = screen.getByLabelText('cell-10')
+    fireEvent.focus(cell10)
+    expect(mockActions.setActiveCell).toHaveBeenCalledWith(10)
+  })
+
+  it('does not call setActiveCell when in visualizing mode', () => {
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      gameMode: 'visualizing',
+    })
+    render(<SudokuGrid />)
+    const cell10 = screen.getByLabelText('cell-10')
+    fireEvent.focus(cell10)
+    expect(mockActions.setActiveCell).not.toHaveBeenCalled()
+  })
+
+  it('calls setActiveCell with null when the grid loses focus', () => {
     render(<SudokuGrid />)
     const grid = screen.getByRole('grid')
     const outsideElement = document.createElement('button')
     document.body.appendChild(outsideElement)
 
-    mockDispatch.mockClear()
-
     // Simulate focus moving from the grid to the outside element
     fireEvent.blur(grid, { relatedTarget: outsideElement })
 
-    expect(mockDispatch).toHaveBeenCalledWith(actions.setActiveCell(null))
+    expect(mockActions.setActiveCell).toHaveBeenCalledWith(null)
 
     document.body.removeChild(outsideElement)
   })
@@ -101,17 +139,16 @@ describe('SudokuGrid component', () => {
     render(<SudokuGrid />)
     const grid = screen.getByRole('grid')
     const cell1 = screen.getByLabelText('cell-1')
-
-    mockDispatch.mockClear()
+    mockActions.setActiveCell.mockClear() // Clear initial focus call
 
     // Simulate focus moving from one part of the grid to another
     fireEvent.blur(grid, { relatedTarget: cell1 })
 
-    expect(mockDispatch).not.toHaveBeenCalled()
+    expect(mockActions.setActiveCell).not.toHaveBeenCalled()
   })
 
   it('does not highlight any cells when no cell is active', () => {
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
+    mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: null })
     render(<SudokuGrid />)
 
     // Check the props of the first rendered cell
@@ -129,7 +166,7 @@ describe('SudokuGrid component', () => {
       value: index % 9 + 1,
     }))
     mockUseSudokuState.mockReturnValue({
-      ...initialState,
+      ...defaultState,
       board: boardWithValues,
       highlightedValue: 5,
     })
@@ -143,35 +180,23 @@ describe('SudokuGrid component', () => {
   })
 
   describe('Keyboard Interactions', () => {
-    it('dispatches inputValue on number key press', async () => {
+    it('calls inputValue and setHighlightedValue on number key press', async () => {
       const user = userEvent.setup()
       render(<SudokuGrid />)
-      mockDispatch.mockClear()
       await user.keyboard('{5}')
-      expect(mockDispatch).toHaveBeenCalledWith(actions.inputValue(5))
+      expect(mockActions.inputValue).toHaveBeenCalledWith(5)
+      expect(mockActions.setHighlightedValue).toHaveBeenCalledWith(5)
     })
 
-    it('ignores keyboard input when solving', async () => {
+    it('ignores keyboard input when in visualizing mode', async () => {
       mockUseSudokuState.mockReturnValue({
-        ...initialState,
-        isSolving: true,
-        activeCellIndex: 0,
+        ...defaultState,
+        gameMode: 'visualizing',
       })
       const user = userEvent.setup()
       render(<SudokuGrid />)
-      mockDispatch.mockClear() // Clear the dispatch from the initial render's useEffect
-
       await user.keyboard('{5}')
-      expect(mockDispatch).not.toHaveBeenCalled()
-    })
-
-    it('ignores keyboard input when no cell is active', async () => {
-      mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
-      const user = userEvent.setup()
-      render(<SudokuGrid />)
-      // No dispatch on render because activeCellIndex is null
-      await user.keyboard('{5}')
-      expect(mockDispatch).not.toHaveBeenCalled()
+      expect(mockActions.inputValue).not.toHaveBeenCalled()
     })
 
     it.each([
@@ -179,30 +204,79 @@ describe('SudokuGrid component', () => {
       ['{ArrowDown}', 'down'],
       ['{ArrowLeft}', 'left'],
       ['{ArrowRight}', 'right'],
-    ])('dispatches navigate action for %s key', async (key, direction) => {
+    ])('calls navigate for %s key', async (key, direction) => {
       const user = userEvent.setup()
       render(<SudokuGrid />)
-      mockDispatch.mockClear()
       await user.keyboard(key)
-      expect(mockDispatch).toHaveBeenCalledWith(actions.navigate(direction as 'up'))
+      expect(mockActions.navigate).toHaveBeenCalledWith(direction)
     })
 
-    it('handles Backspace to dispatch eraseActiveCell("backspace")', async () => {
+    it('handles Backspace to call eraseActiveCell("backspace")', async () => {
       const user = userEvent.setup()
       render(<SudokuGrid />)
-      mockDispatch.mockClear()
-
       await user.keyboard('{Backspace}')
-      expect(mockDispatch).toHaveBeenCalledWith(actions.eraseActiveCell('backspace'))
+      expect(mockActions.eraseActiveCell).toHaveBeenCalledWith('backspace')
     })
 
-    it('handles Delete to dispatch eraseActiveCell("delete")', async () => {
+    it('handles Delete to call eraseActiveCell("delete")', async () => {
       const user = userEvent.setup()
       render(<SudokuGrid />)
-      mockDispatch.mockClear()
-
       await user.keyboard('{Delete}')
-      expect(mockDispatch).toHaveBeenCalledWith(actions.eraseActiveCell('delete'))
+      expect(mockActions.eraseActiveCell).toHaveBeenCalledWith('delete')
+    })
+  })
+
+  describe('when in visualizing mode', () => {
+    it('passes correct candidates and eliminations to SudokuCell', () => {
+      const mockElimination = { index: 1, value: 5 }
+      const mockCandidates: (Set<number> | null)[] = Array(81).fill(null)
+      mockCandidates[0] = new Set([2, 4])
+      mockCandidates[1] = new Set([5, 7])
+
+      const visualizingState: SudokuState = {
+        ...defaultState,
+        gameMode: 'visualizing',
+        // Create a board where cell 0 has a value, but cell 1 and 2 are empty for testing candidates
+        visualizationBoard: initialState.board.map((c, i) =>
+          i === 0 ? { ...c, value: 9 } : c,
+        ),
+        candidatesForViz: mockCandidates,
+        eliminationsForViz: [mockElimination],
+      }
+
+      mockUseSudokuState.mockReturnValue(visualizingState)
+      render(<SudokuGrid />)
+
+      // Check props for cell 0, which has candidates
+      const cell0Props = mockSudokuCellRender.mock.calls[0][0]
+      expect(cell0Props.cell.candidates).toEqual(new Set([2, 4]))
+      expect(cell0Props.eliminatedCandidates).toEqual(new Set()) // No eliminations for this cell
+
+      // Check props for cell 1, which has an elimination
+      const cell1Props = mockSudokuCellRender.mock.calls[1][0]
+      expect(cell1Props.cell.candidates).toEqual(new Set([5, 7]))
+      expect(cell1Props.eliminatedCandidates).toEqual(new Set([5]))
+
+      // Check props for cell 2, which has null candidates in the array
+      const cell2Props = mockSudokuCellRender.mock.calls[2][0]
+      expect(cell2Props.cell.candidates).toEqual(new Set()) // Should default to empty set
+      expect(cell2Props.eliminatedCandidates).toEqual(new Set())
+    })
+
+    it('handles null eliminationsForViz gracefully', () => {
+      const visualizingState: SudokuState = {
+        ...defaultState,
+        gameMode: 'visualizing',
+        visualizationBoard: initialState.board,
+        candidatesForViz: [],
+        eliminationsForViz: null, // Test this case
+      }
+
+      mockUseSudokuState.mockReturnValue(visualizingState)
+      render(<SudokuGrid />)
+
+      const cell0Props = mockSudokuCellRender.mock.calls[0][0]
+      expect(cell0Props.eliminatedCandidates).toEqual(new Set())
     })
   })
 
@@ -216,7 +290,7 @@ describe('SudokuGrid component', () => {
 
     // Rerender with a new active cell index
     act(() => {
-      mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 5 })
+      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: 5 })
     })
     rerender(<SudokuGrid />)
 

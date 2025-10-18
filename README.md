@@ -19,6 +19,9 @@ WASudoku is a Sudoku solver that runs locally in your browser using WebAssembly.
 ### Gameplay Features
 
 - **Conflict Highlighting:** The board highlights numbers that break Sudoku rules in any row, column, or 3x3 box.
+- **Solver Visualization:** After a puzzle is solved, the interface reveals the logical steps taken:
+  - Explore the logical steps the solver took, such as "Naked Single".
+  - Navigate step-by-step to see the board's state at each stage of the solution.
 - **Undo/Redo:** Step backward and forward through any moves.
 - **Multiple Input Modes:**
   - **Normal:** Enter the final numbers.
@@ -42,4 +45,4 @@ This is implemented using React's built-in [useReducer](https://react.dev/refere
 - **WebAssembly Module:**
   - [Rust](https://www.rust-lang.org/)
   - [wasm-pack](https://drager.github.io/wasm-pack/)
-  - [wasm-bindgen](https://github.com/rustwasm/wasm-bindgen)
+  - [wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/)

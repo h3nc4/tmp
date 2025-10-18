@@ -17,23 +17,20 @@
  */
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
-import { setInputMode } from '@/context/sudoku.actions'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import type { InputMode } from '@/context/sudoku.types'
 
 /**
  * A toggle group for switching between Normal, Candidate, and Center input modes.
  */
 export function InputModeToggle() {
-  const { inputMode } = useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const { inputMode, gameMode } = useSudokuState()
+  const { setInputMode } = useSudokuActions()
 
   const handleModeChange = (value: string) => {
     if (value) {
-      dispatch(setInputMode(value as InputMode))
+      setInputMode(value as InputMode)
     }
   }
 
@@ -44,6 +41,7 @@ export function InputModeToggle() {
       onValueChange={handleModeChange}
       className="flex-1"
       aria-label="Input Mode"
+      disabled={gameMode === 'visualizing'}
     >
       <ToggleGroupItem
         value="normal"

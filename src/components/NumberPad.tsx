@@ -18,11 +18,8 @@
 
 import { memo, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
-import { inputValue, setHighlightedValue } from '@/context/sudoku.actions'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 
 const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -31,8 +28,8 @@ const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
  * for each number, indicating how many are left to be placed.
  */
 export const NumberPad = memo(function NumberPad() {
-  const { board, activeCellIndex } = useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const { board, gameMode } = useSudokuState()
+  const { inputValue, setHighlightedValue } = useSudokuActions()
 
   const numberCounts = useMemo(() => {
     const counts = new Array(10).fill(0)
@@ -47,13 +44,11 @@ export const NumberPad = memo(function NumberPad() {
   const handleNumberClick = useCallback(
     (value: number) => {
       // Always highlight the number that was tapped
-      dispatch(setHighlightedValue(value))
-      // Only input the value if a cell is active
-      if (activeCellIndex !== null) {
-        dispatch(inputValue(value))
-      }
+      setHighlightedValue(value)
+      // The inputValue action already knows whether a cell is active
+      inputValue(value)
     },
-    [activeCellIndex, dispatch],
+    [inputValue, setHighlightedValue],
   )
 
   return (
@@ -72,7 +67,7 @@ export const NumberPad = memo(function NumberPad() {
             size="icon"
             className="aspect-square h-auto w-full"
             onClick={() => handleNumberClick(num)}
-            disabled={isComplete}
+            disabled={isComplete || gameMode === 'visualizing'}
             aria-label={`Enter number ${num}`}
             onMouseDown={(e) => e.preventDefault()}
           >

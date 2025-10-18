@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { toast } from 'sonner'
 import { useSudokuSolver } from './useSudokuSolver'
 import SolverWorker from '@/workers/sudoku.worker?worker'
-import type { SudokuState } from '@/context/sudoku.types'
+import type { SudokuState, SolveResult } from '@/context/sudoku.types'
 import { initialState } from '@/context/sudoku.reducer'
 
 // --- Mocks ---
@@ -113,30 +113,26 @@ describe('useSudokuSolver', () => {
   it('should dispatch SOLVE_SUCCESS on receiving a solution message', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
 
-    const solutionString = '1'.repeat(81)
-    const expectedBoard = solutionString
-      .split('')
-      .map((char) => ({
-        value: parseInt(char, 10),
-        candidates: new Set(),
-        centers: new Set(),
-      }))
+    const mockResult: SolveResult = {
+      steps: [],
+      solution: '1'.repeat(81),
+    }
 
     mockWorkerInstance.__simulateMessage({
       type: 'solution',
-      solution: solutionString,
+      result: mockResult,
     })
 
     expect(mockDispatch).toHaveBeenCalledWith({
       type: 'SOLVE_SUCCESS',
-      solution: expectedBoard,
+      result: mockResult,
     })
     expect(toast.success).toHaveBeenCalledWith('Sudoku solved successfully!')
   })
 
-  it('should do nothing if solution message is missing solution string', () => {
+  it('should do nothing if solution message is missing result object', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'solution' }) // No solution string
+    mockWorkerInstance.__simulateMessage({ type: 'solution' }) // No result object
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.success).not.toHaveBeenCalled()
   })

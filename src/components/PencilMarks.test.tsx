@@ -80,4 +80,18 @@ describe('PencilMarks component', () => {
     const span = container.querySelector('span')
     expect(span).toHaveClass('text-xs')
   })
+
+  it('renders eliminated candidates with a line-through style', () => {
+    render(
+      <PencilMarks
+        candidates={new Set([1, 2, 3])}
+        centers={new Set()}
+        eliminations={new Set([2])}
+      />,
+    )
+    const eliminatedMark = screen.getByText('2')
+    expect(eliminatedMark).toHaveClass('line-through')
+    expect(screen.getByText('1')).not.toHaveClass('line-through')
+    expect(screen.getByText('3')).not.toHaveClass('line-through')
+  })
 })

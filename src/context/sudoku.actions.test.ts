@@ -18,34 +18,10 @@
 
 import { describe, it, expect } from 'vitest'
 import * as actions from './sudoku.actions'
-import { createEmptyBoard } from './sudoku.reducer'
 import type { SudokuAction } from './sudoku.actions.types'
+import type { SolveResult } from './sudoku.types'
 
 describe('Sudoku Action Creators', () => {
-  it('should create an INPUT_VALUE action', () => {
-    const expectedAction: SudokuAction = {
-      type: 'INPUT_VALUE',
-      value: 7,
-    }
-    expect(actions.inputValue(7)).toEqual(expectedAction)
-  })
-
-  it('should create a NAVIGATE action', () => {
-    const expectedAction: SudokuAction = {
-      type: 'NAVIGATE',
-      direction: 'up',
-    }
-    expect(actions.navigate('up')).toEqual(expectedAction)
-  })
-
-  it('should create an ERASE_ACTIVE_CELL action', () => {
-    const expectedAction: SudokuAction = {
-      type: 'ERASE_ACTIVE_CELL',
-      mode: 'backspace',
-    }
-    expect(actions.eraseActiveCell('backspace')).toEqual(expectedAction)
-  })
-
   it('should create a SET_CELL_VALUE action', () => {
     const expectedAction: SudokuAction = {
       type: 'SET_CELL_VALUE',
@@ -91,12 +67,15 @@ describe('Sudoku Action Creators', () => {
   })
 
   it('should create a SOLVE_SUCCESS action', () => {
-    const board = createEmptyBoard()
+    const mockResult: SolveResult = {
+      steps: [],
+      solution: '1'.repeat(81),
+    }
     const expectedAction: SudokuAction = {
       type: 'SOLVE_SUCCESS',
-      solution: board,
+      result: mockResult,
     }
-    expect(actions.solveSuccess(board)).toEqual(expectedAction)
+    expect(actions.solveSuccess(mockResult)).toEqual(expectedAction)
   })
 
   it('should create a SOLVE_FAILURE action', () => {
@@ -128,5 +107,15 @@ describe('Sudoku Action Creators', () => {
       value: 8,
     }
     expect(actions.setHighlightedValue(8)).toEqual(expectedAction)
+  })
+
+  it('should create a VIEW_SOLVER_STEP action', () => {
+    const expectedAction: SudokuAction = { type: 'VIEW_SOLVER_STEP', index: 5 }
+    expect(actions.viewSolverStep(5)).toEqual(expectedAction)
+  })
+
+  it('should create an EXIT_VISUALIZATION action', () => {
+    const expectedAction: SudokuAction = { type: 'EXIT_VISUALIZATION' }
+    expect(actions.exitVisualization()).toEqual(expectedAction)
   })
 })

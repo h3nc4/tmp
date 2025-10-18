@@ -28,6 +28,37 @@ export interface CellState {
 
 export type BoardState = readonly CellState[]
 export type InputMode = 'normal' | 'candidate' | 'center'
+export type GameMode = 'playing' | 'visualizing'
+
+// --- Solver Data Structures ---
+// These types mirror the Rust structs returned by the WASM module.
+
+export interface Placement {
+  index: number
+  value: number
+}
+
+export interface Elimination {
+  index: number
+  value: number
+}
+
+export interface CauseCell {
+  index: number
+  candidates: number[]
+}
+
+export interface SolvingStep {
+  technique: string
+  placements: Placement[]
+  eliminations: Elimination[]
+  cause: CauseCell[]
+}
+
+export interface SolveResult {
+  steps: SolvingStep[]
+  solution: string | null
+}
 
 /** The complete state of the Sudoku game. */
 export interface SudokuState {
@@ -59,6 +90,18 @@ export interface SudokuState {
   readonly isBoardFull: boolean
   /** A message for the last user-facing error, used for toasts. */
   readonly lastError: string | null
+  /** The current application mode. */
+  readonly gameMode: GameMode
+  /** The list of logical steps returned by the solver. */
+  readonly solverSteps: readonly SolvingStep[]
+  /** The index of the currently viewed step in visualization mode. */
+  readonly currentStepIndex: number | null
+  /** The calculated board state for the currently viewed step. */
+  readonly visualizationBoard: BoardState | null
+  /** For visualization, the candidates for each cell *before* the current step. */
+  readonly candidatesForViz: (ReadonlySet<number> | null)[] | null
+  /** For visualization, the eliminations from the current step. */
+  readonly eliminationsForViz: readonly Elimination[] | null
 }
 
 /** The shape of the game state object saved to local storage. */

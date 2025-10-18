@@ -19,7 +19,7 @@
 import { useEffect, useRef, type Dispatch } from 'react'
 import { toast } from 'sonner'
 import type { SudokuAction } from '@/context/sudoku.actions.types'
-import type { SudokuState } from '@/context/sudoku.types'
+import type { SudokuState, SolveResult } from '@/context/sudoku.types'
 import { solveSuccess, solveFailure } from '@/context/sudoku.actions'
 import SolverWorker from '@/workers/sudoku.worker?worker'
 
@@ -52,24 +52,14 @@ export function useSudokuSolver(
     const handleWorkerMessage = (
       event: MessageEvent<{
         type: 'solution' | 'error'
-        solution?: string
+        result?: SolveResult
         error?: string
       }>,
     ) => {
-      const { type, solution, error } = event.data
+      const { type, result, error } = event.data
 
-      if (type === 'solution' && solution) {
-        const solvedBoardArray = solution
-          .split('')
-          .map((char) => parseInt(char, 10))
-        // Create a fresh board state from the solution. This correctly removes
-        // all pencil marks and does not depend on the previous board state.
-        const newBoard = solvedBoardArray.map((value) => ({
-          value,
-          candidates: new Set<number>(),
-          centers: new Set<number>(),
-        }))
-        dispatch(solveSuccess(newBoard))
+      if (type === 'solution' && result) {
+        dispatch(solveSuccess(result))
         toast.success('Sudoku solved successfully!')
       } else if (type === 'error' && error) {
         console.error('Solver worker error:', error)

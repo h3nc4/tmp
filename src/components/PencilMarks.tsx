@@ -17,20 +17,25 @@
  */
 
 import { memo } from 'react'
+import { cn } from '@/lib/utils'
 
 interface SudokuPencilMarksProps {
   readonly candidates: ReadonlySet<number>
   readonly centers: ReadonlySet<number>
+  /** A set of candidates to be rendered with a "strike-through" style. */
+  readonly eliminations?: ReadonlySet<number>
 }
 
 const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 /**
  * Renders the candidate (corner) or center pencil marks within a Sudoku cell.
+ * During visualization, it can also render eliminated candidates.
  */
 export const PencilMarks = memo(function PencilMarks({
   candidates,
   centers,
+  eliminations,
 }: SudokuPencilMarksProps) {
   const baseClasses = 'text-muted-foreground/80'
 
@@ -61,7 +66,17 @@ export const PencilMarks = memo(function PencilMarks({
             key={`candidate-${num}`}
             className={`${baseClasses} flex items-center justify-center text-[0.5rem] leading-none md:text-[0.6rem]`}
           >
-            {candidates.has(num) ? num : ''}
+            {candidates.has(num) ? (
+              <span
+                className={cn(
+                  eliminations?.has(num) && 'text-destructive/80 line-through',
+                )}
+              >
+                {num}
+              </span>
+            ) : (
+              ''
+            )}
           </div>
         ))}
       </div>

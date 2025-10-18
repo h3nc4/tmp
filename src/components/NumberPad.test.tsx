@@ -27,26 +27,29 @@ import {
   beforeEach,
 } from 'vitest'
 import { NumberPad } from './NumberPad'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState, createEmptyBoard } from '@/context/sudoku.reducer'
 import type { SudokuState } from '@/context/sudoku.types'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
+vi.mock('@/hooks/useSudokuActions')
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('NumberPad component', () => {
-  const mockDispatch = vi.fn()
+  const mockInputValue = vi.fn()
+  const mockSetHighlightedValue = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseSudokuState.mockReturnValue(initialState) // activeCellIndex is null
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuActions.mockReturnValue({
+      inputValue: mockInputValue,
+      setHighlightedValue: mockSetHighlightedValue,
+    })
   })
 
   it('renders 9 number buttons with their main number', () => {
@@ -64,36 +67,15 @@ describe('NumberPad component', () => {
     }
   })
 
-  it('dispatches inputValue and setHighlightedValue when a cell is active', async () => {
+  it('calls inputValue and setHighlightedValue when a button is clicked', async () => {
     const user = userEvent.setup()
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 10 })
     render(<NumberPad />)
 
     const button5 = screen.getByRole('button', { name: 'Enter number 5' })
     await user.click(button5)
 
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'SET_HIGHLIGHTED_VALUE',
-      value: 5,
-    })
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'INPUT_VALUE',
-      value: 5,
-    })
-  })
-
-  it('dispatches only setHighlightedValue if no cell is active', async () => {
-    const user = userEvent.setup()
-    render(<NumberPad />) // activeCellIndex is null
-
-    const button5 = screen.getByRole('button', { name: 'Enter number 5' })
-    await user.click(button5)
-
-    expect(mockDispatch).toHaveBeenCalledOnce()
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'SET_HIGHLIGHTED_VALUE',
-      value: 5,
-    })
+    expect(mockSetHighlightedValue).toHaveBeenCalledWith(5)
+    expect(mockInputValue).toHaveBeenCalledWith(5)
   })
 
   it('disables a number button if that number is on the board 9 times', () => {
@@ -111,6 +93,18 @@ describe('NumberPad component', () => {
     expect(
       screen.getByRole('button', { name: 'Enter number 4' }),
     ).not.toBeDisabled()
+  })
+
+  it('disables all number buttons when in visualizing mode', () => {
+    const state: SudokuState = { ...initialState, gameMode: 'visualizing' }
+    mockUseSudokuState.mockReturnValue(state)
+    render(<NumberPad />)
+
+    for (let i = 1; i <= 9; i++) {
+      expect(
+        screen.getByRole('button', { name: `Enter number ${i}` }),
+      ).toBeDisabled()
+    }
   })
 
   it('displays the remaining count for an incomplete number', () => {

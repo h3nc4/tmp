@@ -23,25 +23,26 @@ import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
 import { SudokuGrid } from '@/components/SudokuGrid'
 import { NumberPad } from '@/components/NumberPad'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from './context/sudoku.hooks'
+import { useSudokuState } from './context/sudoku.hooks'
 import { SolveButton } from './components/controls/SolveButton'
 import { ClearButton } from './components/controls/ClearButton'
 import { UndoRedo } from './components/controls/UndoRedo'
 import { InputModeToggle } from './components/controls/InputModeToggle'
-import { eraseActiveCell } from './context/sudoku.actions'
+import { SolverStepsPanel } from './components/SolverStepsPanel'
+import { useSynchronizedHeight } from './hooks/useSynchronizedHeight'
+import { useSudokuActions } from './hooks/useSudokuActions'
 
 function App() {
-  const { activeCellIndex } = useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const { activeCellIndex, gameMode } = useSudokuState()
+  const { eraseActiveCell } = useSudokuActions()
+
+  const { sourceRef, targetRef } = useSynchronizedHeight(
+    gameMode === 'visualizing',
+  )
 
   const handleErase = useCallback(() => {
-    if (activeCellIndex !== null) {
-      dispatch(eraseActiveCell('delete'))
-    }
-  }, [activeCellIndex, dispatch])
+    eraseActiveCell('delete')
+  }, [eraseActiveCell])
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -63,32 +64,44 @@ function App() {
       </header>
 
       <main className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
-        <div className="flex w-full max-w-md flex-col gap-6 md:gap-8">
-          <SudokuGrid />
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-row gap-2">
-              <InputModeToggle />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleErase}
-                disabled={activeCellIndex === null}
-                title="Erase selected cell"
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                <Eraser />
-              </Button>
-              <UndoRedo />
-            </div>
-
-            <NumberPad />
-
-            <div className="flex w-full flex-row gap-2">
-              <SolveButton />
-              <ClearButton />
+        <div className="flex w-full max-w-4xl flex-col items-center gap-8 md:flex-row md:items-start md:justify-center">
+          {/* Main content: Grid + Controls */}
+          <div
+            ref={sourceRef}
+            className="flex w-full max-w-md flex-col gap-4 md:order-2 md:gap-6"
+          >
+            <SudokuGrid />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-row gap-2">
+                <InputModeToggle />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleErase}
+                  disabled={
+                    activeCellIndex === null || gameMode === 'visualizing'
+                  }
+                  title="Erase selected cell"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <Eraser />
+                </Button>
+                <UndoRedo />
+              </div>
+              <NumberPad />
+              <div className="flex w-full flex-row gap-2">
+                <SolveButton />
+                <ClearButton />
+              </div>
             </div>
           </div>
+
+          {/* Side Panel: Shown only in visualization mode */}
+          {gameMode === 'visualizing' && (
+            <div ref={targetRef} className="w-full md:order-1 md:w-64">
+              <SolverStepsPanel />
+            </div>
+          )}
         </div>
       </main>
 

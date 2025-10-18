@@ -19,3 +19,14 @@
 // A global setup file for Vitest
 
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
+
+// JSDOM doesn't implement ResizeObserver, so we need to mock it for tests
+// that use components relying on it (e.g., Radix UI's ScrollArea).
+const ResizeObserverMock = vi.fn(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}))
+
+vi.stubGlobal('ResizeObserver', ResizeObserverMock)

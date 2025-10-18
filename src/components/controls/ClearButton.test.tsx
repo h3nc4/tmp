@@ -27,27 +27,26 @@ import {
   type Mock,
 } from 'vitest'
 import { ClearButton } from './ClearButton'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 import { toast } from 'sonner'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
+vi.mock('@/hooks/useSudokuActions')
 vi.mock('sonner', () => ({ toast: { info: vi.fn() } }))
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('ClearButton component', () => {
-  const mockDispatch = vi.fn()
+  const mockClearBoard = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseSudokuState.mockReturnValue({ ...initialState, isBoardEmpty: true })
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuActions.mockReturnValue({ clearBoard: mockClearBoard })
   })
 
   it('is disabled and has correct title when board is empty', () => {
@@ -65,13 +64,13 @@ describe('ClearButton component', () => {
     ).not.toBeDisabled()
   })
 
-  it('dispatches CLEAR_BOARD and shows toast on click', async () => {
+  it('calls clearBoard and shows toast on click', async () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({ ...initialState, isBoardEmpty: false })
     render(<ClearButton />)
 
     await user.click(screen.getByRole('button', { name: 'Clear Board' }))
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_BOARD' })
+    expect(mockClearBoard).toHaveBeenCalled()
     expect(toast.info).toHaveBeenCalledWith('Board cleared.')
   })
 

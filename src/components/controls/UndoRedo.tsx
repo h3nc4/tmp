@@ -18,32 +18,27 @@
 
 import { Undo, Redo } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
-import { undo, redo } from '@/context/sudoku.actions'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 
 /**
  * A component containing the Undo and Redo buttons.
  * It derives its enabled/disabled state from the global context.
  */
 export function UndoRedo() {
-  const { history, historyIndex } = useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const { history, historyIndex, gameMode } = useSudokuState()
+  const { undo, redo } = useSudokuActions()
 
-  const canUndo = historyIndex > 0
-  const canRedo = historyIndex < history.length - 1
-
-  const handleUndo = () => dispatch(undo())
-  const handleRedo = () => dispatch(redo())
+  const isVisualizing = gameMode === 'visualizing'
+  const canUndo = historyIndex > 0 && !isVisualizing
+  const canRedo = historyIndex < history.length - 1 && !isVisualizing
 
   return (
     <>
       <Button
         variant="outline"
         size="icon"
-        onClick={handleUndo}
+        onClick={undo}
         disabled={!canUndo}
         title="Undo"
         onMouseDown={(e) => e.preventDefault()}
@@ -53,7 +48,7 @@ export function UndoRedo() {
       <Button
         variant="outline"
         size="icon"
-        onClick={handleRedo}
+        onClick={redo}
         disabled={!canRedo}
         title="Redo"
         onMouseDown={(e) => e.preventDefault()}

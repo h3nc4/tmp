@@ -27,14 +27,21 @@ import {
   type Mock,
 } from 'vitest'
 import App from './App'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from './context/sudoku.hooks'
+import { useSudokuState } from './context/sudoku.hooks'
+import { useSudokuActions } from './hooks/useSudokuActions'
 import { initialState } from './context/sudoku.reducer'
+import type { SudokuState } from './context/sudoku.types'
 
 // --- Mocks ---
 vi.mock('./context/sudoku.hooks')
+vi.mock('./hooks/useSudokuActions')
+// Mock the custom hook to prevent its implementation details from affecting this test
+vi.mock('./hooks/useSynchronizedHeight', () => ({
+  useSynchronizedHeight: vi.fn(() => ({
+    sourceRef: vi.fn(),
+    targetRef: vi.fn(),
+  })),
+}))
 
 // Mock child components
 vi.mock('./components/SudokuGrid', () => ({
@@ -63,17 +70,26 @@ vi.mock('./components/controls/InputModeToggle', () => ({
 vi.mock('./components/mode-toggle', () => ({
   ModeToggle: vi.fn(() => <button>Toggle Theme</button>),
 }))
+vi.mock('./components/SolverStepsPanel', () => ({
+  SolverStepsPanel: vi.fn(() => <div data-testid="solver-steps-panel" />),
+}))
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('App component', () => {
-  const mockDispatch = vi.fn()
+  const mockEraseActiveCell = vi.fn()
+  const defaultState: SudokuState = {
+    ...initialState,
+    activeCellIndex: 5,
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseSudokuState.mockReturnValue(initialState)
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuState.mockReturnValue(defaultState)
+    mockUseSudokuActions.mockReturnValue({
+      eraseActiveCell: mockEraseActiveCell,
+    })
   })
 
   it('renders the main layout and all control components', () => {
@@ -89,35 +105,41 @@ describe('App component', () => {
     ).toBeInTheDocument()
   })
 
-  it('calls dispatch with eraseActiveCell when erase button is clicked and a cell is active', async () => {
-    const user = userEvent.setup()
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: 5 })
+  it('does not render the SolverStepsPanel in playing mode', () => {
     render(<App />)
-
-    const eraseButton = screen.getByRole('button', {
-      name: 'Erase selected cell',
-    })
-    await user.click(eraseButton)
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'ERASE_ACTIVE_CELL',
-      mode: 'delete',
-    })
+    expect(screen.queryByTestId('solver-steps-panel')).not.toBeInTheDocument()
   })
 
-  it('does not dispatch when erase button is clicked and no cell is active', async () => {
+  it('renders the SolverStepsPanel in visualizing mode', () => {
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      gameMode: 'visualizing',
+    })
+    render(<App />)
+    expect(screen.getByTestId('solver-steps-panel')).toBeInTheDocument()
+  })
+
+  it('calls eraseActiveCell when erase button is clicked', async () => {
     const user = userEvent.setup()
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
     render(<App />)
 
     const eraseButton = screen.getByRole('button', {
       name: 'Erase selected cell',
     })
     await user.click(eraseButton)
-    expect(mockDispatch).not.toHaveBeenCalled()
+    expect(mockEraseActiveCell).toHaveBeenCalledWith('delete')
   })
 
   it('disables erase button when no cell is active', () => {
     mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
+    render(<App />)
+    expect(
+      screen.getByRole('button', { name: 'Erase selected cell' }),
+    ).toBeDisabled()
+  })
+
+  it('disables erase button when in visualizing mode', () => {
+    mockUseSudokuState.mockReturnValue({ ...defaultState, gameMode: 'visualizing' })
     render(<App />)
     expect(
       screen.getByRole('button', { name: 'Erase selected cell' }),

@@ -19,12 +19,9 @@
 import { useMemo } from 'react'
 import { Eraser } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { toast } from 'sonner'
-import { clearBoard } from '@/context/sudoku.actions'
 
 /**
  * A button to clear the entire Sudoku board.
@@ -32,7 +29,7 @@ import { clearBoard } from '@/context/sudoku.actions'
  */
 export function ClearButton() {
   const { isSolving, isBoardEmpty } = useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const { clearBoard } = useSudokuActions()
 
   const isClearDisabled = isSolving || isBoardEmpty
 
@@ -42,7 +39,7 @@ export function ClearButton() {
   }, [isBoardEmpty])
 
   const handleClear = () => {
-    dispatch(clearBoard())
+    clearBoard()
     toast.info('Board cleared.')
   }
 

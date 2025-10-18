@@ -16,29 +16,11 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import type { BoardState, InputMode } from './sudoku.types'
+import type { InputMode, SolveResult } from './sudoku.types'
 
-// --- High-Level User Intent Actions ---
-
-/** Action representing user inputting a number, to be interpreted by the reducer based on the current mode. */
-export interface InputValueAction {
-  type: 'INPUT_VALUE'
-  value: number
-}
-
-/** Action for navigating the grid with arrow keys. */
-export interface NavigateAction {
-  type: 'NAVIGATE'
-  direction: 'up' | 'down' | 'left' | 'right'
-}
-
-/** Action to erase the active cell, with a mode for backspace-like behavior. */
-export interface EraseActiveCellAction {
-  type: 'ERASE_ACTIVE_CELL'
-  mode: 'delete' | 'backspace'
-}
-
-// --- Internal State Management Actions ---
+// --- State Management Actions ---
+// These actions represent direct, unambiguous mutations to the state.
+// They are dispatched by the `useSudokuActions` hook, not directly by UI components.
 
 /** Action to set the definitive value of a cell. */
 export interface SetCellValueAction {
@@ -84,7 +66,7 @@ export interface SolveStartAction {
 /** Action for when the solver successfully finds a solution. */
 export interface SolveSuccessAction {
   type: 'SOLVE_SUCCESS'
-  solution: BoardState
+  result: SolveResult
 }
 
 /** Action for when the solver fails to find a solution. */
@@ -115,11 +97,19 @@ export interface SetHighlightedValueAction {
   value: number | null
 }
 
+/** Action to set the current step to view in visualization mode. */
+export interface ViewSolverStepAction {
+  type: 'VIEW_SOLVER_STEP'
+  index: number
+}
+
+/** Action to exit visualization mode. */
+export interface ExitVisualizationAction {
+  type: 'EXIT_VISUALIZATION'
+}
+
 /** A union of all possible actions that can be dispatched to the sudokuReducer. */
 export type SudokuAction =
-  | InputValueAction
-  | NavigateAction
-  | EraseActiveCellAction
   | SetCellValueAction
   | TogglePencilMarkAction
   | EraseCellAction
@@ -133,3 +123,6 @@ export type SudokuAction =
   | SetInputModeAction
   | ClearErrorAction
   | SetHighlightedValueAction
+  | ViewSolverStepAction
+  | ExitVisualizationAction
+

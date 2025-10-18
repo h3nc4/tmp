@@ -17,28 +17,35 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { BrainCircuit } from 'lucide-react'
+import { BrainCircuit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
-import { solveStart } from '@/context/sudoku.actions'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 
 /**
- * A button that triggers the Sudoku solver.
- * It derives its enabled/disabled state and tooltip from the global context.
+ * A button that triggers the Sudoku solver or exits visualization mode.
+ * It derives its state and tooltip from the global context.
  */
 export function SolveButton() {
-  const { isSolving, solveFailed, conflicts, isBoardEmpty, isBoardFull } =
-    useSudokuState()
-  const dispatch = useSudokuDispatch()
+  const {
+    isSolving,
+    solveFailed,
+    conflicts,
+    isBoardEmpty,
+    isBoardFull,
+    gameMode,
+  } = useSudokuState()
+  const { solve, exitVisualization } = useSudokuActions()
 
   const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
   const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isSolveDisabled =
-    isSolving || isBoardEmpty || isBoardFull || conflicts.size > 0 || solveFailed
+    isSolving ||
+    isBoardEmpty ||
+    isBoardFull ||
+    conflicts.size > 0 ||
+    solveFailed
 
   const solveButtonTitle = useMemo(() => {
     if (conflicts.size > 0) return 'Cannot solve with conflicts.'
@@ -67,13 +74,18 @@ export function SolveButton() {
     }
   }, [isSolving])
 
-  const handleSolve = () => {
-    dispatch(solveStart())
+  if (gameMode === 'visualizing') {
+    return (
+      <Button onClick={exitVisualization} className="flex-1" variant="destructive">
+        <X className="mr-2 size-4" />
+        Exit Visualization
+      </Button>
+    )
   }
 
   return (
     <Button
-      onClick={handleSolve}
+      onClick={solve}
       className="flex-1"
       disabled={isSolveDisabled}
       title={solveButtonTitle}

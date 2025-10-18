@@ -67,6 +67,18 @@ describe('SudokuCell component', () => {
       expect(screen.getByRole('textbox')).toHaveClass('text-transparent')
     })
 
+    it('renders eliminated pencil marks with line-through style', () => {
+      render(
+        <SudokuCell
+          {...defaultProps}
+          cell={{ ...defaultProps.cell, candidates: new Set([1, 9]) }}
+          eliminatedCandidates={new Set([9])}
+        />,
+      )
+      expect(screen.getByText('1')).not.toHaveClass('line-through')
+      expect(screen.getByText('9')).toHaveClass('line-through')
+    })
+
     it('is marked as invalid when in conflict', () => {
       render(<SudokuCell {...defaultProps} isConflict />)
       expect(screen.getByRole('textbox')).toBeInvalid()

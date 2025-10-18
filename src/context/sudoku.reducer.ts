@@ -17,16 +17,22 @@
  */
 
 import type { SudokuAction } from './sudoku.actions.types'
-import type { BoardState, SudokuState, SavedGameState } from './sudoku.types'
+import type {
+  BoardState,
+  Elimination,
+  SudokuState,
+  SavedGameState,
+} from './sudoku.types'
 import {
   getRelatedCellIndices,
   validateBoard,
-  isMoveValid,
   areBoardsEqual,
+  calculateCandidates,
 } from '@/lib/utils'
 
 const BOARD_SIZE = 81
 const LOCAL_STORAGE_KEY = 'wasudoku-game-state'
+const MAX_HISTORY_ENTRIES = 100
 
 /**
  * Creates an empty Sudoku board.
@@ -71,6 +77,12 @@ export const initialState: SudokuState = {
   highlightedValue: null,
   inputMode: 'normal',
   lastError: null,
+  gameMode: 'playing',
+  solverSteps: [],
+  currentStepIndex: null,
+  visualizationBoard: null,
+  candidatesForViz: null,
+  eliminationsForViz: null,
   ...getDerivedBoardState(createEmptyBoard()),
 }
 
@@ -123,6 +135,39 @@ export function loadInitialState(): SudokuState {
 }
 
 /**
+ * A helper function to manage the history stack. It adds a new board state,
+ * truncates any future (redo) states, and prunes the oldest entry if the
+ * history exceeds the maximum size.
+ * @param state The current `SudokuState`.
+ * @param newBoard The `BoardState` to be added to the history.
+ * @returns An object with the updated `history` and `historyIndex`.
+ */
+function updateHistory(
+  state: SudokuState,
+  newBoard: BoardState,
+): {
+  history: readonly BoardState[]
+  historyIndex: number
+} {
+  if (areBoardsEqual(state.board, newBoard)) {
+    return { history: state.history, historyIndex: state.historyIndex }
+  }
+
+  let newHistory = state.history.slice(0, state.historyIndex + 1)
+  newHistory.push(newBoard)
+
+  if (newHistory.length > MAX_HISTORY_ENTRIES) {
+    // Prune the oldest entry to keep the history size manageable.
+    newHistory = newHistory.slice(newHistory.length - MAX_HISTORY_ENTRIES)
+  }
+
+  return {
+    history: newHistory,
+    historyIndex: newHistory.length - 1,
+  }
+}
+
+/**
  * A pure function that handles all state transitions for the Sudoku game.
  *
  * @param state - The current state.
@@ -143,6 +188,8 @@ export function sudokuReducer(
     'SET_INPUT_MODE',
     'CLEAR_ERROR',
     'SET_HIGHLIGHTED_VALUE',
+    'VIEW_SOLVER_STEP',
+    'EXIT_VISUALIZATION',
   ].includes(action.type)
 
   const baseState = {
@@ -152,68 +199,6 @@ export function sudokuReducer(
   }
 
   switch (action.type) {
-    case 'INPUT_VALUE': {
-      if (state.activeCellIndex === null) return state
-      const { value } = action
-
-      if (state.inputMode === 'normal') {
-        const nextState = sudokuReducer(baseState, {
-          type: 'SET_CELL_VALUE',
-          index: state.activeCellIndex,
-          value,
-        })
-        // Auto-advance focus if the move was valid and changed the board state
-        if (
-          nextState !== state && // Check if the state actually changed
-          isMoveValid(state.board, state.activeCellIndex, value) &&
-          state.activeCellIndex < 80
-        ) {
-          return { ...nextState, activeCellIndex: state.activeCellIndex + 1 }
-        }
-        return nextState
-      }
-      // Handle pencil mark modes
-      if (!isMoveValid(state.board, state.activeCellIndex, value)) {
-        return {
-          ...state,
-          lastError: `Cannot add pencil mark for ${value}, it conflicts with a number on the board.`,
-        }
-      }
-      return sudokuReducer(baseState, {
-        type: 'TOGGLE_PENCIL_MARK',
-        index: state.activeCellIndex,
-        value,
-        mode: state.inputMode,
-      })
-    }
-
-    case 'NAVIGATE': {
-      if (state.activeCellIndex === null) return state
-      let nextIndex = -1
-      const { activeCellIndex } = state
-      const { direction } = action
-
-      if (direction === 'right' && activeCellIndex < 80) nextIndex = activeCellIndex + 1
-      else if (direction === 'left' && activeCellIndex > 0) nextIndex = activeCellIndex - 1
-      else if (direction === 'down' && activeCellIndex < 72) nextIndex = activeCellIndex + 9
-      else if (direction === 'up' && activeCellIndex > 8) nextIndex = activeCellIndex - 9
-
-      return nextIndex !== -1 ? { ...baseState, activeCellIndex: nextIndex } : state
-    }
-
-    case 'ERASE_ACTIVE_CELL': {
-      if (state.activeCellIndex === null) return state
-      const nextState = sudokuReducer(baseState, {
-        type: 'ERASE_CELL',
-        index: state.activeCellIndex,
-      })
-
-      if (action.mode === 'backspace' && state.activeCellIndex > 0) {
-        return { ...nextState, activeCellIndex: state.activeCellIndex - 1 }
-      }
-      return nextState
-    }
-
     case 'SET_CELL_VALUE': {
       const newBoard = state.board.map((cell) => ({
         value: cell.value,
@@ -233,18 +218,13 @@ export function sudokuReducer(
         newBoard[relatedIndex].centers.delete(action.value)
       })
 
-      if (areBoardsEqual(state.board, newBoard)) {
-        return state
-      }
-
-      const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(newBoard)
+      const historyUpdate = updateHistory(state, newBoard)
+      if (historyUpdate.history === state.history) return state
 
       return {
         ...baseState,
         board: newBoard,
-        history: newHistory,
-        historyIndex: newHistory.length - 1,
+        ...historyUpdate,
         isSolved: false,
         ...getDerivedBoardState(newBoard),
       }
@@ -273,14 +253,12 @@ export function sudokuReducer(
           : targetCell.centers.add(action.value)
       }
 
-      const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(newBoard)
+      const historyUpdate = updateHistory(state, newBoard)
 
       return {
         ...baseState,
         board: newBoard,
-        history: newHistory,
-        historyIndex: newHistory.length - 1,
+        ...historyUpdate,
         ...getDerivedBoardState(newBoard),
       }
     }
@@ -300,18 +278,13 @@ export function sudokuReducer(
           },
       )
 
-      if (areBoardsEqual(state.board, newBoard)) {
-        return state
-      }
-
-      const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(newBoard)
+      const historyUpdate = updateHistory(state, newBoard)
+      if (historyUpdate.history === state.history) return state
 
       return {
         ...baseState,
         board: newBoard,
-        history: newHistory,
-        historyIndex: newHistory.length - 1,
+        ...historyUpdate,
         isSolved: false,
         ...getDerivedBoardState(newBoard),
       }
@@ -323,21 +296,13 @@ export function sudokuReducer(
         return state
       }
 
-      const newHistory = [
-        ...state.history.slice(0, state.historyIndex + 1),
-        newBoard,
-      ]
+      const historyUpdate = updateHistory(state, newBoard)
 
       return {
-        ...baseState,
+        ...initialState, // Reset to a clean slate
         board: newBoard,
-        initialBoard: createEmptyBoard(),
-        history: newHistory,
-        historyIndex: state.historyIndex + 1,
-        isSolved: false,
-        activeCellIndex: null,
-        highlightedValue: null,
-        ...getDerivedBoardState(newBoard),
+        history: historyUpdate.history,
+        historyIndex: historyUpdate.historyIndex,
       }
     }
 
@@ -379,19 +344,54 @@ export function sudokuReducer(
       }
 
     case 'SOLVE_SUCCESS': {
-      const newBoard = action.solution
-      const newHistory = [
-        ...state.history.slice(0, state.historyIndex + 1),
-        newBoard,
-      ]
+      const { steps, solution } = action.result
+      if (!solution) {
+        return { ...state, isSolving: false, solveFailed: true }
+      }
+
+      // Create a mutable copy of the initial board to simulate the logical solve
+      const boardAfterLogic = state.initialBoard.map((cell) => ({
+        ...cell,
+      }))
+
+      // Apply only placements from logical steps
+      for (const step of steps) {
+        for (const placement of step.placements) {
+          boardAfterLogic[placement.index].value = placement.value
+        }
+      }
+
+      const isSolvedByLogic = boardAfterLogic.every((cell) => cell.value !== null)
+      const finalSteps = [...steps]
+
+      // If logic didn't solve it, add a synthetic backtracking step
+      if (!isSolvedByLogic) {
+        finalSteps.push({
+          technique: 'Backtracking',
+          placements: [],
+          eliminations: [],
+          cause: [],
+        })
+      }
+
+      const solvedBoard: BoardState = solution
+        .split('')
+        .map((char) => ({
+          value: char === '.' ? null : parseInt(char, 10),
+          candidates: new Set(),
+          centers: new Set(),
+        }))
+
       return {
         ...baseState,
-        board: newBoard,
-        history: newHistory,
-        historyIndex: state.historyIndex + 1,
+        board: solvedBoard, // Show solution on main board
         isSolving: false,
         isSolved: true,
-        ...getDerivedBoardState(newBoard),
+        gameMode: 'visualizing',
+        solverSteps: finalSteps,
+        currentStepIndex: finalSteps.length, // Select last step (final state)
+        visualizationBoard: solvedBoard, // Show final state in viz
+        ...getDerivedBoardState(solvedBoard),
       }
     }
 
@@ -401,6 +401,99 @@ export function sudokuReducer(
         isSolving: false,
         solveFailed: true,
       }
+
+    case 'VIEW_SOLVER_STEP': {
+      if (state.gameMode !== 'visualizing') return state
+
+      const stepIndexToShow = action.index
+
+      // Calculate the board state and candidates *before* the target step
+      const boardBeforeStep = state.initialBoard.map((cell) => ({
+        ...cell,
+        candidates: new Set<number>(),
+      }))
+      const candidates = calculateCandidates(state.initialBoard)
+      for (let i = 0; i < BOARD_SIZE; i++) {
+        boardBeforeStep[i].candidates = candidates[i] ?? new Set()
+      }
+
+      // Apply all steps UP TO the one we are viewing
+      for (let i = 0; i < stepIndexToShow - 1; i++) {
+        const step = state.solverSteps[i]
+        for (const p of step.placements) {
+          boardBeforeStep[p.index].value = p.value
+          boardBeforeStep[p.index].candidates.clear()
+          const peers = getRelatedCellIndices(p.index)
+          peers.forEach((peerIdx) => {
+            if (peerIdx !== p.index) {
+              boardBeforeStep[peerIdx].candidates.delete(p.value)
+            }
+          })
+        }
+        for (const e of step.eliminations) {
+          boardBeforeStep[e.index].candidates.delete(e.value)
+        }
+      }
+
+      let boardAfterStep = boardBeforeStep
+      let eliminationsForViz: Elimination[] = []
+
+      if (stepIndexToShow > 0) {
+        const currentStep = state.solverSteps[stepIndexToShow - 1]
+        eliminationsForViz = currentStep.eliminations
+
+        // Create the board state *after* the current step's placements
+        boardAfterStep = boardBeforeStep.map((cell, i) => {
+          const placement = currentStep.placements.find((p) => p.index === i)
+          return placement
+            ? {
+              value: placement.value,
+              candidates: new Set(),
+              centers: new Set(),
+            }
+            : cell
+        })
+      }
+
+      if (stepIndexToShow === state.solverSteps.length) {
+        // When viewing the final step/solution, always use the definitive solved board.
+        // This correctly handles cases where the final step was backtracking, which
+        // has no placements of its own. We create a mutable copy to satisfy TypeScript.
+        boardAfterStep = state.board.map((c) => ({
+          value: c.value,
+          candidates: new Set(c.candidates),
+          centers: new Set(c.centers),
+        }))
+      }
+
+      const candidatesForViz = boardBeforeStep.map((c) =>
+        c.value === null ? c.candidates : null,
+      )
+
+      return {
+        ...baseState,
+        currentStepIndex: stepIndexToShow,
+        visualizationBoard: boardAfterStep,
+        candidatesForViz,
+        eliminationsForViz,
+      }
+    }
+
+    case 'EXIT_VISUALIZATION': {
+      const restoredBoard = state.initialBoard
+      return {
+        ...baseState,
+        board: restoredBoard, // Restore the pre-solve board state
+        gameMode: 'playing',
+        solverSteps: [],
+        currentStepIndex: null,
+        visualizationBoard: null,
+        candidatesForViz: null,
+        eliminationsForViz: null,
+        isSolved: false, // Exiting means we are no longer in a "solved" state
+        ...getDerivedBoardState(restoredBoard),
+      }
+    }
 
     case 'SET_ACTIVE_CELL': {
       const newHighlightedValue =

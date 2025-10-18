@@ -27,25 +27,29 @@ import {
   type Mock,
 } from 'vitest'
 import { UndoRedo } from './UndoRedo'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
+import type { SudokuState } from '@/context/sudoku.types'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
+vi.mock('@/hooks/useSudokuActions')
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('UndoRedo component', () => {
-  const mockDispatch = vi.fn()
+  const mockUndo = vi.fn()
+  const mockRedo = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseSudokuState.mockReturnValue(initialState)
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuActions.mockReturnValue({
+      undo: mockUndo,
+      redo: mockRedo,
+    })
   })
 
   it('disables both buttons with initial state', () => {
@@ -76,7 +80,20 @@ describe('UndoRedo component', () => {
     expect(screen.getByRole('button', { name: 'Redo' })).not.toBeDisabled()
   })
 
-  it('dispatches UNDO action on click', async () => {
+  it('disables both buttons when in visualizing mode, even if history exists', () => {
+    const state: SudokuState = {
+      ...initialState,
+      historyIndex: 1,
+      history: [initialState.board, initialState.board, initialState.board],
+      gameMode: 'visualizing',
+    }
+    mockUseSudokuState.mockReturnValue(state)
+    render(<UndoRedo />)
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
+  })
+
+  it('calls undo on click', async () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({
       ...initialState,
@@ -86,10 +103,10 @@ describe('UndoRedo component', () => {
     render(<UndoRedo />)
 
     await user.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'UNDO' })
+    expect(mockUndo).toHaveBeenCalled()
   })
 
-  it('dispatches REDO action on click', async () => {
+  it('calls redo on click', async () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({
       ...initialState,
@@ -99,6 +116,6 @@ describe('UndoRedo component', () => {
     render(<UndoRedo />)
 
     await user.click(screen.getByRole('button', { name: 'Redo' }))
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'REDO' })
+    expect(mockRedo).toHaveBeenCalled()
   })
 })

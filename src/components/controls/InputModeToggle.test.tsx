@@ -27,25 +27,24 @@ import {
   type Mock,
 } from 'vitest'
 import { InputModeToggle } from './InputModeToggle'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
+vi.mock('@/hooks/useSudokuActions')
 
 const mockUseSudokuState = useSudokuState as Mock
-const mockUseSudokuDispatch = useSudokuDispatch as Mock
+const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('InputModeToggle component', () => {
-  const mockDispatch = vi.fn()
+  const mockSetInputMode = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseSudokuState.mockReturnValue(initialState) // default mode is 'normal'
-    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
+    mockUseSudokuActions.mockReturnValue({ setInputMode: mockSetInputMode })
   })
 
   it('renders with the correct initial mode selected', () => {
@@ -54,20 +53,17 @@ describe('InputModeToggle component', () => {
     expect(normalButton).toBeChecked()
   })
 
-  it('dispatches SET_INPUT_MODE when a different mode is selected', async () => {
+  it('calls setInputMode when a different mode is selected', async () => {
     const user = userEvent.setup()
     render(<InputModeToggle />)
 
     const candidateButton = screen.getByRole('radio', { name: 'Candidate' })
     await user.click(candidateButton)
 
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'SET_INPUT_MODE',
-      mode: 'candidate',
-    })
+    expect(mockSetInputMode).toHaveBeenCalledWith('candidate')
   })
 
-  it('does not dispatch if the onValueChange callback receives an empty value', async () => {
+  it('does not call setInputMode if the onValueChange callback receives an empty value', async () => {
     const user = userEvent.setup()
     // Start with a mode selected
     mockUseSudokuState.mockReturnValue({ ...initialState, inputMode: 'candidate' });
@@ -78,7 +74,17 @@ describe('InputModeToggle component', () => {
     // call onValueChange with an empty string.
     await user.click(candidateButton);
 
-    // The handler's guard `if (value)` should prevent dispatching.
-    expect(mockDispatch).not.toHaveBeenCalled();
+    // The handler's guard `if (value)` should prevent calling the action.
+    expect(mockSetInputMode).not.toHaveBeenCalled();
   });
+
+  it('is disabled when in visualizing mode', () => {
+    mockUseSudokuState.mockReturnValue({ ...initialState, gameMode: 'visualizing' })
+    render(<InputModeToggle />)
+
+    // Check that the individual buttons inside the group are disabled.
+    screen.getAllByRole('radio').forEach(button => {
+      expect(button).toBeDisabled()
+    })
+  })
 })
