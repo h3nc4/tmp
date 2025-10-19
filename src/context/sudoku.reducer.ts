@@ -22,6 +22,7 @@ import type {
   Elimination,
   SudokuState,
   SavedGameState,
+  HistoryState,
 } from './sudoku.types'
 import {
   getRelatedCellIndices,
@@ -68,22 +69,28 @@ function getDerivedBoardState(board: BoardState) {
 export const initialState: SudokuState = {
   board: createEmptyBoard(),
   initialBoard: createEmptyBoard(),
-  history: [createEmptyBoard()],
-  historyIndex: 0,
-  isSolving: false,
-  isSolved: false,
-  solveFailed: false,
-  activeCellIndex: null,
-  highlightedValue: null,
-  inputMode: 'normal',
-  lastError: null,
-  gameMode: 'playing',
-  solverSteps: [],
-  currentStepIndex: null,
-  visualizationBoard: null,
-  candidatesForViz: null,
-  eliminationsForViz: null,
-  ...getDerivedBoardState(createEmptyBoard()),
+  history: {
+    stack: [createEmptyBoard()],
+    index: 0,
+  },
+  ui: {
+    activeCellIndex: null,
+    highlightedValue: null,
+    inputMode: 'normal',
+    lastError: null,
+  },
+  solver: {
+    isSolving: false,
+    isSolved: false,
+    solveFailed: false,
+    gameMode: 'playing',
+    steps: [],
+    currentStepIndex: null,
+    visualizationBoard: null,
+    candidatesForViz: null,
+    eliminationsForViz: null,
+  },
+  derived: getDerivedBoardState(createEmptyBoard()),
 }
 
 /**
@@ -113,18 +120,17 @@ export function loadInitialState(): SudokuState {
     if (savedStateJSON) {
       const savedState = JSON.parse(savedStateJSON, reviver) as SavedGameState
       if (
-        savedState &&
-        Array.isArray(savedState.history) &&
-        typeof savedState.historyIndex === 'number' &&
-        savedState.history.length > 0
+        savedState?.history &&
+        Array.isArray(savedState.history.stack) &&
+        typeof savedState.history.index === 'number' &&
+        savedState.history.stack.length > 0
       ) {
-        const currentBoard = savedState.history[savedState.historyIndex]
+        const currentBoard = savedState.history.stack[savedState.history.index]
         return {
           ...initialState,
           history: savedState.history,
-          historyIndex: savedState.historyIndex,
           board: currentBoard,
-          ...getDerivedBoardState(currentBoard),
+          derived: getDerivedBoardState(currentBoard),
         }
       }
     }
@@ -138,46 +144,42 @@ export function loadInitialState(): SudokuState {
  * A helper function to manage the history stack. It adds a new board state,
  * truncates any future (redo) states, and prunes the oldest entry if the
  * history exceeds the maximum size.
- * @param state The current `SudokuState`.
+ * @param historyState The current `HistoryState`.
+ * @param currentBoard The current `BoardState` from the main state.
  * @param newBoard The `BoardState` to be added to the history.
- * @returns An object with the updated `history` and `historyIndex`.
+ * @returns An updated `HistoryState` object.
  */
 function updateHistory(
-  state: SudokuState,
+  historyState: HistoryState,
+  currentBoard: BoardState,
   newBoard: BoardState,
-): {
-  history: readonly BoardState[]
-  historyIndex: number
-} {
-  if (areBoardsEqual(state.board, newBoard)) {
-    return { history: state.history, historyIndex: state.historyIndex }
+): HistoryState {
+  if (areBoardsEqual(currentBoard, newBoard)) {
+    return historyState
   }
 
-  let newHistory = state.history.slice(0, state.historyIndex + 1)
-  newHistory.push(newBoard)
+  let newStack = historyState.stack.slice(0, historyState.index + 1)
+  newStack.push(newBoard)
 
-  if (newHistory.length > MAX_HISTORY_ENTRIES) {
+  if (newStack.length > MAX_HISTORY_ENTRIES) {
     // Prune the oldest entry to keep the history size manageable.
-    newHistory = newHistory.slice(newHistory.length - MAX_HISTORY_ENTRIES)
+    newStack = newStack.slice(newStack.length - MAX_HISTORY_ENTRIES)
   }
 
   return {
-    history: newHistory,
-    historyIndex: newHistory.length - 1,
+    stack: newStack,
+    index: newStack.length - 1,
   }
 }
 
 /**
- * A pure function that handles all state transitions for the Sudoku game.
- *
- * @param state - The current state.
- * @param action - The action to perform.
- * @returns The new state.
+ * A pure function that calculates the next state based on the current state and a dispatched action.
+ * This function does not handle derived state, which is calculated by the main `sudokuReducer`.
+ * @param state The current `SudokuState`.
+ * @param action The `SudokuAction` to process.
+ * @returns The new, unprocessed `SudokuState`.
  */
-export function sudokuReducer(
-  state: SudokuState,
-  action: SudokuAction,
-): SudokuState {
+function produceNewState(state: SudokuState, action: SudokuAction): SudokuState {
   // Any action that modifies the board should clear a previous solve-failed state.
   const isBoardModifyingAction = ![
     'UNDO',
@@ -192,11 +194,9 @@ export function sudokuReducer(
     'EXIT_VISUALIZATION',
   ].includes(action.type)
 
-  const baseState = {
-    ...state,
-    lastError: null, // Clear errors on any new action
-    solveFailed: isBoardModifyingAction ? false : state.solveFailed,
-  }
+  const baseSolverState = isBoardModifyingAction
+    ? { ...state.solver, solveFailed: false }
+    : state.solver
 
   switch (action.type) {
     case 'SET_CELL_VALUE': {
@@ -218,15 +218,14 @@ export function sudokuReducer(
         newBoard[relatedIndex].centers.delete(action.value)
       })
 
-      const historyUpdate = updateHistory(state, newBoard)
-      if (historyUpdate.history === state.history) return state
+      const newHistory = updateHistory(state.history, state.board, newBoard)
+      if (newHistory === state.history) return state
 
       return {
-        ...baseState,
+        ...state,
         board: newBoard,
-        ...historyUpdate,
-        isSolved: false,
-        ...getDerivedBoardState(newBoard),
+        history: newHistory,
+        solver: { ...baseSolverState, isSolved: false },
       }
     }
 
@@ -253,13 +252,13 @@ export function sudokuReducer(
           : targetCell.centers.add(action.value)
       }
 
-      const historyUpdate = updateHistory(state, newBoard)
+      const newHistory = updateHistory(state.history, state.board, newBoard)
 
       return {
-        ...baseState,
+        ...state,
         board: newBoard,
-        ...historyUpdate,
-        ...getDerivedBoardState(newBoard),
+        history: newHistory,
+        solver: baseSolverState,
       }
     }
 
@@ -278,15 +277,14 @@ export function sudokuReducer(
           },
       )
 
-      const historyUpdate = updateHistory(state, newBoard)
-      if (historyUpdate.history === state.history) return state
+      const newHistory = updateHistory(state.history, state.board, newBoard)
+      if (newHistory === state.history) return state
 
       return {
-        ...baseState,
+        ...state,
         board: newBoard,
-        ...historyUpdate,
-        isSolved: false,
-        ...getDerivedBoardState(newBoard),
+        history: newHistory,
+        solver: { ...baseSolverState, isSolved: false },
       }
     }
 
@@ -295,42 +293,36 @@ export function sudokuReducer(
       if (areBoardsEqual(state.board, newBoard)) {
         return state
       }
-
-      const historyUpdate = updateHistory(state, newBoard)
-
+      const newHistory = updateHistory(state.history, state.board, newBoard)
       return {
         ...initialState, // Reset to a clean slate
         board: newBoard,
-        history: historyUpdate.history,
-        historyIndex: historyUpdate.historyIndex,
+        history: newHistory,
       }
     }
 
     case 'UNDO': {
-      if (state.historyIndex > 0) {
-        const newHistoryIndex = state.historyIndex - 1
-        const newBoard = state.history[newHistoryIndex]
+      if (state.history.index > 0) {
+        const newHistoryIndex = state.history.index - 1
+        const newBoard = state.history.stack[newHistoryIndex]
         return {
-          ...baseState,
-          historyIndex: newHistoryIndex,
+          ...state,
+          history: { ...state.history, index: newHistoryIndex },
           board: newBoard,
-          isSolved: false,
-          solveFailed: false, // Can try solving again after undo
-          ...getDerivedBoardState(newBoard),
+          solver: { ...state.solver, isSolved: false, solveFailed: false },
         }
       }
       return state
     }
 
     case 'REDO': {
-      if (state.historyIndex < state.history.length - 1) {
-        const newHistoryIndex = state.historyIndex + 1
-        const newBoard = state.history[newHistoryIndex]
+      if (state.history.index < state.history.stack.length - 1) {
+        const newHistoryIndex = state.history.index + 1
+        const newBoard = state.history.stack[newHistoryIndex]
         return {
-          ...baseState,
-          historyIndex: newHistoryIndex,
+          ...state,
+          history: { ...state.history, index: newHistoryIndex },
           board: newBoard,
-          ...getDerivedBoardState(newBoard),
         }
       }
       return state
@@ -338,23 +330,21 @@ export function sudokuReducer(
 
     case 'SOLVE_START':
       return {
-        ...baseState,
-        isSolving: true,
+        ...state,
         initialBoard: state.board,
+        solver: { ...state.solver, isSolving: true },
       }
 
     case 'SOLVE_SUCCESS': {
       const { steps, solution } = action.result
       if (!solution) {
-        return { ...state, isSolving: false, solveFailed: true }
+        return { ...state, solver: { ...state.solver, isSolving: false, solveFailed: true } }
       }
 
-      // Create a mutable copy of the initial board to simulate the logical solve
       const boardAfterLogic = state.initialBoard.map((cell) => ({
         ...cell,
       }))
 
-      // Apply only placements from logical steps
       for (const step of steps) {
         for (const placement of step.placements) {
           boardAfterLogic[placement.index].value = placement.value
@@ -364,7 +354,6 @@ export function sudokuReducer(
       const isSolvedByLogic = boardAfterLogic.every((cell) => cell.value !== null)
       const finalSteps = [...steps]
 
-      // If logic didn't solve it, add a synthetic backtracking step
       if (!isSolvedByLogic) {
         finalSteps.push({
           technique: 'Backtracking',
@@ -383,31 +372,30 @@ export function sudokuReducer(
         }))
 
       return {
-        ...baseState,
-        board: solvedBoard, // Show solution on main board
-        isSolving: false,
-        isSolved: true,
-        gameMode: 'visualizing',
-        solverSteps: finalSteps,
-        currentStepIndex: finalSteps.length, // Select last step (final state)
-        visualizationBoard: solvedBoard, // Show final state in viz
-        ...getDerivedBoardState(solvedBoard),
+        ...state,
+        board: solvedBoard,
+        solver: {
+          ...state.solver,
+          isSolving: false,
+          isSolved: true,
+          gameMode: 'visualizing',
+          steps: finalSteps,
+          currentStepIndex: finalSteps.length,
+          visualizationBoard: solvedBoard,
+        },
       }
     }
 
     case 'SOLVE_FAILURE':
       return {
         ...state,
-        isSolving: false,
-        solveFailed: true,
+        solver: { ...state.solver, isSolving: false, solveFailed: true },
       }
 
     case 'VIEW_SOLVER_STEP': {
-      if (state.gameMode !== 'visualizing') return state
+      if (state.solver.gameMode !== 'visualizing') return state
 
       const stepIndexToShow = action.index
-
-      // Calculate the board state and candidates *before* the target step
       const boardBeforeStep = state.initialBoard.map((cell) => ({
         ...cell,
         candidates: new Set<number>(),
@@ -417,9 +405,8 @@ export function sudokuReducer(
         boardBeforeStep[i].candidates = candidates[i] ?? new Set()
       }
 
-      // Apply all steps UP TO the one we are viewing
       for (let i = 0; i < stepIndexToShow - 1; i++) {
-        const step = state.solverSteps[i]
+        const step = state.solver.steps[i]
         for (const p of step.placements) {
           boardBeforeStep[p.index].value = p.value
           boardBeforeStep[p.index].candidates.clear()
@@ -439,10 +426,8 @@ export function sudokuReducer(
       let eliminationsForViz: Elimination[] = []
 
       if (stepIndexToShow > 0) {
-        const currentStep = state.solverSteps[stepIndexToShow - 1]
+        const currentStep = state.solver.steps[stepIndexToShow - 1]
         eliminationsForViz = currentStep.eliminations
-
-        // Create the board state *after* the current step's placements
         boardAfterStep = boardBeforeStep.map((cell, i) => {
           const placement = currentStep.placements.find((p) => p.index === i)
           return placement
@@ -455,10 +440,7 @@ export function sudokuReducer(
         })
       }
 
-      if (stepIndexToShow === state.solverSteps.length) {
-        // When viewing the final step/solution, always use the definitive solved board.
-        // This correctly handles cases where the final step was backtracking, which
-        // has no placements of its own. We create a mutable copy to satisfy TypeScript.
+      if (stepIndexToShow === state.solver.steps.length) {
         boardAfterStep = state.board.map((c) => ({
           value: c.value,
           candidates: new Set(c.candidates),
@@ -471,27 +453,25 @@ export function sudokuReducer(
       )
 
       return {
-        ...baseState,
-        currentStepIndex: stepIndexToShow,
-        visualizationBoard: boardAfterStep,
-        candidatesForViz,
-        eliminationsForViz,
+        ...state,
+        solver: {
+          ...state.solver,
+          currentStepIndex: stepIndexToShow,
+          visualizationBoard: boardAfterStep,
+          candidatesForViz,
+          eliminationsForViz,
+        },
       }
     }
 
     case 'EXIT_VISUALIZATION': {
       const restoredBoard = state.initialBoard
       return {
-        ...baseState,
-        board: restoredBoard, // Restore the pre-solve board state
-        gameMode: 'playing',
-        solverSteps: [],
-        currentStepIndex: null,
-        visualizationBoard: null,
-        candidatesForViz: null,
-        eliminationsForViz: null,
-        isSolved: false, // Exiting means we are no longer in a "solved" state
-        ...getDerivedBoardState(restoredBoard),
+        ...state,
+        board: restoredBoard,
+        solver: {
+          ...initialState.solver,
+        },
       }
     }
 
@@ -499,22 +479,53 @@ export function sudokuReducer(
       const newHighlightedValue =
         action.index !== null ? state.board[action.index].value : null
       return {
-        ...baseState,
-        activeCellIndex: action.index,
-        highlightedValue: newHighlightedValue,
+        ...state,
+        ui: {
+          ...state.ui,
+          activeCellIndex: action.index,
+          highlightedValue: newHighlightedValue,
+          lastError: null,
+        },
       }
     }
 
     case 'SET_INPUT_MODE':
-      return { ...baseState, inputMode: action.mode }
+      return { ...state, ui: { ...state.ui, inputMode: action.mode, lastError: null } }
 
     case 'CLEAR_ERROR':
-      return { ...state, lastError: null }
+      return { ...state, ui: { ...state.ui, lastError: null } }
 
     case 'SET_HIGHLIGHTED_VALUE':
-      return { ...baseState, highlightedValue: action.value }
+      return {
+        ...state,
+        ui: { ...state.ui, highlightedValue: action.value, lastError: null },
+      }
 
     default:
       return state
   }
+}
+
+/**
+ * The main reducer for the Sudoku game. It wraps the core logic with derived state calculation.
+ *
+ * @param state - The current state.
+ * @param action - The action to perform.
+ * @returns The new state.
+ */
+export function sudokuReducer(
+  state: SudokuState,
+  action: SudokuAction,
+): SudokuState {
+  const newState = produceNewState(state, action)
+
+  // If the board instance has changed, recalculate derived state.
+  if (newState.board !== state.board) {
+    return {
+      ...newState,
+      derived: getDerivedBoardState(newState.board),
+    }
+  }
+
+  return newState
 }

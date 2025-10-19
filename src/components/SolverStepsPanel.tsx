@@ -60,8 +60,9 @@ const getStepExplanation = (step: SolvingStep): string => {
  * It allows the user to navigate through the steps and see the board state at each point.
  */
 export function SolverStepsPanel() {
-  const { solverSteps, currentStepIndex } = useSudokuState()
+  const { solver } = useSudokuState()
   const { viewSolverStep } = useSudokuActions()
+  const { steps, currentStepIndex } = solver
 
   const handleStepSelect = useCallback(
     (index: number) => {
@@ -80,7 +81,7 @@ export function SolverStepsPanel() {
     }
   }
 
-  if (solverSteps.length === 0) {
+  if (steps.length === 0) {
     return null
   }
 
@@ -109,7 +110,7 @@ export function SolverStepsPanel() {
           value={activeAccordionItem}
           onValueChange={handleAccordionChange}
         >
-          {solverSteps.map((step, index) => (
+          {steps.map((step, index) => (
             <AccordionItem key={index} value={index.toString()}>
               <AccordionTrigger>
                 Step {index + 1}: {step.technique}
@@ -122,14 +123,10 @@ export function SolverStepsPanel() {
         </Accordion>
       </ScrollArea>
       <Button
-        variant={
-          currentStepIndex === solverSteps.length ? 'secondary' : 'ghost'
-        }
-        data-state={
-          currentStepIndex === solverSteps.length ? 'active' : 'inactive'
-        }
+        variant={currentStepIndex === steps.length ? 'secondary' : 'ghost'}
+        data-state={currentStepIndex === steps.length ? 'active' : 'inactive'}
         size="sm"
-        onClick={() => handleStepSelect(solverSteps.length)}
+        onClick={() => handleStepSelect(steps.length)}
       >
         Solution
       </Button>

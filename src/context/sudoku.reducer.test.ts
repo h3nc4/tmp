@@ -24,7 +24,12 @@ import {
   loadInitialState,
 } from './sudoku.reducer'
 import type { SudokuAction } from './sudoku.actions.types'
-import type { BoardState, SudokuState, SolvingStep } from './sudoku.types'
+import type {
+  BoardState,
+  SudokuState,
+  SolvingStep,
+  SavedGameState,
+} from './sudoku.types'
 import { getRelatedCellIndices } from '@/lib/utils'
 
 describe('sudokuReducer', () => {
@@ -44,10 +49,10 @@ describe('sudokuReducer', () => {
 
         expect(newState.board[0].value).toBe(5)
         expect(newState.board[0].candidates.size).toBe(0)
-        expect(newState.history).toHaveLength(2)
-        expect(newState.historyIndex).toBe(1)
-        expect(newState.isSolved).toBe(false)
-        expect(newState.solveFailed).toBe(false)
+        expect(newState.history.stack).toHaveLength(2)
+        expect(newState.history.index).toBe(1)
+        expect(newState.solver.isSolved).toBe(false)
+        expect(newState.solver.solveFailed).toBe(false)
       })
 
       it('should return original state if value is already set', () => {
@@ -56,14 +61,14 @@ describe('sudokuReducer', () => {
           index: 0,
           value: 5,
         })
-        const historyLength = stateWithValue.history.length
+        const historyLength = stateWithValue.history.stack.length
         const newState = sudokuReducer(stateWithValue, {
           type: 'SET_CELL_VALUE',
           index: 0,
           value: 5,
         })
         expect(newState).toBe(stateWithValue)
-        expect(newState.history.length).toBe(historyLength)
+        expect(newState.history.stack.length).toBe(historyLength)
       })
 
       it('should clear related pencil marks (candidates and centers)', () => {
@@ -100,15 +105,15 @@ describe('sudokuReducer', () => {
           index: 1,
           value: 2,
         })
-        state = sudokuReducer(state, { type: 'UNDO' }) // historyIndex is now 1
+        state = sudokuReducer(state, { type: 'UNDO' }) // history.index is now 1
 
         const newState = sudokuReducer(state, {
           type: 'SET_CELL_VALUE',
           index: 2,
           value: 3,
         })
-        expect(newState.history).toHaveLength(3) // [empty, {0:1}, {0:1, 2:3}]
-        expect(newState.historyIndex).toBe(2)
+        expect(newState.history.stack).toHaveLength(3) // [empty, {0:1}, {0:1, 2:3}]
+        expect(newState.history.index).toBe(2)
         expect(newState.board[1].value).toBe(null) // The undone move is gone
       })
     })
@@ -215,86 +220,97 @@ describe('sudokuReducer', () => {
         expect(newState.board[0].value).toBeNull()
         expect(newState.board[0].candidates.size).toBe(0)
         expect(newState.board[0].centers.size).toBe(0)
-        expect(newState.historyIndex).toBe(2)
+        expect(newState.history.index).toBe(2)
       })
 
       it('should return original state if cell is already empty', () => {
         const state = sudokuReducer(initialState, { type: 'ERASE_CELL', index: 0 })
         expect(state).toBe(initialState)
-        expect(state.history.length).toBe(1)
+        expect(state.history.stack.length).toBe(1)
       })
     })
 
     describe('CLEAR_BOARD', () => {
-      it('should reset the board and active cell', () => {
+      it('should reset the board and ui state', () => {
         let state: SudokuState = sudokuReducer(initialState, {
           type: 'SET_CELL_VALUE',
           index: 0,
           value: 5,
         })
-        state = { ...state, activeCellIndex: 0, highlightedValue: 5 }
+        state = {
+          ...state,
+          ui: { ...state.ui, activeCellIndex: 0, highlightedValue: 5 },
+        }
         const action: SudokuAction = { type: 'CLEAR_BOARD' }
         const newState = sudokuReducer(state, action)
         expect(newState.board).toEqual(createEmptyBoard())
-        expect(newState.activeCellIndex).toBe(null)
-        expect(newState.highlightedValue).toBe(null)
+        expect(newState.ui.activeCellIndex).toBe(null)
+        expect(newState.ui.highlightedValue).toBe(null)
         // History should now be [initial, move, clear]
-        expect(newState.history).toHaveLength(3)
-        expect(newState.history[2]).toEqual(createEmptyBoard())
+        expect(newState.history.stack).toHaveLength(3)
+        expect(newState.history.stack[2]).toEqual(createEmptyBoard())
       })
 
       it('should return original state if board is already empty', () => {
         const state = sudokuReducer(initialState, { type: 'CLEAR_BOARD' })
         expect(state).toBe(initialState)
-        expect(state.history.length).toBe(1)
+        expect(state.history.stack.length).toBe(1)
       })
 
       it('should exit visualization mode when cleared', () => {
         const visualizingState: SudokuState = {
           ...initialState,
-          gameMode: 'visualizing',
-          board: initialState.board.map(c => ({ ...c, value: 1 })), // Make it not empty
-        };
-        const newState = sudokuReducer(visualizingState, { type: 'CLEAR_BOARD' });
-        expect(newState.gameMode).toBe('playing');
-        expect(newState.isBoardEmpty).toBe(true);
-      });
+          solver: { ...initialState.solver, gameMode: 'visualizing' },
+          board: initialState.board.map((c) => ({ ...c, value: 1 })), // Make it not empty
+        }
+        const newState = sudokuReducer(visualizingState, { type: 'CLEAR_BOARD' })
+        expect(newState.solver.gameMode).toBe('playing')
+        expect(newState.derived.isBoardEmpty).toBe(true)
+      })
     })
 
     describe('History (UNDO/REDO)', () => {
       const stateWithHistory: SudokuState = {
         ...initialState,
-        history: [
-          createEmptyBoard(),
-          createEmptyBoard().map((c, i) => (i === 0 ? { ...c, value: 1 } : c)),
-          createEmptyBoard().map((c, i) => (i === 0 ? { ...c, value: 2 } : c)),
-        ],
-        historyIndex: 2,
+        history: {
+          stack: [
+            createEmptyBoard(),
+            createEmptyBoard().map((c, i) => (i === 0 ? { ...c, value: 1 } : c)),
+            createEmptyBoard().map((c, i) => (i === 0 ? { ...c, value: 2 } : c)),
+          ],
+          index: 2,
+        },
       }
 
       it('should UNDO to the previous state', () => {
         const newState = sudokuReducer(stateWithHistory, { type: 'UNDO' })
-        expect(newState.historyIndex).toBe(1)
-        expect(newState.board).toEqual(stateWithHistory.history[1])
-        expect(newState.solveFailed).toBe(false) // Can solve again after undo
+        expect(newState.history.index).toBe(1)
+        expect(newState.board).toEqual(stateWithHistory.history.stack[1])
+        expect(newState.solver.solveFailed).toBe(false) // Can solve again after undo
       })
 
       it('should not UNDO past the beginning of history', () => {
-        const stateAtStart: SudokuState = { ...stateWithHistory, historyIndex: 0 }
+        const stateAtStart: SudokuState = {
+          ...stateWithHistory,
+          history: { ...stateWithHistory.history, index: 0 },
+        }
         const newState = sudokuReducer(stateAtStart, { type: 'UNDO' })
-        expect(newState.historyIndex).toBe(0)
+        expect(newState.history.index).toBe(0)
       })
 
       it('should REDO to the next state', () => {
-        const stateInMiddle: SudokuState = { ...stateWithHistory, historyIndex: 1 }
+        const stateInMiddle: SudokuState = {
+          ...stateWithHistory,
+          history: { ...stateWithHistory.history, index: 1 },
+        }
         const newState = sudokuReducer(stateInMiddle, { type: 'REDO' })
-        expect(newState.historyIndex).toBe(2)
-        expect(newState.board).toEqual(stateWithHistory.history[2])
+        expect(newState.history.index).toBe(2)
+        expect(newState.board).toEqual(stateWithHistory.history.stack[2])
       })
 
       it('should not REDO past the end of history', () => {
         const newState = sudokuReducer(stateWithHistory, { type: 'REDO' })
-        expect(newState.historyIndex).toBe(2)
+        expect(newState.history.index).toBe(2)
       })
 
       it('should prune history when it exceeds the maximum size', () => {
@@ -309,17 +325,17 @@ describe('sudokuReducer', () => {
             value: ((state.board[0].value ?? 0) % 9) + 1 as 1, // Cycle through 1-9
           })
         }
-        expect(state.history.length).toBe(MAX_HISTORY_ENTRIES)
-        expect(state.historyIndex).toBe(MAX_HISTORY_ENTRIES - 1)
+        expect(state.history.stack.length).toBe(MAX_HISTORY_ENTRIES)
+        expect(state.history.index).toBe(MAX_HISTORY_ENTRIES - 1)
         // Check that the first entry is no longer the initial empty board
-        expect(state.history[0]).not.toEqual(createEmptyBoard())
+        expect(state.history.stack[0]).not.toEqual(createEmptyBoard())
       })
     })
 
     describe('Solver Actions', () => {
       it('should set solving state on SOLVE_START', () => {
         const state = sudokuReducer(initialState, { type: 'SOLVE_START' })
-        expect(state.isSolving).toBe(true)
+        expect(state.solver.isSolving).toBe(true)
         expect(state.initialBoard).toEqual(initialState.board)
       })
 
@@ -337,23 +353,29 @@ describe('sudokuReducer', () => {
           solution: solvedBoardString,
         }
 
-        const state: SudokuState = { ...initialState, isSolving: true, initialBoard: createEmptyBoard().map((c, i) => i === 0 ? c : { ...c, value: (i % 9) + 1 }) }
+        const state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, isSolving: true },
+          initialBoard: createEmptyBoard().map((c, i) =>
+            i === 0 ? c : { ...c, value: (i % 9) + 1 },
+          ),
+        }
         const newState = sudokuReducer(state, {
           type: 'SOLVE_SUCCESS',
           result: mockResult,
         })
 
-        expect(newState.isSolving).toBe(false)
-        expect(newState.isSolved).toBe(true)
-        expect(newState.gameMode).toBe('visualizing')
-        expect(newState.solverSteps[0]).toEqual(mockResult.steps[0])
-        expect(newState.currentStepIndex).toBe(newState.solverSteps.length)
-        expect(newState.visualizationBoard?.[0].value).toBe(1)
+        expect(newState.solver.isSolving).toBe(false)
+        expect(newState.solver.isSolved).toBe(true)
+        expect(newState.solver.gameMode).toBe('visualizing')
+        expect(newState.solver.steps[0]).toEqual(mockResult.steps[0])
+        expect(newState.solver.currentStepIndex).toBe(newState.solver.steps.length)
+        expect(newState.solver.visualizationBoard?.[0].value).toBe(1)
         expect(newState.board[0].value).toBe(1)
       })
 
       it('should handle SOLVE_SUCCESS and add a backtracking step if needed', () => {
-        const solvedBoardString = '12' + '.'.repeat(79); // A full solution string
+        const solvedBoardString = '12' + '.'.repeat(79) // A full solution string
         const mockResult = {
           steps: [
             {
@@ -365,30 +387,38 @@ describe('sudokuReducer', () => {
           ],
           solution: solvedBoardString,
         }
-        const state: SudokuState = { ...initialState, isSolving: true }
-        const newState = sudokuReducer(state, { type: 'SOLVE_SUCCESS', result: mockResult });
+        const state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, isSolving: true },
+        }
+        const newState = sudokuReducer(state, { type: 'SOLVE_SUCCESS', result: mockResult })
 
-        expect(newState.solverSteps.length).toBe(2);
-        expect(newState.solverSteps[1].technique).toBe('Backtracking');
-        expect(newState.currentStepIndex).toBe(2);
+        expect(newState.solver.steps.length).toBe(2)
+        expect(newState.solver.steps[1].technique).toBe('Backtracking')
+        expect(newState.solver.currentStepIndex).toBe(2)
       })
 
-
       it('should handle SOLVE_SUCCESS with no solution string', () => {
-        const state: SudokuState = { ...initialState, isSolving: true }
+        const state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, isSolving: true },
+        }
         const newState = sudokuReducer(state, {
           type: 'SOLVE_SUCCESS',
           result: { steps: [], solution: null },
         })
-        expect(newState.isSolving).toBe(false)
-        expect(newState.solveFailed).toBe(true)
+        expect(newState.solver.isSolving).toBe(false)
+        expect(newState.solver.solveFailed).toBe(true)
       })
 
       it('should handle SOLVE_FAILURE', () => {
-        const state: SudokuState = { ...initialState, isSolving: true }
+        const state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, isSolving: true },
+        }
         const newState = sudokuReducer(state, { type: 'SOLVE_FAILURE' })
-        expect(newState.isSolving).toBe(false)
-        expect(newState.solveFailed).toBe(true)
+        expect(newState.solver.isSolving).toBe(false)
+        expect(newState.solver.solveFailed).toBe(true)
       })
     })
 
@@ -419,18 +449,21 @@ describe('sudokuReducer', () => {
       )
       // This represents the final solved board state.
       const solvedBoardForTest = createEmptyBoard().map((c, i) => {
-        if (i === 0) return { ...c, value: 1 };
-        if (i === 2) return { ...c, value: 3 };
-        if (i === 80) return { ...c, value: 9 };
-        return c;
-      });
+        if (i === 0) return { ...c, value: 1 }
+        if (i === 2) return { ...c, value: 3 }
+        if (i === 80) return { ...c, value: 9 }
+        return c
+      })
 
       const visualizingState: SudokuState = {
         ...initialState,
-        gameMode: 'visualizing',
         initialBoard,
-        solverSteps: steps,
         board: solvedBoardForTest, // The `board` property holds the solution
+        solver: {
+          ...initialState.solver,
+          gameMode: 'visualizing',
+          steps,
+        },
       }
 
       it('should handle VIEW_SOLVER_STEP correctly, applying previous steps and calculating candidates', () => {
@@ -440,49 +473,49 @@ describe('sudokuReducer', () => {
           index: 2,
         })
 
-        expect(state.currentStepIndex).toBe(2)
+        expect(state.solver.currentStepIndex).toBe(2)
 
         // --- Check the visualization board (state AFTER step 2 placements) ---
-        expect(state.visualizationBoard).not.toBeNull()
+        expect(state.solver.visualizationBoard).not.toBeNull()
         // Placement from step 1 should be applied
-        expect(state.visualizationBoard?.[0].value).toBe(1)
+        expect(state.solver.visualizationBoard?.[0].value).toBe(1)
         // Placement from step 2 should be applied
-        expect(state.visualizationBoard?.[2].value).toBe(3)
+        expect(state.solver.visualizationBoard?.[2].value).toBe(3)
         // Initial value should persist
-        expect(state.visualizationBoard?.[80].value).toBe(9)
+        expect(state.solver.visualizationBoard?.[80].value).toBe(9)
         // Other cells should be null
-        expect(state.visualizationBoard?.[1].value).toBeNull()
+        expect(state.solver.visualizationBoard?.[1].value).toBeNull()
 
         // --- Check the candidates (state BEFORE step 2) ---
-        expect(state.candidatesForViz).not.toBeNull()
+        expect(state.solver.candidatesForViz).not.toBeNull()
         // The cell for step 1's placement should have no candidates
-        expect(state.candidatesForViz?.[0]).toBeNull()
+        expect(state.solver.candidatesForViz?.[0]).toBeNull()
         // A peer of step 1's placement (e.g., cell 1) should not have 1 as a candidate
-        expect(state.candidatesForViz?.[1]?.has(1)).toBe(false)
+        expect(state.solver.candidatesForViz?.[1]?.has(1)).toBe(false)
         // The cell for step 2's placement (cell 2) should still have candidates from before the step was applied
-        expect(state.candidatesForViz?.[2]?.has(3)).toBe(true)
-        expect(state.candidatesForViz?.[2]?.has(4)).toBe(true) // one of the eliminations for this step
+        expect(state.solver.candidatesForViz?.[2]?.has(3)).toBe(true)
+        expect(state.solver.candidatesForViz?.[2]?.has(4)).toBe(true) // one of the eliminations for this step
 
         // --- Check the eliminations (from step 2 itself) ---
-        expect(state.eliminationsForViz).not.toBeNull()
-        expect(state.eliminationsForViz).toEqual(steps[1].eliminations)
+        expect(state.solver.eliminationsForViz).not.toBeNull()
+        expect(state.solver.eliminationsForViz).toEqual(steps[1].eliminations)
       })
 
       it('should handle VIEW_SOLVER_STEP for the initial state (index 0)', () => {
         const state = sudokuReducer(visualizingState, {
           type: 'VIEW_SOLVER_STEP',
           index: 0,
-        });
+        })
 
-        expect(state.currentStepIndex).toBe(0);
+        expect(state.solver.currentStepIndex).toBe(0)
         // Board should be the initial board
-        expect(state.visualizationBoard?.[80].value).toBe(9);
-        expect(state.visualizationBoard?.[0].value).toBeNull();
+        expect(state.solver.visualizationBoard?.[80].value).toBe(9)
+        expect(state.solver.visualizationBoard?.[0].value).toBeNull()
         // No eliminations to show for the initial state
-        expect(state.eliminationsForViz).toEqual([]);
+        expect(state.solver.eliminationsForViz).toEqual([])
         // Candidates should be the initial candidates
-        expect(state.candidatesForViz?.[0]?.size).toBeGreaterThan(1);
-      });
+        expect(state.solver.candidatesForViz?.[0]?.size).toBeGreaterThan(1)
+      })
 
       it('should show the final solved board when viewing the last step after backtracking', () => {
         // Setup a state where the solver used logic then backtracked
@@ -505,8 +538,11 @@ describe('sudokuReducer', () => {
 
         const visualizingStateWithBacktrack: SudokuState = {
           ...visualizingState,
-          solverSteps: [logicalStep, backtrackingStep],
           board: solvedBoard, // The real solution
+          solver: {
+            ...visualizingState.solver,
+            steps: [logicalStep, backtrackingStep],
+          },
         }
 
         // 1. View the first logical step
@@ -516,8 +552,8 @@ describe('sudokuReducer', () => {
         })
 
         // The visualization board should only have the first placement
-        expect(stateAfterStep1.visualizationBoard?.[0].value).toBe(1)
-        expect(stateAfterStep1.visualizationBoard?.[1].value).toBeNull()
+        expect(stateAfterStep1.solver.visualizationBoard?.[0].value).toBe(1)
+        expect(stateAfterStep1.solver.visualizationBoard?.[1].value).toBeNull()
 
         // 2. Now, view the solution (step index 2)
         const stateAfterFinalStep = sudokuReducer(stateAfterStep1, {
@@ -526,12 +562,15 @@ describe('sudokuReducer', () => {
         })
 
         // The visualization board should now be the fully solved board
-        expect(stateAfterFinalStep.visualizationBoard).toEqual(solvedBoard)
-        expect(stateAfterFinalStep.currentStepIndex).toBe(2)
+        expect(stateAfterFinalStep.solver.visualizationBoard).toEqual(solvedBoard)
+        expect(stateAfterFinalStep.solver.currentStepIndex).toBe(2)
       })
 
       it('should do nothing if not in visualizing mode', () => {
-        const state: SudokuState = { ...initialState, gameMode: 'playing' }
+        const state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, gameMode: 'playing' },
+        }
         const newState = sudokuReducer(state, {
           type: 'VIEW_SOLVER_STEP',
           index: 1,
@@ -541,14 +580,14 @@ describe('sudokuReducer', () => {
 
       it('should handle EXIT_VISUALIZATION', () => {
         const state = sudokuReducer(visualizingState, { type: 'EXIT_VISUALIZATION' })
-        expect(state.gameMode).toBe('playing')
+        expect(state.solver.gameMode).toBe('playing')
         expect(state.board).toEqual(initialBoard)
-        expect(state.isSolved).toBe(false)
-        expect(state.solverSteps).toEqual([])
-        expect(state.currentStepIndex).toBeNull()
-        expect(state.visualizationBoard).toBeNull()
-        expect(state.candidatesForViz).toBeNull()
-        expect(state.eliminationsForViz).toBeNull()
+        expect(state.solver.isSolved).toBe(false)
+        expect(state.solver.steps).toEqual([])
+        expect(state.solver.currentStepIndex).toBeNull()
+        expect(state.solver.visualizationBoard).toBeNull()
+        expect(state.solver.candidatesForViz).toBeNull()
+        expect(state.solver.eliminationsForViz).toBeNull()
       })
     })
 
@@ -559,28 +598,30 @@ describe('sudokuReducer', () => {
           index: 10,
           value: 7,
         })
-        stateWithValue = { ...stateWithValue, highlightedValue: null } // reset highlight
+        stateWithValue = {
+          ...stateWithValue,
+          ui: { ...stateWithValue.ui, highlightedValue: null },
+        } // reset highlight
 
         const newState = sudokuReducer(stateWithValue, {
           type: 'SET_ACTIVE_CELL',
           index: 10,
         })
-        expect(newState.activeCellIndex).toBe(10)
-        expect(newState.highlightedValue).toBe(7)
+        expect(newState.ui.activeCellIndex).toBe(10)
+        expect(newState.ui.highlightedValue).toBe(7)
       })
 
       it('should set active cell to null and clear highlighted value', () => {
         const stateWithActiveCell: SudokuState = {
           ...initialState,
-          activeCellIndex: 10,
-          highlightedValue: 7,
+          ui: { ...initialState.ui, activeCellIndex: 10, highlightedValue: 7 },
         }
         const newState = sudokuReducer(stateWithActiveCell, {
           type: 'SET_ACTIVE_CELL',
           index: null,
         })
-        expect(newState.activeCellIndex).toBe(null)
-        expect(newState.highlightedValue).toBe(null)
+        expect(newState.ui.activeCellIndex).toBe(null)
+        expect(newState.ui.highlightedValue).toBe(null)
       })
 
       it('should set input mode', () => {
@@ -588,13 +629,16 @@ describe('sudokuReducer', () => {
           type: 'SET_INPUT_MODE',
           mode: 'candidate',
         })
-        expect(newState.inputMode).toBe('candidate')
+        expect(newState.ui.inputMode).toBe('candidate')
       })
 
       it('should clear the last error', () => {
-        const stateWithError: SudokuState = { ...initialState, lastError: 'Some error' }
+        const stateWithError: SudokuState = {
+          ...initialState,
+          ui: { ...initialState.ui, lastError: 'Some error' },
+        }
         const newState = sudokuReducer(stateWithError, { type: 'CLEAR_ERROR' })
-        expect(newState.lastError).toBeNull()
+        expect(newState.ui.lastError).toBeNull()
       })
 
       it('should set the highlighted value', () => {
@@ -602,7 +646,7 @@ describe('sudokuReducer', () => {
           type: 'SET_HIGHLIGHTED_VALUE',
           value: 5,
         })
-        expect(newState.highlightedValue).toBe(5)
+        expect(newState.ui.highlightedValue).toBe(5)
       })
     })
 
@@ -613,20 +657,23 @@ describe('sudokuReducer', () => {
           index: 0,
           value: 5,
         })
-        expect(state.isBoardEmpty).toBe(false)
-        expect(state.isBoardFull).toBe(false)
-        expect(state.conflicts.size).toBe(0)
+        expect(state.derived.isBoardEmpty).toBe(false)
+        expect(state.derived.isBoardFull).toBe(false)
+        expect(state.derived.conflicts.size).toBe(0)
 
         state = sudokuReducer(state, { type: 'SET_CELL_VALUE', index: 1, value: 5 })
-        expect(state.conflicts.size).toBe(2)
-        expect(state.conflicts.has(0)).toBe(true)
-        expect(state.conflicts.has(1)).toBe(true)
+        expect(state.derived.conflicts.size).toBe(2)
+        expect(state.derived.conflicts.has(0)).toBe(true)
+        expect(state.derived.conflicts.has(1)).toBe(true)
       })
 
       it('should reset solveFailed state on any board modifying action', () => {
-        let state: SudokuState = { ...initialState, solveFailed: true }
+        let state: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, solveFailed: true },
+        }
         state = sudokuReducer(state, { type: 'SET_CELL_VALUE', index: 0, value: 1 })
-        expect(state.solveFailed).toBe(false)
+        expect(state.solver.solveFailed).toBe(false)
       })
     })
 
@@ -677,9 +724,11 @@ describe('loadInitialState', () => {
     const boardWithPencilMarks: BoardState = createEmptyBoard().map((cell, index) =>
       index === 0 ? { ...cell, candidates: new Set([1, 2, 3]) } : cell,
     )
-    const savedState = {
-      history: [boardWithPencilMarks],
-      historyIndex: 0,
+    const savedState: SavedGameState = {
+      history: {
+        stack: [boardWithPencilMarks],
+        index: 0,
+      },
     }
 
     function replacer(_key: string, value: unknown) {
@@ -692,11 +741,11 @@ describe('loadInitialState', () => {
     localStorageMock.getItem.mockReturnValue(JSON.stringify(savedState, replacer))
     const state = loadInitialState()
 
-    expect(state.historyIndex).toBe(0)
+    expect(state.history.index).toBe(0)
     expect(state.board[0].candidates).toBeInstanceOf(Set)
     expect(state.board[0].candidates).toEqual(new Set([1, 2, 3]))
     expect(state.board[1].candidates.size).toBe(0)
-    expect(state.isBoardEmpty).toBe(true)
+    expect(state.derived.isBoardEmpty).toBe(true) // no .value properties were set
   })
 
   it('should handle JSON parsing errors gracefully', () => {
@@ -718,8 +767,8 @@ describe('loadInitialState', () => {
     expect(state).toEqual(initialState)
   })
 
-  it('should return initial state if saved history is empty', () => {
-    const malformedData = { history: [], historyIndex: 0 }
+  it('should return initial state if saved history stack is empty', () => {
+    const malformedData: SavedGameState = { history: { stack: [], index: 0 } }
     localStorageMock.getItem.mockReturnValue(JSON.stringify(malformedData))
     const state = loadInitialState()
     expect(state).toEqual(initialState)

@@ -81,7 +81,10 @@ describe('App component', () => {
   const mockEraseActiveCell = vi.fn()
   const defaultState: SudokuState = {
     ...initialState,
-    activeCellIndex: 5,
+    ui: {
+      ...initialState.ui,
+      activeCellIndex: 5,
+    },
   }
 
   beforeEach(() => {
@@ -113,7 +116,10 @@ describe('App component', () => {
   it('renders the SolverStepsPanel in visualizing mode', () => {
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
-      gameMode: 'visualizing',
+      solver: {
+        ...defaultState.solver,
+        gameMode: 'visualizing',
+      },
     })
     render(<App />)
     expect(screen.getByTestId('solver-steps-panel')).toBeInTheDocument()
@@ -131,7 +137,10 @@ describe('App component', () => {
   })
 
   it('disables erase button when no cell is active', () => {
-    mockUseSudokuState.mockReturnValue({ ...initialState, activeCellIndex: null })
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      ui: { ...initialState.ui, activeCellIndex: null },
+    })
     render(<App />)
     expect(
       screen.getByRole('button', { name: 'Erase selected cell' }),
@@ -139,7 +148,10 @@ describe('App component', () => {
   })
 
   it('disables erase button when in visualizing mode', () => {
-    mockUseSudokuState.mockReturnValue({ ...defaultState, gameMode: 'visualizing' })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, gameMode: 'visualizing' },
+    })
     render(<App />)
     expect(
       screen.getByRole('button', { name: 'Erase selected cell' }),

@@ -27,37 +27,35 @@ import { useSudokuActions } from '@/hooks/useSudokuActions'
  * It derives its state and tooltip from the global context.
  */
 export function SolveButton() {
-  const {
-    isSolving,
-    solveFailed,
-    conflicts,
-    isBoardEmpty,
-    isBoardFull,
-    gameMode,
-  } = useSudokuState()
+  const { solver, derived } = useSudokuState()
   const { solve, exitVisualization } = useSudokuActions()
 
   const [isShowingSolvingState, setIsShowingSolvingState] = useState(false)
   const solveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isSolveDisabled =
-    isSolving ||
-    isBoardEmpty ||
-    isBoardFull ||
-    conflicts.size > 0 ||
-    solveFailed
+    solver.isSolving ||
+    derived.isBoardEmpty ||
+    derived.isBoardFull ||
+    derived.conflicts.size > 0 ||
+    solver.solveFailed
 
   const solveButtonTitle = useMemo(() => {
-    if (conflicts.size > 0) return 'Cannot solve with conflicts.'
-    if (isBoardFull) return 'Board is already full.'
-    if (isBoardEmpty) return 'Board is empty.'
-    if (solveFailed)
+    if (derived.conflicts.size > 0) return 'Cannot solve with conflicts.'
+    if (derived.isBoardFull) return 'Board is already full.'
+    if (derived.isBoardEmpty) return 'Board is empty.'
+    if (solver.solveFailed)
       return 'Solving failed. Please change the board to try again.'
     return 'Solve the puzzle'
-  }, [isBoardEmpty, isBoardFull, conflicts.size, solveFailed])
+  }, [
+    derived.isBoardEmpty,
+    derived.isBoardFull,
+    derived.conflicts.size,
+    solver.solveFailed,
+  ])
 
   useEffect(() => {
-    if (isSolving) {
+    if (solver.isSolving) {
       solveTimerRef.current = setTimeout(() => {
         setIsShowingSolvingState(true)
       }, 500)
@@ -72,9 +70,9 @@ export function SolveButton() {
         clearTimeout(solveTimerRef.current)
       }
     }
-  }, [isSolving])
+  }, [solver.isSolving])
 
-  if (gameMode === 'visualizing') {
+  if (solver.gameMode === 'visualizing') {
     return (
       <Button onClick={exitVisualization} className="flex-1" variant="destructive">
         <X className="mr-2 size-4" />

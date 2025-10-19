@@ -28,15 +28,15 @@ import { toast } from 'sonner'
  * It derives its enabled/disabled state from the global context.
  */
 export function ClearButton() {
-  const { isSolving, isBoardEmpty } = useSudokuState()
+  const { solver, derived } = useSudokuState()
   const { clearBoard } = useSudokuActions()
 
-  const isClearDisabled = isSolving || isBoardEmpty
+  const isClearDisabled = solver.isSolving || derived.isBoardEmpty
 
   const clearButtonTitle = useMemo(() => {
-    if (isBoardEmpty) return 'Board is already empty.'
+    if (derived.isBoardEmpty) return 'Board is already empty.'
     return 'Clear the board'
-  }, [isBoardEmpty])
+  }, [derived.isBoardEmpty])
 
   const handleClear = () => {
     clearBoard()

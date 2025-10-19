@@ -77,8 +77,14 @@ describe('SudokuGrid component', () => {
   }
   const defaultState: SudokuState = {
     ...initialState,
-    activeCellIndex: 0,
-    visualizationBoard: initialState.board, // ensure it's not null
+    ui: {
+      ...initialState.ui,
+      activeCellIndex: 0,
+    },
+    solver: {
+      ...initialState.solver,
+      visualizationBoard: initialState.board, // ensure it's not null
+    },
   }
 
   beforeEach(() => {
@@ -96,8 +102,11 @@ describe('SudokuGrid component', () => {
   it('does not render if displayBoard is null', () => {
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
-      gameMode: 'visualizing',
-      visualizationBoard: null,
+      solver: {
+        ...defaultState.solver,
+        gameMode: 'visualizing',
+        visualizationBoard: null,
+      },
     })
     const { container } = render(<SudokuGrid />)
     expect(container.firstChild).toBeNull()
@@ -113,7 +122,10 @@ describe('SudokuGrid component', () => {
   it('does not call setActiveCell when in visualizing mode', () => {
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
-      gameMode: 'visualizing',
+      solver: {
+        ...defaultState.solver,
+        gameMode: 'visualizing',
+      },
     })
     render(<SudokuGrid />)
     const cell10 = screen.getByLabelText('cell-10')
@@ -148,7 +160,10 @@ describe('SudokuGrid component', () => {
   })
 
   it('does not highlight any cells when no cell is active', () => {
-    mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: null })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      ui: { ...defaultState.ui, activeCellIndex: null },
+    })
     render(<SudokuGrid />)
 
     // Check the props of the first rendered cell
@@ -168,7 +183,7 @@ describe('SudokuGrid component', () => {
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
       board: boardWithValues,
-      highlightedValue: 5,
+      ui: { ...defaultState.ui, highlightedValue: 5 },
     })
     render(<SudokuGrid />)
 
@@ -191,7 +206,7 @@ describe('SudokuGrid component', () => {
     it('ignores keyboard input when in visualizing mode', async () => {
       mockUseSudokuState.mockReturnValue({
         ...defaultState,
-        gameMode: 'visualizing',
+        solver: { ...defaultState.solver, gameMode: 'visualizing' },
       })
       const user = userEvent.setup()
       render(<SudokuGrid />)
@@ -235,13 +250,16 @@ describe('SudokuGrid component', () => {
 
       const visualizingState: SudokuState = {
         ...defaultState,
-        gameMode: 'visualizing',
-        // Create a board where cell 0 has a value, but cell 1 and 2 are empty for testing candidates
-        visualizationBoard: initialState.board.map((c, i) =>
-          i === 0 ? { ...c, value: 9 } : c,
-        ),
-        candidatesForViz: mockCandidates,
-        eliminationsForViz: [mockElimination],
+        solver: {
+          ...defaultState.solver,
+          gameMode: 'visualizing',
+          // Create a board where cell 0 has a value, but cell 1 and 2 are empty for testing candidates
+          visualizationBoard: initialState.board.map((c, i) =>
+            i === 0 ? { ...c, value: 9 } : c,
+          ),
+          candidatesForViz: mockCandidates,
+          eliminationsForViz: [mockElimination],
+        },
       }
 
       mockUseSudokuState.mockReturnValue(visualizingState)
@@ -266,10 +284,13 @@ describe('SudokuGrid component', () => {
     it('handles null eliminationsForViz gracefully', () => {
       const visualizingState: SudokuState = {
         ...defaultState,
-        gameMode: 'visualizing',
-        visualizationBoard: initialState.board,
-        candidatesForViz: [],
-        eliminationsForViz: null, // Test this case
+        solver: {
+          ...defaultState.solver,
+          gameMode: 'visualizing',
+          visualizationBoard: initialState.board,
+          candidatesForViz: [],
+          eliminationsForViz: null, // Test this case
+        },
       }
 
       mockUseSudokuState.mockReturnValue(visualizingState)
@@ -290,7 +311,10 @@ describe('SudokuGrid component', () => {
 
     // Rerender with a new active cell index
     act(() => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: 5 })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: 5 },
+      })
     })
     rerender(<SudokuGrid />)
 

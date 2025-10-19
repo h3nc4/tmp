@@ -25,7 +25,7 @@ import type { InputMode } from '@/context/sudoku.types'
  * A toggle group for switching between Normal, Candidate, and Center input modes.
  */
 export function InputModeToggle() {
-  const { inputMode, gameMode } = useSudokuState()
+  const { ui, solver } = useSudokuState()
   const { setInputMode } = useSudokuActions()
 
   const handleModeChange = (value: string) => {
@@ -37,11 +37,11 @@ export function InputModeToggle() {
   return (
     <ToggleGroup
       type="single"
-      value={inputMode}
+      value={ui.inputMode}
       onValueChange={handleModeChange}
       className="flex-1"
       aria-label="Input Mode"
-      disabled={gameMode === 'visualizing'}
+      disabled={solver.gameMode === 'visualizing'}
     >
       <ToggleGroupItem
         value="normal"

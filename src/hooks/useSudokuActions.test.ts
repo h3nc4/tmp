@@ -46,7 +46,10 @@ describe('useSudokuActions', () => {
   const mockDispatch = vi.fn()
   const defaultState: SudokuState = {
     ...initialState,
-    activeCellIndex: 0,
+    ui: {
+      ...initialState.ui,
+      activeCellIndex: 0,
+    },
   }
 
   beforeEach(() => {
@@ -85,7 +88,7 @@ describe('useSudokuActions', () => {
     it('dispatches togglePencilMark in candidate mode', () => {
       mockUseSudokuState.mockReturnValue({
         ...defaultState,
-        inputMode: 'candidate',
+        ui: { ...defaultState.ui, inputMode: 'candidate' },
       })
       const actions = getActions()
       act(() => actions.inputValue(3))
@@ -96,7 +99,10 @@ describe('useSudokuActions', () => {
     })
 
     it('does not dispatch anything if no cell is active', () => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: null })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: null },
+      })
       const actions = getActions()
       act(() => actions.inputValue(5))
 
@@ -113,7 +119,10 @@ describe('useSudokuActions', () => {
     ])(
       'dispatches setActiveCell for direction %s from %i to %i',
       (direction, startIndex, expectedIndex) => {
-        mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: startIndex })
+        mockUseSudokuState.mockReturnValue({
+          ...defaultState,
+          ui: { ...defaultState.ui, activeCellIndex: startIndex },
+        })
         const actions = getActions()
         act(() => actions.navigate(direction as 'right'))
 
@@ -124,7 +133,10 @@ describe('useSudokuActions', () => {
     )
 
     it('does not dispatch if navigation is not possible', () => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: 80 })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: 80 },
+      })
       const actions = getActions()
       act(() => actions.navigate('right'))
 
@@ -132,7 +144,10 @@ describe('useSudokuActions', () => {
     })
 
     it('does not dispatch if no cell is active', () => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: null })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: null },
+      })
       const actions = getActions()
       act(() => actions.navigate('right'))
       expect(mockDispatch).not.toHaveBeenCalled()
@@ -141,7 +156,10 @@ describe('useSudokuActions', () => {
 
   describe('eraseActiveCell', () => {
     it('dispatches eraseCell and moves left for "backspace"', () => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: 1 })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: 1 },
+      })
       const actions = getActions()
       act(() => actions.eraseActiveCell('backspace'))
 
@@ -160,7 +178,10 @@ describe('useSudokuActions', () => {
     })
 
     it('does not dispatch if no cell is active', () => {
-      mockUseSudokuState.mockReturnValue({ ...defaultState, activeCellIndex: null })
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        ui: { ...defaultState.ui, activeCellIndex: null },
+      })
       const actions = getActions()
       act(() => actions.eraseActiveCell('delete'))
       expect(mockDispatch).not.toHaveBeenCalled()

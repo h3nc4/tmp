@@ -64,9 +64,12 @@ describe('SolverStepsPanel component', () => {
   const mockViewSolverStep = vi.fn()
   const defaultState: SudokuState = {
     ...initialState,
-    gameMode: 'visualizing',
-    solverSteps: mockSteps,
-    currentStepIndex: mockSteps.length, // Start at solution
+    solver: {
+      ...initialState.solver,
+      gameMode: 'visualizing',
+      steps: mockSteps,
+      currentStepIndex: mockSteps.length, // Start at solution
+    },
   }
 
   beforeEach(() => {
@@ -78,7 +81,10 @@ describe('SolverStepsPanel component', () => {
   })
 
   it('renders nothing if there are no solver steps', () => {
-    mockUseSudokuState.mockReturnValue({ ...defaultState, solverSteps: [] })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, steps: [] },
+    })
     const { container } = render(<SolverStepsPanel />)
     expect(container.firstChild).toBeNull()
   })
@@ -132,14 +138,20 @@ describe('SolverStepsPanel component', () => {
 
   it('highlights the correct buttons based on currentStepIndex', () => {
     // When viewing step 1 (index 0), its accordion should be active
-    mockUseSudokuState.mockReturnValue({ ...defaultState, currentStepIndex: 1 })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, currentStepIndex: 1 },
+    })
     const { rerender } = render(<SolverStepsPanel />)
 
     const step1Button = screen.getByRole('button', { name: /Step 1: NakedSingle/ })
     expect(step1Button).toHaveAttribute('data-state', 'open')
 
     // When viewing initial state
-    mockUseSudokuState.mockReturnValue({ ...defaultState, currentStepIndex: 0 })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, currentStepIndex: 0 },
+    })
     rerender(<SolverStepsPanel />)
     expect(
       screen.getByRole('button', { name: 'Initial Board State' }),
@@ -151,7 +163,7 @@ describe('SolverStepsPanel component', () => {
     // When viewing final state
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
-      currentStepIndex: mockSteps.length,
+      solver: { ...defaultState.solver, currentStepIndex: mockSteps.length },
     })
     rerender(<SolverStepsPanel />)
     expect(
@@ -164,7 +176,10 @@ describe('SolverStepsPanel component', () => {
 
   it('shows the correct explanation when an accordion item is expanded', async () => {
     // Start with no item selected and mock the state change that would happen on click
-    mockUseSudokuState.mockReturnValue({ ...defaultState, currentStepIndex: 1 })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, currentStepIndex: 1 },
+    })
     const { rerender } = render(<SolverStepsPanel />)
 
     // Now, wait for the content to appear
@@ -178,8 +193,11 @@ describe('SolverStepsPanel component', () => {
     ]
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
-      solverSteps: magicSteps,
-      currentStepIndex: 1,
+      solver: {
+        ...defaultState.solver,
+        steps: magicSteps,
+        currentStepIndex: 1,
+      },
     })
     rerender(<SolverStepsPanel />)
 
@@ -189,7 +207,10 @@ describe('SolverStepsPanel component', () => {
   it('does not call viewSolverStep when an accordion item is closed', async () => {
     const user = userEvent.setup()
     // Start with an item open
-    mockUseSudokuState.mockReturnValue({ ...defaultState, currentStepIndex: 1 })
+    mockUseSudokuState.mockReturnValue({
+      ...defaultState,
+      solver: { ...defaultState.solver, currentStepIndex: 1 },
+    })
     render(<SolverStepsPanel />)
 
     mockViewSolverStep.mockClear()

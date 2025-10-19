@@ -57,8 +57,10 @@ function saveGameState(state: SavedGameState) {
 export function useSudokuPersistence(state: SudokuState) {
   useEffect(() => {
     saveGameState({
-      history: state.history as SavedGameState['history'],
-      historyIndex: state.historyIndex,
+      history: {
+        stack: state.history.stack as SavedGameState['history']['stack'],
+        index: state.history.index,
+      },
     })
-  }, [state.history, state.historyIndex])
+  }, [state.history])
 }

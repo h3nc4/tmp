@@ -46,7 +46,7 @@ describe('useSudokuPersistence', () => {
   beforeEach(() => {
     localStorageMock.clear()
     setItemSpy = vi.spyOn(localStorageMock, 'setItem')
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
@@ -62,15 +62,17 @@ describe('useSudokuPersistence', () => {
       expect.any(String),
     )
     const savedData = JSON.parse(setItemSpy.mock.calls[0][1] as string)
-    expect(savedData.historyIndex).toBe(0)
-    expect(savedData.history).toHaveLength(1)
+    expect(savedData.history.index).toBe(0)
+    expect(savedData.history.stack).toHaveLength(1)
   })
 
   it('should save state to local storage when history changes', () => {
     const updatedState: SudokuState = {
       ...initialState,
-      history: [...initialState.history, initialState.board], // Simulate adding a new state
-      historyIndex: 1,
+      history: {
+        stack: [...initialState.history.stack, initialState.board], // Simulate adding a new state
+        index: 1,
+      },
     }
 
     const { rerender } = renderHook((props) => useSudokuPersistence(props), {
@@ -83,14 +85,14 @@ describe('useSudokuPersistence', () => {
 
     expect(setItemSpy).toHaveBeenCalledTimes(2)
     const savedData = JSON.parse(setItemSpy.mock.calls[1][1] as string)
-    expect(savedData.historyIndex).toBe(1)
-    expect(savedData.history).toHaveLength(2)
+    expect(savedData.history.index).toBe(1)
+    expect(savedData.history.stack).toHaveLength(2)
   })
 
   it('should not save state if only irrelevant props change', () => {
     const updatedState: SudokuState = {
       ...initialState,
-      isSolving: true, // This prop change should not trigger a save
+      solver: { ...initialState.solver, isSolving: true }, // This prop change should not trigger a save
     }
 
     const { rerender } = renderHook((props) => useSudokuPersistence(props), {

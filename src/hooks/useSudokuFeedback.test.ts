@@ -38,7 +38,10 @@ describe('useSudokuFeedback', () => {
   })
 
   it('does not show a toast or dispatch when there is no error', () => {
-    const state: SudokuState = { ...initialState, lastError: null }
+    const state: SudokuState = {
+      ...initialState,
+      ui: { ...initialState.ui, lastError: null },
+    }
     renderHook(() => useSudokuFeedback(state, mockDispatch))
     expect(toast.error).not.toHaveBeenCalled()
     expect(mockDispatch).not.toHaveBeenCalled()
@@ -46,7 +49,10 @@ describe('useSudokuFeedback', () => {
 
   it('shows a toast and dispatches clearError when an error is present', () => {
     const errorMessage = 'Invalid move'
-    const state: SudokuState = { ...initialState, lastError: errorMessage }
+    const state: SudokuState = {
+      ...initialState,
+      ui: { ...initialState.ui, lastError: errorMessage },
+    }
     const { rerender } = renderHook(
       (props) => useSudokuFeedback(props.state, props.dispatch),
       { initialProps: { state, dispatch: mockDispatch } },
@@ -56,7 +62,10 @@ describe('useSudokuFeedback', () => {
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_ERROR' })
 
     // Rerender with the error cleared to ensure the effect doesn't fire again
-    const clearedState = { ...state, lastError: null }
+    const clearedState: SudokuState = {
+      ...state,
+      ui: { ...state.ui, lastError: null },
+    }
     rerender({ state: clearedState, dispatch: mockDispatch })
 
     // The mocks should not be called a second time

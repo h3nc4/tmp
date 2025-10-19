@@ -96,7 +96,10 @@ describe('NumberPad component', () => {
   })
 
   it('disables all number buttons when in visualizing mode', () => {
-    const state: SudokuState = { ...initialState, gameMode: 'visualizing' }
+    const state: SudokuState = {
+      ...initialState,
+      solver: { ...initialState.solver, gameMode: 'visualizing' },
+    }
     mockUseSudokuState.mockReturnValue(state)
     render(<NumberPad />)
 

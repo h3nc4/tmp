@@ -28,30 +28,19 @@ import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import type { CellState } from '@/context/sudoku.types'
 
-interface SudokuGridProps { }
+interface SudokuGridProps {}
 
 /**
  * Renders the 9x9 Sudoku grid container and manages all keyboard interactions.
  * It orchestrates focus management and dispatches actions for cell changes.
  */
-export function SudokuGrid({ }: SudokuGridProps) {
-  const {
-    board,
-    initialBoard,
-    isSolving,
-    isSolved,
-    activeCellIndex,
-    highlightedValue,
-    conflicts,
-    gameMode,
-    visualizationBoard,
-    candidatesForViz,
-    eliminationsForViz,
-  } = useSudokuState()
+export function SudokuGrid({}: SudokuGridProps) {
+  const { board, initialBoard, ui, solver, derived } = useSudokuState()
   const actions = useSudokuActions()
 
-  const displayBoard = gameMode === 'visualizing' ? visualizationBoard : board
-  const isReadOnly = gameMode === 'visualizing' || isSolving
+  const displayBoard =
+    solver.gameMode === 'visualizing' ? solver.visualizationBoard : board
+  const isReadOnly = solver.gameMode === 'visualizing' || solver.isSolving
 
   const cellRefs = useMemo(
     () => Array.from({ length: 81 }, () => createRef<HTMLInputElement>()),
@@ -59,18 +48,18 @@ export function SudokuGrid({ }: SudokuGridProps) {
   )
 
   const highlightedIndices = useMemo(() => {
-    if (activeCellIndex === null) {
+    if (ui.activeCellIndex === null) {
       return new Set<number>()
     }
-    return getRelatedCellIndices(activeCellIndex)
-  }, [activeCellIndex])
+    return getRelatedCellIndices(ui.activeCellIndex)
+  }, [ui.activeCellIndex])
 
   // Effect to declaratively manage focus based on the activeCellIndex state.
   useEffect(() => {
-    if (activeCellIndex !== null && cellRefs[activeCellIndex]?.current) {
-      cellRefs[activeCellIndex].current?.focus()
+    if (ui.activeCellIndex !== null && cellRefs[ui.activeCellIndex]?.current) {
+      cellRefs[ui.activeCellIndex].current?.focus()
     }
-  }, [activeCellIndex, cellRefs])
+  }, [ui.activeCellIndex, cellRefs])
 
   const handleCellFocus = useCallback(
     (index: number) => {
@@ -142,26 +131,26 @@ export function SudokuGrid({ }: SudokuGridProps) {
     >
       {displayBoard.map((_, index) => {
         const isInitial = initialBoard[index]?.value != null
-        const isVisualizing = gameMode === 'visualizing'
+        const isVisualizing = solver.gameMode === 'visualizing'
 
         // In visualization mode, we construct a synthetic cell state for rendering.
         // Otherwise, we use the cell state from the main board.
         const displayCell: CellState = isVisualizing
           ? {
-            value: displayBoard[index].value,
-            // Candidates are from the state *before* the current step.
-            candidates: candidatesForViz?.[index] ?? new Set(),
-            // Center marks are not shown during visualization.
-            centers: new Set(),
-          }
+              value: displayBoard[index].value,
+              // Candidates are from the state *before* the current step.
+              candidates: solver.candidatesForViz?.[index] ?? new Set(),
+              // Center marks are not shown during visualization.
+              centers: new Set(),
+            }
           : displayBoard[index]
 
         const eliminatedCandidates = isVisualizing
           ? new Set(
-            eliminationsForViz
-              ?.filter((e) => e.index === index)
-              .map((e) => e.value),
-          )
+              solver.eliminationsForViz
+                ?.filter((e) => e.index === index)
+                .map((e) => e.value),
+            )
           : undefined
 
         return (
@@ -171,14 +160,14 @@ export function SudokuGrid({ }: SudokuGridProps) {
             index={index}
             cell={displayCell}
             isInitial={isInitial}
-            isSolving={isSolving}
-            isSolved={isSolved}
-            isConflict={conflicts.has(index)}
-            isActive={activeCellIndex === index}
+            isSolving={solver.isSolving}
+            isSolved={solver.isSolved}
+            isConflict={derived.conflicts.has(index)}
+            isActive={ui.activeCellIndex === index}
             isHighlighted={highlightedIndices.has(index)}
             isNumberHighlighted={
               displayCell.value !== null &&
-              displayCell.value === highlightedValue
+              displayCell.value === ui.highlightedValue
             }
             onFocus={handleCellFocus}
             eliminatedCandidates={eliminatedCandidates}

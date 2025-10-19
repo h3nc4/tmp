@@ -46,23 +46,23 @@ export function useSudokuActions() {
 
       /** Inputs a value, respecting the current input mode. */
       inputValue: (value: number) => {
-        if (state.activeCellIndex === null) return
+        if (state.ui.activeCellIndex === null) return
 
-        if (state.inputMode === 'normal') {
-          dispatch(actions.setCellValue(state.activeCellIndex, value))
+        if (state.ui.inputMode === 'normal') {
+          dispatch(actions.setCellValue(state.ui.activeCellIndex, value))
           // Auto-advance focus if the move was valid
           if (
-            isMoveValid(state.board, state.activeCellIndex, value) &&
-            state.activeCellIndex < 80
+            isMoveValid(state.board, state.ui.activeCellIndex, value) &&
+            state.ui.activeCellIndex < 80
           ) {
-            dispatch(actions.setActiveCell(state.activeCellIndex + 1))
+            dispatch(actions.setActiveCell(state.ui.activeCellIndex + 1))
           }
         } else {
           dispatch(
             actions.togglePencilMark(
-              state.activeCellIndex,
+              state.ui.activeCellIndex,
               value,
-              state.inputMode,
+              state.ui.inputMode,
             ),
           )
         }
@@ -70,9 +70,9 @@ export function useSudokuActions() {
 
       /** Navigates the grid from the active cell. */
       navigate: (direction: 'up' | 'down' | 'left' | 'right') => {
-        if (state.activeCellIndex === null) return
+        if (state.ui.activeCellIndex === null) return
         let nextIndex = -1
-        const { activeCellIndex } = state
+        const { activeCellIndex } = state.ui
 
         if (direction === 'right' && activeCellIndex < 80) nextIndex = activeCellIndex + 1
         else if (direction === 'left' && activeCellIndex > 0) nextIndex = activeCellIndex - 1
@@ -86,11 +86,11 @@ export function useSudokuActions() {
 
       /** Erases the active cell's content, with different behaviors for delete/backspace. */
       eraseActiveCell: (mode: 'delete' | 'backspace') => {
-        if (state.activeCellIndex === null) return
-        dispatch(actions.eraseCell(state.activeCellIndex))
+        if (state.ui.activeCellIndex === null) return
+        dispatch(actions.eraseCell(state.ui.activeCellIndex))
 
-        if (mode === 'backspace' && state.activeCellIndex > 0) {
-          dispatch(actions.setActiveCell(state.activeCellIndex - 1))
+        if (mode === 'backspace' && state.ui.activeCellIndex > 0) {
+          dispatch(actions.setActiveCell(state.ui.activeCellIndex - 1))
         }
       },
 

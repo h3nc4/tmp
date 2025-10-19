@@ -45,7 +45,10 @@ describe('ClearButton component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseSudokuState.mockReturnValue({ ...initialState, isBoardEmpty: true })
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      derived: { ...initialState.derived, isBoardEmpty: true },
+    })
     mockUseSudokuActions.mockReturnValue({ clearBoard: mockClearBoard })
   })
 
@@ -57,7 +60,10 @@ describe('ClearButton component', () => {
   })
 
   it('is enabled when board is not empty', () => {
-    mockUseSudokuState.mockReturnValue({ ...initialState, isBoardEmpty: false })
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      derived: { ...initialState.derived, isBoardEmpty: false },
+    })
     render(<ClearButton />)
     expect(
       screen.getByRole('button', { name: 'Clear Board' }),
@@ -66,7 +72,10 @@ describe('ClearButton component', () => {
 
   it('calls clearBoard and shows toast on click', async () => {
     const user = userEvent.setup()
-    mockUseSudokuState.mockReturnValue({ ...initialState, isBoardEmpty: false })
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      derived: { ...initialState.derived, isBoardEmpty: false },
+    })
     render(<ClearButton />)
 
     await user.click(screen.getByRole('button', { name: 'Clear Board' }))
@@ -77,8 +86,8 @@ describe('ClearButton component', () => {
   it('is disabled while solving', () => {
     mockUseSudokuState.mockReturnValue({
       ...initialState,
-      isBoardEmpty: false,
-      isSolving: true,
+      derived: { ...initialState.derived, isBoardEmpty: false },
+      solver: { ...initialState.solver, isSolving: true },
     })
     render(<ClearButton />)
     expect(screen.getByRole('button', { name: 'Clear Board' })).toBeDisabled()

@@ -34,7 +34,7 @@ export function useSudokuFeedback(
   state: SudokuState,
   dispatch: Dispatch<SudokuAction>,
 ) {
-  const { lastError } = state
+  const { lastError } = state.ui
 
   useEffect(() => {
     if (lastError) {

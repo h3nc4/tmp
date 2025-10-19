@@ -33,11 +33,11 @@ import { useSynchronizedHeight } from './hooks/useSynchronizedHeight'
 import { useSudokuActions } from './hooks/useSudokuActions'
 
 function App() {
-  const { activeCellIndex, gameMode } = useSudokuState()
+  const { ui, solver } = useSudokuState()
   const { eraseActiveCell } = useSudokuActions()
 
   const { sourceRef, targetRef } = useSynchronizedHeight(
-    gameMode === 'visualizing',
+    solver.gameMode === 'visualizing',
   )
 
   const handleErase = useCallback(() => {
@@ -79,7 +79,7 @@ function App() {
                   size="icon"
                   onClick={handleErase}
                   disabled={
-                    activeCellIndex === null || gameMode === 'visualizing'
+                    ui.activeCellIndex === null || solver.gameMode === 'visualizing'
                   }
                   title="Erase selected cell"
                   onMouseDown={(e) => e.preventDefault()}
@@ -97,7 +97,7 @@ function App() {
           </div>
 
           {/* Side Panel: Shown only in visualization mode */}
-          {gameMode === 'visualizing' && (
+          {solver.gameMode === 'visualizing' && (
             <div ref={targetRef} className="w-full md:order-1 md:w-64">
               <SolverStepsPanel />
             </div>

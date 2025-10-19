@@ -66,24 +66,30 @@ describe('InputModeToggle component', () => {
   it('does not call setInputMode if the onValueChange callback receives an empty value', async () => {
     const user = userEvent.setup()
     // Start with a mode selected
-    mockUseSudokuState.mockReturnValue({ ...initialState, inputMode: 'candidate' });
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      ui: { ...initialState.ui, inputMode: 'candidate' },
+    })
     render(<InputModeToggle />)
 
-    const candidateButton = screen.getByRole('radio', { name: 'Candidate' });
+    const candidateButton = screen.getByRole('radio', { name: 'Candidate' })
     // This second click simulates deselecting the item, which makes Radix ToggleGroup
     // call onValueChange with an empty string.
-    await user.click(candidateButton);
+    await user.click(candidateButton)
 
     // The handler's guard `if (value)` should prevent calling the action.
-    expect(mockSetInputMode).not.toHaveBeenCalled();
-  });
+    expect(mockSetInputMode).not.toHaveBeenCalled()
+  })
 
   it('is disabled when in visualizing mode', () => {
-    mockUseSudokuState.mockReturnValue({ ...initialState, gameMode: 'visualizing' })
+    mockUseSudokuState.mockReturnValue({
+      ...initialState,
+      solver: { ...initialState.solver, gameMode: 'visualizing' },
+    })
     render(<InputModeToggle />)
 
     // Check that the individual buttons inside the group are disabled.
-    screen.getAllByRole('radio').forEach(button => {
+    screen.getAllByRole('radio').forEach((button) => {
       expect(button).toBeDisabled()
     })
   })

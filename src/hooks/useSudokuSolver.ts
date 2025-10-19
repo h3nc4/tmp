@@ -36,7 +36,8 @@ export function useSudokuSolver(
   dispatch: Dispatch<SudokuAction>,
 ) {
   const workerRef = useRef<Worker | null>(null)
-  const { isSolving, board } = state
+  const { isSolving } = state.solver
+  const { board } = state
 
   // Effect for managing the worker's lifecycle.
   // This runs once on mount to create the worker and once on unmount to terminate it.

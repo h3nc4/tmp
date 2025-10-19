@@ -28,7 +28,7 @@ const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
  * for each number, indicating how many are left to be placed.
  */
 export const NumberPad = memo(function NumberPad() {
-  const { board, gameMode } = useSudokuState()
+  const { board, solver } = useSudokuState()
   const { inputValue, setHighlightedValue } = useSudokuActions()
 
   const numberCounts = useMemo(() => {
@@ -67,7 +67,7 @@ export const NumberPad = memo(function NumberPad() {
             size="icon"
             className="aspect-square h-auto w-full"
             onClick={() => handleNumberClick(num)}
-            disabled={isComplete || gameMode === 'visualizing'}
+            disabled={isComplete || solver.gameMode === 'visualizing'}
             aria-label={`Enter number ${num}`}
             onMouseDown={(e) => e.preventDefault()}
           >

@@ -58,11 +58,13 @@ describe('UndoRedo component', () => {
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
   })
 
-  it('enables Undo button when historyIndex > 0', () => {
+  it('enables Undo button when history.index > 0', () => {
     mockUseSudokuState.mockReturnValue({
       ...initialState,
-      historyIndex: 1,
-      history: [initialState.board, initialState.board], // 2 states
+      history: {
+        index: 1,
+        stack: [initialState.board, initialState.board], // 2 states
+      },
     })
     render(<UndoRedo />)
     expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled()
@@ -72,8 +74,10 @@ describe('UndoRedo component', () => {
   it('enables Redo button when not at the end of history', () => {
     mockUseSudokuState.mockReturnValue({
       ...initialState,
-      historyIndex: 0,
-      history: [initialState.board, initialState.board], // 2 states
+      history: {
+        index: 0,
+        stack: [initialState.board, initialState.board], // 2 states
+      },
     })
     render(<UndoRedo />)
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
@@ -83,9 +87,11 @@ describe('UndoRedo component', () => {
   it('disables both buttons when in visualizing mode, even if history exists', () => {
     const state: SudokuState = {
       ...initialState,
-      historyIndex: 1,
-      history: [initialState.board, initialState.board, initialState.board],
-      gameMode: 'visualizing',
+      history: {
+        index: 1,
+        stack: [initialState.board, initialState.board, initialState.board],
+      },
+      solver: { ...initialState.solver, gameMode: 'visualizing' },
     }
     mockUseSudokuState.mockReturnValue(state)
     render(<UndoRedo />)
@@ -97,8 +103,10 @@ describe('UndoRedo component', () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({
       ...initialState,
-      historyIndex: 1,
-      history: [initialState.board, initialState.board],
+      history: {
+        index: 1,
+        stack: [initialState.board, initialState.board],
+      },
     })
     render(<UndoRedo />)
 
@@ -110,8 +118,10 @@ describe('UndoRedo component', () => {
     const user = userEvent.setup()
     mockUseSudokuState.mockReturnValue({
       ...initialState,
-      historyIndex: 0,
-      history: [initialState.board, initialState.board],
+      history: {
+        index: 0,
+        stack: [initialState.board, initialState.board],
+      },
     })
     render(<UndoRedo />)
 

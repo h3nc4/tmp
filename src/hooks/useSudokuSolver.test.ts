@@ -88,7 +88,10 @@ describe('useSudokuSolver', () => {
   })
 
   it('should post a message to the worker when isSolving becomes true', () => {
-    const solvingState: SudokuState = { ...initialState, isSolving: true }
+    const solvingState: SudokuState = {
+      ...initialState,
+      solver: { ...initialState.solver, isSolving: true },
+    }
     const { rerender } = renderHook(
       (props) => useSudokuSolver(props.state, props.dispatch),
       { initialProps: { state: initialState, dispatch: mockDispatch } },
@@ -182,7 +185,10 @@ describe('useSudokuSolver', () => {
     )
 
     // 3. Now, simulate the user trying to solve.
-    const solvingState: SudokuState = { ...initialState, isSolving: true }
+    const solvingState: SudokuState = {
+      ...initialState,
+      solver: { ...initialState.solver, isSolving: true },
+    }
     rerender({ state: solvingState, dispatch: mockDispatch })
 
     // 4. The second useEffect should now run, see that the workerRef is null, and report the error.

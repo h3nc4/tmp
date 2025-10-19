@@ -60,6 +60,38 @@ export interface SolveResult {
   solution: string | null
 }
 
+// --- State Domain Slices ---
+
+export interface HistoryState {
+  readonly stack: readonly BoardState[]
+  readonly index: number
+}
+
+export interface UiState {
+  readonly activeCellIndex: number | null
+  readonly highlightedValue: number | null
+  readonly inputMode: InputMode
+  readonly lastError: string | null
+}
+
+export interface SolverState {
+  readonly isSolving: boolean
+  readonly isSolved: boolean
+  readonly solveFailed: boolean
+  readonly gameMode: GameMode
+  readonly steps: readonly SolvingStep[]
+  readonly currentStepIndex: number | null
+  readonly visualizationBoard: BoardState | null
+  readonly candidatesForViz: (ReadonlySet<number> | null)[] | null
+  readonly eliminationsForViz: readonly Elimination[] | null
+}
+
+export interface DerivedState {
+  readonly conflicts: ReadonlySet<number>
+  readonly isBoardEmpty: boolean
+  readonly isBoardFull: boolean
+}
+
 /** The complete state of the Sudoku game. */
 export interface SudokuState {
   /** The current state of the 81 Sudoku cells. */
@@ -67,45 +99,19 @@ export interface SudokuState {
   /** The board state as it was when the solver was last initiated. */
   readonly initialBoard: BoardState
   /** A history of board states for undo/redo functionality. */
-  readonly history: readonly BoardState[]
-  /** The current position within the history array. */
-  readonly historyIndex: number
-  /** True if the solver Web Worker is currently processing a puzzle. */
-  readonly isSolving: boolean
-  /** True if the board has been successfully solved by the solver. */
-  readonly isSolved: boolean
-  /** True if the last solve attempt failed. */
-  readonly solveFailed: boolean
-  /** The index of the currently active/focused cell. */
-  readonly activeCellIndex: number | null
-  /** The number value to be highlighted across the board, or null. */
-  readonly highlightedValue: number | null
-  /** The current input mode ('normal', 'candidate', or 'center'). */
-  readonly inputMode: InputMode
-  /** A set of indices for cells with conflicting values. */
-  readonly conflicts: ReadonlySet<number>
-  /** True if the board has no numbers. */
-  readonly isBoardEmpty: boolean
-  /** True if every cell on the board has a number. */
-  readonly isBoardFull: boolean
-  /** A message for the last user-facing error, used for toasts. */
-  readonly lastError: string | null
-  /** The current application mode. */
-  readonly gameMode: GameMode
-  /** The list of logical steps returned by the solver. */
-  readonly solverSteps: readonly SolvingStep[]
-  /** The index of the currently viewed step in visualization mode. */
-  readonly currentStepIndex: number | null
-  /** The calculated board state for the currently viewed step. */
-  readonly visualizationBoard: BoardState | null
-  /** For visualization, the candidates for each cell *before* the current step. */
-  readonly candidatesForViz: (ReadonlySet<number> | null)[] | null
-  /** For visualization, the eliminations from the current step. */
-  readonly eliminationsForViz: readonly Elimination[] | null
+  readonly history: HistoryState
+  /** The current state of the UI. */
+  readonly ui: UiState
+  /** The current state related to the solver and visualization. */
+  readonly solver: SolverState
+  /** State that is calculated based on the current board. */
+  readonly derived: DerivedState
 }
 
 /** The shape of the game state object saved to local storage. */
 export interface SavedGameState {
-  history: BoardState[]
-  historyIndex: number
+  history: {
+    stack: BoardState[]
+    index: number
+  }
 }

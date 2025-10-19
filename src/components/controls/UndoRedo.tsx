@@ -26,12 +26,12 @@ import { useSudokuActions } from '@/hooks/useSudokuActions'
  * It derives its enabled/disabled state from the global context.
  */
 export function UndoRedo() {
-  const { history, historyIndex, gameMode } = useSudokuState()
+  const { history, solver } = useSudokuState()
   const { undo, redo } = useSudokuActions()
 
-  const isVisualizing = gameMode === 'visualizing'
-  const canUndo = historyIndex > 0 && !isVisualizing
-  const canRedo = historyIndex < history.length - 1 && !isVisualizing
+  const isVisualizing = solver.gameMode === 'visualizing'
+  const canUndo = history.index > 0 && !isVisualizing
+  const canRedo = history.index < history.stack.length - 1 && !isVisualizing
 
   return (
     <>
