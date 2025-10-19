@@ -72,8 +72,8 @@ ENV LC_ALL=en_US.UTF-8
 
 # Runtime user
 ARG USER=hookci
-ARG UID=1000
-ARG GID=1000
+ARG UID=1001
+ARG GID=1001
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -175,7 +175,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################## LAYER SQUASHING
-FROM busybox:1.36.0-musl AS final
+FROM python:${PYTHON_VERSION}-slim-trixie AS final
 
 COPY --from=base / /
 COPY --from=node-stage /rootfs/ /
