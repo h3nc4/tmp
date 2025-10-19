@@ -1,104 +1,86 @@
 @startuml classes
 skinparam packageStyle rectangle
 
-package "Presentation (CLI)" <<Layer>> {
-    class HookciCli {
-        + logger : Logger
-        + main()
-        + run_command(args)
+package "Presentation" <<Rectangle>> {
+    class HookciCli <<CLI>> {
+        + init()
+        + run()
+        + migrate()
     }
-    interface Logger <<Interface>> {
-        + info(message)
-        + error(message)
-        + debug(message)
-        + set_level(level)
+
+    class PipelineUI <<UI>> {
+        + handle_event(PipelineEvent)
     }
-    class ConsoleLogger implements Logger {
+
+    class DebugUI <<UI>> {
+        + handle_event(PipelineEvent)
     }
 }
 
-package "Application" <<Layer>> {
-    interface ApplicationService <<Interface>> {
+package "Application" <<Rectangle>> {
+    class ProjectInitService <<Service>> {
         + run()
     }
 
-    abstract class BaseApplicationService implements ApplicationService {
-        - conf : Configuration
-        - conf_handler : ConfigurationHandler
+    class CiExecutionService <<Service>> {
+        + run(hook_type, debug)
     }
 
-    class CiExecutionService extends BaseApplicationService {
-        - docker_service : DockerService
+    class MigrationService <<Service>> {
+        + run()
     }
 
-    class MigrationService extends BaseApplicationService {
-    }
+    package "events" {
+        interface PipelineEvent <<DTO>>
 
-    class ProjectInitializationService extends BaseApplicationService {
-        - git_service : GitService
     }
 }
 
-package "Domain" <<Layer>> {
-    class Configuration {
-        - image : str
-        - dockerfile : str
-        - steps : dict
-        + validate()
-        + get_image_info()
-        + get_test_steps()
-    }
+package "Domain" <<Rectangle>> {
+    class Configuration <<Model>>
 
-    class TestStep {
-        - name : str
-        - command : str
-        - critical : bool
-    }
-
-    Configuration *-- "1..*" TestStep
 }
 
-package "Infrastructure" <<Layer>> {
+package "Infrastructure" <<Rectangle>> {
+    interface IFileSystem <<Interface>>
+    class LocalFileSystem <<Implementation>>
 
-    interface ConfigurationHandler <<Interface>> {
-        + load_conf() : dict
-        + write_def_conf()
-    }
+    interface IScmService <<Interface>>
+    class GitService <<Implementation>>
 
-    abstract class FileSystemService {
-        + write_file(path, content)
-        + file_exists(path) : bool
-        + //--read_conf() : dict--//
-        + //--write_conf(dict)--//
-    }
-    class YamlFileSystemService extends FileSystemService {
-    }
-    class GitService {
-        - fs_service: FileSystemService
-        + install_hooks()
-        + find_git_root() : str
-    }
-    class DockerService {
-        + run_container(image, command) : str
-        + build_dockerfile(dockerfile_path, tag)
-        + open_debug_shell(image)
-    }
+    interface IDockerService <<Interface>>
+    class DockerService <<Implementation>>
 
-    class YamlConfigurationHandler implements ConfigurationHandler {
-        - fs_service: FileSystemService
-    }
+    interface IConfigHandler <<Interface>>
+    class YamlConfigHandler <<Implementation>>
 
-    GitService --> FileSystemService
-    YamlConfigurationHandler --> FileSystemService
+    LocalFileSystem -up-|> IFileSystem
+    GitService -up-|> IScmService
+    DockerService -up-|> IDockerService
+    YamlConfigHandler -up-|> IConfigHandler
 }
 
-HookciCli --> ApplicationService
-HookciCli --> Logger
 
-BaseApplicationService --> ConfigurationHandler
-BaseApplicationService --> Configuration
+HookciCli .down.> ProjectInitService
+HookciCli .down.> CiExecutionService
+HookciCli .down.> MigrationService
+PipelineUI ..> PipelineEvent
+DebugUI ..> PipelineEvent
 
-CiExecutionService --> DockerService
+ProjectInitService ..> Configuration
+CiExecutionService ..> Configuration
+MigrationService ..> Configuration
 
-ProjectInitializationService --> GitService
+ProjectInitService ..> IScmService
+ProjectInitService ..> IFileSystem
+ProjectInitService ..> IConfigHandler
+CiExecutionService ..> IScmService
+CiExecutionService ..> IConfigHandler
+CiExecutionService ..> IDockerService
+MigrationService ..> IScmService
+MigrationService ..> IConfigHandler
+
+GitService ..> IFileSystem
+YamlConfigHandler ..> IFileSystem
+
 @enduml
