@@ -111,7 +111,10 @@ export function SolverStepsPanel() {
           onValueChange={handleAccordionChange}
         >
           {steps.map((step, index) => (
-            <AccordionItem key={index} value={index.toString()}>
+            <AccordionItem
+              key={`step-${index}-${step.technique}`}
+              value={index.toString()}
+            >
               <AccordionTrigger>
                 Step {index + 1}: {step.technique}
               </AccordionTrigger>

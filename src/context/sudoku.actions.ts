@@ -132,4 +132,3 @@ export const viewSolverStep = (index: number): ViewSolverStepAction => ({
 export const exitVisualization = (): ExitVisualizationAction => ({
   type: 'EXIT_VISUALIZATION',
 })
-

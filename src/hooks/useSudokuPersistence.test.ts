@@ -46,7 +46,7 @@ describe('useSudokuPersistence', () => {
   beforeEach(() => {
     localStorageMock.clear()
     setItemSpy = vi.spyOn(localStorageMock, 'setItem')
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
   })
 
   afterEach(() => {

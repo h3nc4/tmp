@@ -34,12 +34,16 @@ export const SudokuDispatchContext = createContext<
   Dispatch<SudokuAction> | undefined
 >(undefined)
 
+type SudokuProviderProps = {
+  readonly children: React.ReactNode
+}
+
 /**
  * Provides the Sudoku game state and dispatch function to its children.
  * It initializes the state, manages side effects like persistence and
  * solver interaction, and makes them available throughout the component tree.
  */
-export function SudokuProvider({ children }: { children: React.ReactNode }) {
+export function SudokuProvider({ children }: SudokuProviderProps) {
   const [state, dispatch] = useReducer(sudokuReducer, undefined, loadInitialState)
 
   // Custom hooks to manage side effects, driven by state changes.

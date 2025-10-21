@@ -28,13 +28,11 @@ import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import type { CellState } from '@/context/sudoku.types'
 
-interface SudokuGridProps {}
-
 /**
  * Renders the 9x9 Sudoku grid container and manages all keyboard interactions.
  * It orchestrates focus management and dispatches actions for cell changes.
  */
-export function SudokuGrid({}: SudokuGridProps) {
+export function SudokuGrid() {
   const { board, initialBoard, ui, solver, derived } = useSudokuState()
   const actions = useSudokuActions()
 
@@ -117,46 +115,45 @@ export function SudokuGrid({}: SudokuGridProps) {
   )
 
   if (!displayBoard) {
-    // This can happen briefly if visualizing but the board hasn't been calculated yet.
-    // Can be replaced with a skeleton loader.
     return null
   }
 
   return (
     <div
       role="grid"
+      tabIndex={0}
       onKeyDown={handleKeyDown}
       onBlur={handleGridBlur}
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
-      {displayBoard.map((_, index) => {
+      {displayBoard.map((currentCell, index) => {
         const isInitial = initialBoard[index]?.value != null
         const isVisualizing = solver.gameMode === 'visualizing'
 
-        // In visualization mode, we construct a synthetic cell state for rendering.
-        // Otherwise, we use the cell state from the main board.
         const displayCell: CellState = isVisualizing
           ? {
-              value: displayBoard[index].value,
-              // Candidates are from the state *before* the current step.
-              candidates: solver.candidatesForViz?.[index] ?? new Set(),
-              // Center marks are not shown during visualization.
-              centers: new Set(),
-            }
-          : displayBoard[index]
+            value: currentCell.value,
+            candidates: solver.candidatesForViz?.[index] ?? new Set(),
+            centers: new Set(),
+          }
+          : currentCell
 
         const eliminatedCandidates = isVisualizing
           ? new Set(
-              solver.eliminationsForViz
-                ?.filter((e) => e.index === index)
-                .map((e) => e.value),
-            )
+            solver.eliminationsForViz
+              ?.filter((e) => e.index === index)
+              .map((e) => e.value),
+          )
           : undefined
+
+        const row = Math.floor(index / 9)
+        const col = index % 9
 
         return (
           <SudokuCell
             ref={cellRefs[index]}
-            key={`cell-${index}`}
+            // For a static 9x9 grid, the row and column form a stable, unique key.
+            key={`cell-r${row}-c${col}`}
             index={index}
             cell={displayCell}
             isInitial={isInitial}

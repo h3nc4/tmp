@@ -19,7 +19,7 @@
 use serde::Serialize;
 
 /// Represents the final result of the solver, to be sent to the frontend.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct SolveResult {
     /// A list of logical steps taken to solve the puzzle.
     pub steps: Vec<SolvingStep>,
@@ -28,7 +28,7 @@ pub struct SolveResult {
 }
 
 /// Represents a single logical step in solving the puzzle.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct SolvingStep {
     /// The name of the technique used (e.g., "NakedSingle").
     pub technique: String,
@@ -41,21 +41,21 @@ pub struct SolvingStep {
 }
 
 /// Represents placing a single number in a cell.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Placement {
     pub index: usize,
     pub value: u8,
 }
 
 /// Represents eliminating a single candidate from a cell.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Elimination {
     pub index: usize,
     pub value: u8,
 }
 
 /// Represents a cell that is part of the cause of a logical deduction.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct CauseCell {
     pub index: usize,
     pub candidates: Vec<u8>,

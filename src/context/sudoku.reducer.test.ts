@@ -258,10 +258,18 @@ describe('sudokuReducer', () => {
       })
 
       it('should exit visualization mode when cleared', () => {
+        const boardWithValues = initialState.board.map((c) => ({
+          ...c,
+          value: 1 as number | null,
+        }))
         const visualizingState: SudokuState = {
           ...initialState,
           solver: { ...initialState.solver, gameMode: 'visualizing' },
-          board: initialState.board.map((c) => ({ ...c, value: 1 })), // Make it not empty
+          board: boardWithValues,
+          derived: {
+            ...initialState.derived,
+            isBoardEmpty: false,
+          },
         }
         const newState = sudokuReducer(visualizingState, { type: 'CLEAR_BOARD' })
         expect(newState.solver.gameMode).toBe('playing')

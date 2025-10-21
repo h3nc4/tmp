@@ -128,8 +128,7 @@ impl LogicalBoard {
                 let mut eliminations = vec![];
 
                 // Eliminate this value from all peers that have it as a candidate.
-                let peers = get_peer_indices(i);
-                for &peer_index in &peers {
+                for &peer_index in &get_peer_indices(i) {
                     if self.cells[peer_index] == 0
                         && (self.candidates[peer_index] & (1 << (value - 1))) != 0
                     {
@@ -151,70 +150,88 @@ impl LogicalBoard {
         None
     }
 
-    /// Finds the first available "Hidden Single".
-    /// A hidden single is a candidate that appears only once in a given row, column, or box.
-    fn find_hidden_single(&self) -> Option<SolvingStep> {
-        // Check rows, columns, and boxes
-        for group_type in 0..3 {
-            for i in 0..9 {
-                for num in 1..=9 {
-                    let candidate_mask = 1 << (num - 1);
-                    let mut found_at: Option<usize> = None;
-                    let mut count = 0;
+    /// Checks a single group (row, column, or box) for a hidden single.
+    fn find_hidden_single_in_group(
+        &self,
+        group_indices: impl IntoIterator<Item = usize>,
+    ) -> Option<(usize, u8)> {
+        let indices: Vec<usize> = group_indices.into_iter().collect();
+        for num in 1..=9 {
+            let candidate_mask = 1 << (num - 1);
+            let mut found_at: Option<usize> = None;
+            let mut count = 0;
 
-                    for j in 0..9 {
-                        let index = match group_type {
-                            0 => i * 9 + j, // Row
-                            1 => j * 9 + i, // Column
-                            _ => {
-                                // Box
-                                let start_row = (i / 3) * 3;
-                                let start_col = (i % 3) * 3;
-                                (start_row + j / 3) * 9 + (start_col + j % 3)
-                            }
-                        };
-
-                        if self.cells[index] == 0 && (self.candidates[index] & candidate_mask) != 0
-                        {
-                            count += 1;
-                            found_at = Some(index);
-                        }
-                    }
-
-                    if count == 1 {
-                        let index = found_at.unwrap();
-                        let value = num;
-                        let mut eliminations = vec![];
-
-                        // 1. Eliminate other candidates from this cell.
-                        let self_candidates = self.candidates[index];
-                        for cand in 1..=9 {
-                            if cand != value && (self_candidates & (1 << (cand - 1))) != 0 {
-                                eliminations.push(Elimination { index, value: cand });
-                            }
-                        }
-
-                        // 2. Eliminate this value from all peers.
-                        let peers = get_peer_indices(index);
-                        for &peer_index in &peers {
-                            if self.cells[peer_index] == 0
-                                && (self.candidates[peer_index] & (1 << (value - 1))) != 0
-                            {
-                                eliminations.push(Elimination {
-                                    index: peer_index,
-                                    value,
-                                });
-                            }
-                        }
-
-                        return Some(SolvingStep {
-                            technique: "HiddenSingle".to_string(),
-                            placements: vec![Placement { index, value }],
-                            eliminations,
-                            cause: vec![],
-                        });
-                    }
+            for &index in &indices {
+                if self.cells[index] == 0 && (self.candidates[index] & candidate_mask) != 0 {
+                    count += 1;
+                    found_at = Some(index);
                 }
+            }
+
+            if count == 1 {
+                return Some((found_at.unwrap(), num));
+            }
+        }
+        None
+    }
+
+    /// Creates a `SolvingStep` for a found hidden single.
+    fn create_hidden_single_step(&self, index: usize, value: u8) -> SolvingStep {
+        let mut eliminations = vec![];
+
+        // 1. Eliminate other candidates from this cell.
+        for cand in 1..=9 {
+            if cand != value && (self.candidates[index] & (1 << (cand - 1))) != 0 {
+                eliminations.push(Elimination { index, value: cand });
+            }
+        }
+
+        // 2. Eliminate this value from all peers.
+        for &peer_index in &get_peer_indices(index) {
+            if self.cells[peer_index] == 0
+                && (self.candidates[peer_index] & (1 << (value - 1))) != 0
+            {
+                eliminations.push(Elimination {
+                    index: peer_index,
+                    value,
+                });
+            }
+        }
+
+        SolvingStep {
+            technique: "HiddenSingle".to_string(),
+            placements: vec![Placement { index, value }],
+            eliminations,
+            cause: vec![],
+        }
+    }
+
+    /// Finds the first available "Hidden Single".
+    fn find_hidden_single(&self) -> Option<SolvingStep> {
+        // Check rows
+        for r in 0..9 {
+            if let Some((index, value)) =
+                self.find_hidden_single_in_group((0..9).map(|c| r * 9 + c))
+            {
+                return Some(self.create_hidden_single_step(index, value));
+            }
+        }
+        // Check columns
+        for c in 0..9 {
+            if let Some((index, value)) =
+                self.find_hidden_single_in_group((0..9).map(|r| r * 9 + c))
+            {
+                return Some(self.create_hidden_single_step(index, value));
+            }
+        }
+        // Check boxes
+        for b in 0..9 {
+            let start_row = (b / 3) * 3;
+            let start_col = (b % 3) * 3;
+            if let Some((index, value)) = self.find_hidden_single_in_group(
+                (0..9).map(|i| (start_row + i / 3) * 9 + (start_col + i % 3)),
+            ) {
+                return Some(self.create_hidden_single_step(index, value));
             }
         }
         None
@@ -228,7 +245,6 @@ pub fn solve_with_steps(initial_board: &Board) -> (Vec<SolvingStep>, Board) {
 
     loop {
         if let Some(step) = board.find_naked_single() {
-            // Apply the step to the board
             for placement in &step.placements {
                 board.set_cell(placement.index, placement.value);
             }

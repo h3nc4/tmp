@@ -19,12 +19,39 @@
 use wasudoku_wasm::board::Board;
 use wasudoku_wasm::logical_solver::{self, LogicalBoard};
 use wasudoku_wasm::solver;
-use wasudoku_wasm::types::Elimination;
+use wasudoku_wasm::types::{Elimination, SolvingStep};
 
 /// Helper to create a `LogicalBoard` from a string for testing.
 fn board_from_str(s: &str) -> LogicalBoard {
     let simple_board = Board::from_str(s).unwrap();
     LogicalBoard::from_board(&simple_board)
+}
+
+/// Helper to parse a puzzle, run the logical solver, and assert the properties of the first step.
+fn assert_first_logical_step(
+    puzzle_str: &str,
+    expected_technique: &str,
+    expected_index: usize,
+    expected_value: u8,
+) -> SolvingStep {
+    let initial_board = Board::from_str(puzzle_str).unwrap();
+    let (steps, _) = logical_solver::solve_with_steps(&initial_board);
+
+    assert!(!steps.is_empty(), "Expected solver to produce steps");
+    let first_step = &steps[0];
+
+    assert_eq!(first_step.technique, expected_technique);
+    assert_eq!(
+        first_step.placements.len(),
+        1,
+        "Expected exactly one placement"
+    );
+
+    let placement = &first_step.placements[0];
+    assert_eq!(placement.index, expected_index);
+    assert_eq!(placement.value, expected_value);
+
+    first_step.clone()
 }
 
 #[test]
@@ -48,19 +75,9 @@ fn test_candidate_initialization() {
 
 #[test]
 fn test_naked_single_step_generation() {
-    // This puzzle's first logical move is a naked single.
     let puzzle_str =
         "...2..7...5..96832.8.7....641.....78.2..745..7.31854....2531..4.3164..5...9...61.";
-    let initial_board = Board::from_str(puzzle_str).unwrap();
-    let (steps, _) = logical_solver::solve_with_steps(&initial_board);
-
-    assert!(!steps.is_empty());
-    let first_step = &steps[0];
-    assert_eq!(first_step.technique, "NakedSingle");
-    assert_eq!(first_step.placements.len(), 1);
-    let placement = &first_step.placements[0];
-    assert_eq!(placement.index, 9);
-    assert_eq!(placement.value, 1);
+    let first_step = assert_first_logical_step(puzzle_str, "NakedSingle", 9, 1);
 
     // Check that eliminations were correctly identified.
     // Placing 1 at index 9 (R1C0) should eliminate 1 from its peers in the same box, like index 0.
@@ -76,19 +93,9 @@ fn test_naked_single_step_generation() {
 
 #[test]
 fn test_hidden_single_detection_in_box() {
-    // A puzzle where the first logical step is a hidden single.
     let puzzle_str =
         ".38.917.571...38.9...78.3419738526148649175325213..9781..67..83386.29.57..7.38.96";
-    let initial_board = Board::from_str(puzzle_str).unwrap();
-    let (steps, _) = logical_solver::solve_with_steps(&initial_board);
-
-    assert!(!steps.is_empty());
-    let first_step = &steps[0];
-    assert_eq!(first_step.technique, "HiddenSingle");
-    assert_eq!(first_step.placements.len(), 1);
-    let placement = &first_step.placements[0];
-    assert_eq!(placement.index, 0);
-    assert_eq!(placement.value, 4);
+    let first_step = assert_first_logical_step(puzzle_str, "HiddenSingle", 0, 4);
 
     // Check that eliminations were correctly identified.
     // Placing 4 at index 0 should eliminate other candidates from cell 0 (2, 6).

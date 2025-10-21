@@ -125,4 +125,3 @@ export type SudokuAction =
   | SetHighlightedValueAction
   | ViewSolverStepAction
   | ExitVisualizationAction
-

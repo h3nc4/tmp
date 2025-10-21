@@ -163,6 +163,27 @@ export function isMoveValid(
 }
 
 /**
+ * Compares two sets for equality.
+ * @param setA The first set.
+ * @param setB The second set.
+ * @returns `true` if the sets contain the same elements, `false` otherwise.
+ */
+function areSetsEqual<T>(
+  setA: ReadonlySet<T>,
+  setB: ReadonlySet<T>,
+): boolean {
+  if (setA.size !== setB.size) {
+    return false
+  }
+  for (const item of setA) {
+    if (!setB.has(item)) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
  * Compares two board states for equality.
  * @param boardA The first board state.
  * @param boardB The second board state.
@@ -179,16 +200,12 @@ export function areBoardsEqual(
     const cellA = boardA[i]
     const cellB = boardB[i]
 
-    if (cellA.value !== cellB.value) return false
-    if (cellA.candidates.size !== cellB.candidates.size) return false
-    if (cellA.centers.size !== cellB.centers.size) return false
-
-    for (const cand of cellA.candidates) {
-      if (!cellB.candidates.has(cand)) return false
-    }
-
-    for (const cent of cellA.centers) {
-      if (!cellB.centers.has(cent)) return false
+    if (
+      cellA.value !== cellB.value ||
+      !areSetsEqual(cellA.candidates, cellB.candidates) ||
+      !areSetsEqual(cellA.centers, cellB.centers)
+    ) {
+      return false
     }
   }
 
