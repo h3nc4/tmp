@@ -28,14 +28,17 @@ import {
   type Mock,
 } from 'vitest'
 import { SudokuGrid } from './SudokuGrid'
-import { useSudokuState } from '@/context/sudoku.hooks'
+import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
+import * as sudokuActions from '@/context/sudoku.actions'
 import type { SudokuState, CellState } from '@/context/sudoku.types'
+import { toast } from 'sonner'
 
 // Mocks
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/hooks/useSudokuActions')
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 interface MockSudokuCellProps {
   index: number
@@ -65,9 +68,11 @@ vi.mock('./SudokuCell', () => ({
 }))
 
 const mockUseSudokuState = useSudokuState as Mock
+const mockUseSudokuDispatch = useSudokuDispatch as Mock
 const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('SudokuGrid component', () => {
+  const mockDispatch = vi.fn()
   const mockActions = {
     setActiveCell: vi.fn(),
     inputValue: vi.fn(),
@@ -89,8 +94,9 @@ describe('SudokuGrid component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSudokuCellRender.mockClear() // Clear the render spy
+    mockSudokuCellRender.mockClear()
     mockUseSudokuState.mockReturnValue(defaultState)
+    mockUseSudokuDispatch.mockReturnValue(mockDispatch)
     mockUseSudokuActions.mockReturnValue(mockActions)
   })
 
@@ -238,6 +244,61 @@ describe('SudokuGrid component', () => {
       render(<SudokuGrid />)
       await user.keyboard('{Delete}')
       expect(mockActions.eraseActiveCell).toHaveBeenCalledWith('delete')
+    })
+  })
+
+  describe('Clipboard (Paste) Interactions', () => {
+    const validBoardString = '.'.repeat(81)
+
+    it('dispatches importBoard action on valid paste', async () => {
+      // Spy on the method and control its return value for this test
+      const readTextSpy = vi
+        .spyOn(navigator.clipboard, 'readText')
+        .mockResolvedValue(validBoardString)
+
+      render(<SudokuGrid />)
+      const grid = screen.getByRole('grid')
+      // Trigger a paste event on the grid
+      fireEvent.paste(grid)
+      await act(async () => await Promise.resolve()) // Wait for async operations
+
+      expect(readTextSpy).toHaveBeenCalled()
+      expect(mockDispatch).toHaveBeenCalledWith(
+        sudokuActions.importBoard(validBoardString),
+      )
+      expect(toast.success).toHaveBeenCalledWith('Board imported from clipboard.')
+      readTextSpy.mockRestore()
+    })
+
+    it('shows an error toast for invalid paste string', async () => {
+      const invalidString = 'abc'
+      const readTextSpy = vi
+        .spyOn(navigator.clipboard, 'readText')
+        .mockResolvedValue(invalidString)
+
+      render(<SudokuGrid />)
+      const grid = screen.getByRole('grid')
+      fireEvent.paste(grid)
+      await act(async () => await Promise.resolve()) // Wait for async operations
+
+      expect(mockDispatch).not.toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledWith('Invalid board format in clipboard.')
+      readTextSpy.mockRestore()
+    })
+
+    it('shows an error toast if clipboard read fails', async () => {
+      const readTextSpy = vi
+        .spyOn(navigator.clipboard, 'readText')
+        .mockRejectedValue(new Error('Read failed'))
+
+      render(<SudokuGrid />)
+      const grid = screen.getByRole('grid')
+      fireEvent.paste(grid)
+      await act(async () => await Promise.resolve())
+
+      expect(mockDispatch).not.toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledWith('Could not read from clipboard.')
+      readTextSpy.mockRestore()
     })
   })
 

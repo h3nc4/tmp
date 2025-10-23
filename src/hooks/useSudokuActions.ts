@@ -17,12 +17,14 @@
  */
 
 import { useMemo } from 'react'
+import { toast } from 'sonner'
 import {
   useSudokuState,
   useSudokuDispatch,
 } from '@/context/sudoku.hooks'
 import * as actions from '@/context/sudoku.actions'
-import { isMoveValid } from '@/lib/utils'
+import { isMoveValid, boardStateToString } from '@/lib/utils'
+import type { InputMode } from '@/context/sudoku.types'
 
 /**
  * A hook that provides a stable, memoized API for dispatching all Sudoku actions.
@@ -96,6 +98,22 @@ export function useSudokuActions() {
 
       /** Clears the entire board. */
       clearBoard: () => dispatch(actions.clearBoard()),
+      /** Exports the current board state to the clipboard. */
+      exportBoard: () => {
+        if (!navigator.clipboard) {
+          toast.error('Clipboard API not available in this browser or context.')
+          return
+        }
+        const boardString = boardStateToString(state.board)
+        navigator.clipboard
+          .writeText(boardString)
+          .then(() => {
+            toast.success('Board exported to clipboard.')
+          })
+          .catch(() => {
+            toast.error('Failed to copy board to clipboard.')
+          })
+      },
       /** Undoes the last move. */
       undo: () => dispatch(actions.undo()),
       /** Redoes the last undone move. */
@@ -105,8 +123,7 @@ export function useSudokuActions() {
       /** Exits the solver visualization mode. */
       exitVisualization: () => dispatch(actions.exitVisualization()),
       /** Changes the input mode. */
-      setInputMode: (mode: 'normal' | 'candidate' | 'center') =>
-        dispatch(actions.setInputMode(mode)),
+      setInputMode: (mode: InputMode) => dispatch(actions.setInputMode(mode)),
       /** Sets the globally highlighted number. */
       setHighlightedValue: (value: number | null) =>
         dispatch(actions.setHighlightedValue(value)),

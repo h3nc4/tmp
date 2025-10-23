@@ -17,7 +17,7 @@
  */
 
 import { useCallback } from 'react'
-import { Eraser } from 'lucide-react'
+import { Eraser, Share2 } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
@@ -34,7 +34,7 @@ import { useSudokuActions } from './hooks/useSudokuActions'
 
 function App() {
   const { ui, solver } = useSudokuState()
-  const { eraseActiveCell } = useSudokuActions()
+  const { eraseActiveCell, exportBoard } = useSudokuActions()
 
   const { sourceRef, targetRef } = useSynchronizedHeight(
     solver.gameMode === 'visualizing',
@@ -49,6 +49,14 @@ function App() {
       <header className="container mx-auto flex items-center justify-between p-4">
         <h1 className="text-2xl font-bold md:text-3xl">WASudoku</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={exportBoard}
+            title="Export Board"
+          >
+            <Share2 className="size-5" />
+          </Button>
           <Button variant="outline" size="icon" asChild>
             <a
               href="https://github.com/h3nc4/WASudoku"

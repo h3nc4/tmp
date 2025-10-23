@@ -79,6 +79,7 @@ const mockUseSudokuActions = useSudokuActions as Mock
 
 describe('App component', () => {
   const mockEraseActiveCell = vi.fn()
+  const mockExportBoard = vi.fn()
   const defaultState: SudokuState = {
     ...initialState,
     ui: {
@@ -92,6 +93,7 @@ describe('App component', () => {
     mockUseSudokuState.mockReturnValue(defaultState)
     mockUseSudokuActions.mockReturnValue({
       eraseActiveCell: mockEraseActiveCell,
+      exportBoard: mockExportBoard,
     })
   })
 
@@ -104,8 +106,20 @@ describe('App component', () => {
     expect(screen.getByRole('button', { name: 'NumberPad' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Solve' })).toBeInTheDocument()
     expect(
+      screen.getByRole('button', { name: 'Export Board' }),
+    ).toBeInTheDocument()
+    expect(
       screen.getByRole('link', { name: /github repository/i }),
     ).toBeInTheDocument()
+  })
+
+  it('calls exportBoard when export button is clicked', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const exportButton = screen.getByRole('button', { name: 'Export Board' })
+    await user.click(exportButton)
+    expect(mockExportBoard).toHaveBeenCalledOnce()
   })
 
   it('does not render the SolverStepsPanel in playing mode', () => {

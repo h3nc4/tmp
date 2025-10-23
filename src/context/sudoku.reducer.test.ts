@@ -277,6 +277,26 @@ describe('sudokuReducer', () => {
       })
     })
 
+    describe('IMPORT_BOARD', () => {
+      it('should correctly parse the board string and reset state', () => {
+        const boardString = '53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79'
+        const action: SudokuAction = { type: 'IMPORT_BOARD', boardString }
+        const newState = sudokuReducer(initialState, action)
+
+        expect(newState.board[0].value).toBe(5)
+        expect(newState.board[2].value).toBe(null)
+        expect(newState.board[80].value).toBe(9)
+
+        // Check that state was reset
+        expect(newState.history.stack.length).toBe(1)
+        expect(newState.history.index).toBe(0)
+        expect(newState.history.stack[0]).toEqual(newState.initialBoard)
+        expect(newState.initialBoard[0].value).toBe(5)
+        expect(newState.solver.isSolved).toBe(false)
+        expect(newState.solver.gameMode).toBe('playing')
+      })
+    })
+
     describe('History (UNDO/REDO)', () => {
       const stateWithHistory: SudokuState = {
         ...initialState,
@@ -754,6 +774,7 @@ describe('loadInitialState', () => {
     expect(state.board[0].candidates).toEqual(new Set([1, 2, 3]))
     expect(state.board[1].candidates.size).toBe(0)
     expect(state.derived.isBoardEmpty).toBe(true) // no .value properties were set
+    expect(state.initialBoard).toEqual(state.board.map(cell => ({ ...cell, candidates: new Set(), centers: new Set() })))
   })
 
   it('should handle JSON parsing errors gracefully', () => {

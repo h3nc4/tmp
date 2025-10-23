@@ -48,6 +48,12 @@ export interface ClearBoardAction {
   type: 'CLEAR_BOARD'
 }
 
+/** Action to replace the current board with data from an imported string. */
+export interface ImportBoardAction {
+  type: 'IMPORT_BOARD'
+  boardString: string
+}
+
 /** Action to revert to the previous state in history. */
 export interface UndoAction {
   type: 'UNDO'
@@ -114,6 +120,7 @@ export type SudokuAction =
   | TogglePencilMarkAction
   | EraseCellAction
   | ClearBoardAction
+  | ImportBoardAction
   | UndoAction
   | RedoAction
   | SolveStartAction

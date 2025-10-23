@@ -22,10 +22,12 @@ import React, {
   useCallback,
   createRef,
 } from 'react'
+import { toast } from 'sonner'
 import SudokuCell from './SudokuCell'
-import { getRelatedCellIndices } from '@/lib/utils'
-import { useSudokuState } from '@/context/sudoku.hooks'
+import { getRelatedCellIndices, isBoardStringValid } from '@/lib/utils'
+import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
+import { importBoard } from '@/context/sudoku.actions'
 import type { CellState } from '@/context/sudoku.types'
 
 /**
@@ -34,6 +36,7 @@ import type { CellState } from '@/context/sudoku.types'
  */
 export function SudokuGrid() {
   const { board, initialBoard, ui, solver, derived } = useSudokuState()
+  const dispatch = useSudokuDispatch()
   const actions = useSudokuActions()
 
   const displayBoard =
@@ -66,6 +69,24 @@ export function SudokuGrid() {
       }
     },
     [actions, isReadOnly],
+  )
+
+  const handlePaste = useCallback(
+    async (event: React.ClipboardEvent) => {
+      event.preventDefault()
+      try {
+        const text = await navigator.clipboard.readText()
+        if (isBoardStringValid(text)) {
+          dispatch(importBoard(text))
+          toast.success('Board imported from clipboard.')
+        } else {
+          toast.error('Invalid board format in clipboard.')
+        }
+      } catch (err) {
+        toast.error('Could not read from clipboard.')
+      }
+    },
+    [dispatch],
   )
 
   // Centralized keyboard handler for the entire grid.
@@ -124,6 +145,7 @@ export function SudokuGrid() {
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onBlur={handleGridBlur}
+      onPaste={handlePaste}
       className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
     >
       {displayBoard.map((currentCell, index) => {

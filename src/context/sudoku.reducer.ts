@@ -24,6 +24,7 @@ import type {
   SolveSuccessAction,
   ViewSolverStepAction,
   SetActiveCellAction,
+  ImportBoardAction,
 } from './sudoku.actions.types'
 import type {
   BoardState,
@@ -35,6 +36,7 @@ import {
   getRelatedCellIndices,
   validateBoard,
   calculateCandidates,
+  boardStateFromString,
 } from '@/lib/utils'
 
 const BOARD_SIZE = 81
@@ -118,6 +120,7 @@ export function loadInitialState(): SudokuState {
           ...initialState,
           history: savedState.history,
           board: currentBoard,
+          initialBoard: currentBoard.map(cell => ({ value: cell.value, candidates: new Set<number>(), centers: new Set<number>() })),
           derived: getDerivedBoardState(currentBoard),
         }
       }
@@ -249,6 +252,22 @@ const handleClearBoard = (state: SudokuState): SudokuState => {
     ...initialState,
     board: newBoard,
     history: updateHistory(state.history, newBoard),
+  }
+}
+
+const handleImportBoard = (
+  _state: SudokuState,
+  action: ImportBoardAction,
+): SudokuState => {
+  const newBoard = boardStateFromString(action.boardString)
+  return {
+    ...initialState,
+    board: newBoard,
+    initialBoard: newBoard,
+    history: {
+      stack: [newBoard],
+      index: 0,
+    },
   }
 }
 
@@ -408,6 +427,9 @@ export function sudokuReducer(
       break
     case 'CLEAR_BOARD':
       newState = handleClearBoard(state)
+      break
+    case 'IMPORT_BOARD':
+      newState = handleImportBoard(state, action)
       break
     case 'UNDO':
       newState = handleUndo(state)

@@ -238,3 +238,37 @@ export function calculateCandidates(
   }
   return candidates
 }
+
+/**
+ * Converts a board state object to its 81-character string representation.
+ * @param board The Sudoku board state.
+ * @returns A string with numbers for filled cells and '.' for empty cells.
+ */
+export function boardStateToString(board: BoardState): string {
+  return board.map((cell) => cell.value?.toString() ?? '.').join('')
+}
+
+/**
+ * Parses an 81-character string into a `BoardState` object.
+ * @param boardString The string to parse.
+ * @returns A new `BoardState` object.
+ */
+export function boardStateFromString(boardString: string): BoardState {
+  return boardString.split('').map((char) => {
+    const value = char === '.' || char === '0' ? null : parseInt(char, 10)
+    return {
+      value,
+      candidates: new Set<number>(),
+      centers: new Set<number>(),
+    }
+  })
+}
+
+/**
+ * Validates if a string is in the correct format for a Sudoku board.
+ * @param boardString The string to validate.
+ * @returns `true` if the string is valid, `false` otherwise.
+ */
+export function isBoardStringValid(boardString: string): boolean {
+  return /^[0-9.]{81}$/.test(boardString)
+}

@@ -17,7 +17,17 @@
  */
 
 import { renderHook, act } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  beforeAll,
+  afterAll,
+  type Mock,
+} from 'vitest'
+import { toast } from 'sonner'
 import { useSudokuActions } from './useSudokuActions'
 import {
   useSudokuState,
@@ -37,6 +47,12 @@ vi.mock('@/lib/utils', async (importOriginal) => {
     isMoveValid: vi.fn(), // Mock this specific function
   }
 })
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 const mockUseSudokuState = useSudokuState as Mock
 const mockUseSudokuDispatch = useSudokuDispatch as Mock
@@ -52,8 +68,30 @@ describe('useSudokuActions', () => {
     },
   }
 
+  // This test file does not use @testing-library/user-event, so we must
+  // provide our own mock for the clipboard API.
+  const mockClipboard = {
+    writeText: vi.fn(),
+    readText: vi.fn(),
+  }
+
+  beforeAll(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: mockClipboard,
+      configurable: true,
+    })
+  })
+
+  afterAll(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    })
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    mockClipboard.writeText.mockResolvedValue(undefined)
     mockUseSudokuState.mockReturnValue(defaultState)
     mockUseSudokuDispatch.mockReturnValue(mockDispatch)
     mockIsMoveValid.mockReturnValue(true) // Default to valid moves
@@ -185,6 +223,54 @@ describe('useSudokuActions', () => {
       const actions = getActions()
       act(() => actions.eraseActiveCell('delete'))
       expect(mockDispatch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('exportBoard', () => {
+    it('calls clipboard.writeText with the correct board string and shows toast', async () => {
+      const boardWithValues = initialState.board.map((cell, index) => {
+        if (index === 0) return { ...cell, value: 5 }
+        if (index === 80) return { ...cell, value: 9 }
+        return cell
+      })
+      mockUseSudokuState.mockReturnValue({ ...defaultState, board: boardWithValues })
+
+      const actions = getActions()
+      await act(async () => {
+        actions.exportBoard()
+      })
+      const expectedString = '5' + '.'.repeat(79) + '9'
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expectedString)
+      expect(toast.success).toHaveBeenCalledWith('Board exported to clipboard.')
+    })
+
+    it('shows an error toast if clipboard write fails', async () => {
+      mockClipboard.writeText.mockRejectedValue(new Error('Write failed'))
+      const actions = getActions()
+      await act(async () => {
+        actions.exportBoard()
+      })
+      expect(toast.error).toHaveBeenCalledWith('Failed to copy board to clipboard.')
+    })
+
+    it('shows an error toast if clipboard API is not available', async () => {
+      const originalClipboard = navigator.clipboard
+      // Temporarily remove the property for this test
+      Object.defineProperty(navigator, 'clipboard', {
+        value: undefined,
+        configurable: true,
+      })
+
+      const actions = getActions()
+      await act(async () => {
+        actions.exportBoard()
+      })
+      expect(toast.error).toHaveBeenCalledWith(
+        'Clipboard API not available in this browser or context.',
+      )
+
+      // Restore it for other tests
+      Object.defineProperty(navigator, 'clipboard', { value: originalClipboard })
     })
   })
 

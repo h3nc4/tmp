@@ -32,6 +32,7 @@ import type {
   SetHighlightedValueAction,
   ViewSolverStepAction,
   ExitVisualizationAction,
+  ImportBoardAction,
 } from './sudoku.actions.types'
 import type { InputMode, SolveResult } from './sudoku.types'
 
@@ -69,6 +70,12 @@ export const eraseCell = (index: number): EraseCellAction => ({
 /** Creates an action to clear the entire board. */
 export const clearBoard = (): ClearBoardAction => ({
   type: 'CLEAR_BOARD',
+})
+
+/** Creates an action to replace the current board with an imported one. */
+export const importBoard = (boardString: string): ImportBoardAction => ({
+  type: 'IMPORT_BOARD',
+  boardString,
 })
 
 /** Creates an action to undo the last move. */

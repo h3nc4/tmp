@@ -20,8 +20,11 @@ import { describe, expect, it } from 'vitest'
 import type { BoardState, CellState } from '@/context/sudoku.types'
 import {
   areBoardsEqual,
+  boardStateFromString,
+  boardStateToString,
   calculateCandidates,
   getRelatedCellIndices,
+  isBoardStringValid,
   isMoveValid,
   validateBoard,
 } from './utils'
@@ -200,6 +203,46 @@ describe('Sudoku Utilities', () => {
       expect(candidates[10]?.has(5)).toBe(false)
       // Cell 80 (not a peer) should still have 5 as a candidate
       expect(candidates[80]?.has(5)).toBe(true)
+    })
+  })
+
+  describe('boardStateToString', () => {
+    it('should convert a board state to a string', () => {
+      const board = createEmptyBoard().map((cell, i) => {
+        if (i === 0) return { ...cell, value: 5 }
+        if (i === 2) return { ...cell, value: 9 }
+        return cell
+      })
+      const expected = '5.9' + '.'.repeat(78)
+      expect(boardStateToString(board)).toBe(expected)
+    })
+  })
+
+  describe('boardStateFromString', () => {
+    it('should parse a valid string into a board state', () => {
+      const boardString = '5.9' + '.'.repeat(78)
+      const board = boardStateFromString(boardString)
+      expect(board.length).toBe(81)
+      expect(board[0].value).toBe(5)
+      expect(board[1].value).toBe(null)
+      expect(board[2].value).toBe(9)
+      expect(board[0].candidates.size).toBe(0)
+      expect(board[0].centers.size).toBe(0)
+    })
+  })
+
+  describe('isBoardStringValid', () => {
+    it('should return true for a valid string', () => {
+      expect(isBoardStringValid('.'.repeat(81))).toBe(true)
+      expect(isBoardStringValid('123456789'.repeat(9))).toBe(true)
+    })
+
+    it('should return false for a string with incorrect length', () => {
+      expect(isBoardStringValid('.'.repeat(80))).toBe(false)
+    })
+
+    it('should return false for a string with invalid characters', () => {
+      expect(isBoardStringValid('a'.repeat(81))).toBe(false)
     })
   })
 })
