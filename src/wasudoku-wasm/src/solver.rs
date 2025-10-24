@@ -18,42 +18,36 @@
 
 use crate::board::Board;
 
-/// Represents the outcome of searching for the next cell to solve.
+/// The outcome of searching for the next cell to solve.
 enum FindResult {
     /// The board is already solved (no empty cells).
     Solved,
     /// The board is in an unsolvable state (an empty cell has 0 valid moves).
     Unsolvable,
-    /// The coordinates of the most constrained cell to try next.
+    /// The coordinates of the most constrained empty cell to try next.
     Cell(usize, usize),
 }
 
-/// Solves the Sudoku puzzle using a backtracking algorithm.
+/// Solve the Sudoku puzzle using a backtracking algorithm with an MRV heuristic.
 ///
 /// ### Arguments
 ///
-/// * `board` - A mutable reference to the `Board` to be solved.
+/// * `board` - A mutable reference to the `Board` to be solved in-place.
 ///
 /// ### Returns
 ///
-/// * `true` if a solution is found.
-/// * `false` if the puzzle is unsolvable.
+/// * `true` if a solution is found, `false` otherwise.
 pub fn solve(board: &mut Board) -> bool {
-    // A test-only feature to ensure the panic boundary in `lib.rs` is covered.
+    // Induce a panic for testing the panic boundary in `lib.rs`.
     #[cfg(feature = "test-panic")]
     if board.cells[0] == 1 && board.cells[1] == 2 && board.cells[2] == 3 {
         panic!("Induced panic for testing");
     }
 
-    // Find the state of the board or the next best cell to operate on.
     match find_most_constrained_cell(board) {
-        // The board is fully solved.
         FindResult::Solved => true,
-        // The board has reached a dead end, backtrack immediately.
         FindResult::Unsolvable => false,
-        // Proceed with the most constrained cell.
         FindResult::Cell(row, col) => {
-            // Iterate through only the valid numbers for this specific cell.
             for num in 1..=9 {
                 if board.is_valid_move(row, col, num) {
                     board.cells[row * 9 + col] = num;
@@ -62,17 +56,17 @@ pub fn solve(board: &mut Board) -> bool {
                         return true;
                     }
 
-                    // Backtrack: if this path didn't work, reset the cell.
+                    // Backtrack if the path did not lead to a solution.
                     board.cells[row * 9 + col] = 0;
                 }
             }
-            // If no valid number for this cell leads to a solution, trigger backtracking.
+            // Trigger further backtracking if no number works for this cell.
             false
         }
     }
 }
 
-/// Counts the number of valid moves (1-9) for a given cell.
+/// Count the number of valid moves (1-9) for a given cell.
 fn count_possibilities(board: &Board, row: usize, col: usize) -> u8 {
     let mut possibilities = 0;
     for num in 1..=9 {
@@ -83,10 +77,10 @@ fn count_possibilities(board: &Board, row: usize, col: usize) -> u8 {
     possibilities
 }
 
-/// MRV heuristic: Finds the empty cell with the fewest valid candidates.
+/// Find the empty cell with the fewest valid moves (Minimum Remaining Values heuristic).
 fn find_most_constrained_cell(board: &Board) -> FindResult {
     let mut best_cell: Option<(usize, usize)> = None;
-    let mut min_possibilities = 10; // Start with a value > 9
+    let mut min_possibilities = 10;
 
     for i in 0..81 {
         if board.cells[i] != 0 {
@@ -97,16 +91,16 @@ fn find_most_constrained_cell(board: &Board) -> FindResult {
         let col = i % 9;
         let possibilities = count_possibilities(board, row, col);
 
-        // Stop immediately if an empty cell with 0 possibilities is found.
+        // An empty cell with zero possibilities means the board is unsolvable.
         if possibilities == 0 {
             return FindResult::Unsolvable;
         }
 
-        // Update the best cell if the current has fewer possibilities.
+        // Update the best cell if the current one is more constrained.
         if possibilities < min_possibilities {
             min_possibilities = possibilities;
             best_cell = Some((row, col));
-            // Stop searching if a cell with only 1 possibility is found (optimization).
+            // A cell with only one possibility is the best we can find, so stop.
             if min_possibilities == 1 {
                 break;
             }

@@ -19,11 +19,11 @@
 import { useRef, useLayoutEffect } from 'react'
 
 /**
- * A hook that synchronizes the height of one element (target) to match the height of another (source).
- * It uses a ResizeObserver to automatically update the height when the source element's size changes.
+ * Synchronizes the height of a target element to match a source element.
+ * It uses a ResizeObserver to automatically update when the source's size changes.
  *
  * @param isEnabled - A boolean to enable or disable the synchronization effect.
- * @returns An object containing `sourceRef` and `targetRef` to be attached to the respective DOM elements.
+ * @returns An object with `sourceRef` and `targetRef` to attach to DOM elements.
  */
 export function useSynchronizedHeight(isEnabled: boolean) {
   const sourceRef = useRef<HTMLDivElement>(null)

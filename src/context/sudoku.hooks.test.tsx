@@ -22,7 +22,6 @@ import { SudokuProvider } from './SudokuProvider'
 import { useSudokuState, useSudokuDispatch } from './sudoku.hooks'
 import { initialState } from './sudoku.reducer'
 
-// Suppress console.error output from React's error boundary for this test file
 beforeAll(() => {
   vi.spyOn(console, 'error').mockImplementation(() => { })
 })
@@ -31,13 +30,11 @@ afterAll(() => {
   vi.mocked(console.error).mockRestore()
 })
 
-/** A component that calls useSudokuState, intended to fail. */
 const StateHookFailComponent = () => {
   useSudokuState()
   return null
 }
 
-/** A component that calls useSudokuDispatch, intended to fail. */
 const DispatchHookFailComponent = () => {
   useSudokuDispatch()
   return null

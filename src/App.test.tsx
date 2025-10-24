@@ -32,18 +32,14 @@ import { useSudokuActions } from './hooks/useSudokuActions'
 import { initialState } from './context/sudoku.reducer'
 import type { SudokuState } from './context/sudoku.types'
 
-// --- Mocks ---
 vi.mock('./context/sudoku.hooks')
 vi.mock('./hooks/useSudokuActions')
-// Mock the custom hook to prevent its implementation details from affecting this test
 vi.mock('./hooks/useSynchronizedHeight', () => ({
   useSynchronizedHeight: vi.fn(() => ({
     sourceRef: vi.fn(),
     targetRef: vi.fn(),
   })),
 }))
-
-// Mock child components
 vi.mock('./components/SudokuGrid', () => ({
   SudokuGrid: vi.fn(() => <div data-testid="sudoku-grid" />),
 }))

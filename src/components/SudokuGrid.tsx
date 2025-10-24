@@ -110,7 +110,7 @@ export function SudokuGrid() {
       if (isReadOnly) return
 
       const key = e.key
-      // Prevent default for keys we handle to avoid scrolling, etc.
+      // Prevent default for handled keys to avoid scrolling.
       if (
         (key >= '1' && key <= '9') ||
         ['Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)

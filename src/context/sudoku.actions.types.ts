@@ -18,10 +18,6 @@
 
 import type { InputMode, SolveResult } from './sudoku.types'
 
-// --- State Management Actions ---
-// These actions represent direct, unambiguous mutations to the state.
-// They are dispatched by the `useSudokuActions` hook, not directly by UI components.
-
 /** Action to set the definitive value of a cell. */
 export interface SetCellValueAction {
   type: 'SET_CELL_VALUE'

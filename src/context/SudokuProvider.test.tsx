@@ -26,12 +26,10 @@ import { useSudokuSolver } from '@/hooks/useSudokuSolver'
 import { useSudokuFeedback } from '@/hooks/useSudokuFeedback'
 import { initialState } from './sudoku.reducer'
 
-// Mock the hooks that SudokuProvider calls as side effects
 vi.mock('@/hooks/useSudokuPersistence')
 vi.mock('@/hooks/useSudokuSolver')
 vi.mock('@/hooks/useSudokuFeedback')
 
-/** A simple test component that consumes the Sudoku context. */
 const TestConsumer = () => {
   const state = useSudokuState()
   const dispatch = useSudokuDispatch()
@@ -48,7 +46,6 @@ const TestConsumer = () => {
 describe('SudokuProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Ensure localStorage is clean before each test that relies on initialization
     vi.spyOn(window.localStorage.__proto__, 'getItem').mockReturnValue(null)
   })
 
@@ -58,9 +55,7 @@ describe('SudokuProvider', () => {
         <TestConsumer />
       </SudokuProvider>,
     )
-    // Check that state is accessible
     expect(screen.getByTestId('cell-0-value')).toHaveTextContent('null')
-    // Check that dispatch is accessible (component renders a button with its onClick)
     expect(screen.getByRole('button', { name: 'Dispatch' })).toBeInTheDocument()
   })
 
@@ -70,7 +65,6 @@ describe('SudokuProvider', () => {
         <TestConsumer />
       </SudokuProvider>,
     )
-    // Verify that the rendered state matches the default initial state
     expect(screen.getByTestId('cell-0-value')).toHaveTextContent(
       String(initialState.board[0].value),
     )

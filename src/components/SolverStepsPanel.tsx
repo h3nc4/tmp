@@ -102,11 +102,9 @@ export function SolverStepsPanel() {
   )
 
   const handleAccordionChange = (value: string) => {
-    // Accordion's `onValueChange` is called with an empty string when an item is closed.
-    // We only want to dispatch when an item is opened.
+    // Only dispatch when an item is opened, not when closed (value is empty string).
     if (value) {
-      // The accordion value is the step index (0-based) as a string.
-      // We need to dispatch `stepIndex + 1` because `viewSolverStep(N)` applies N steps.
+      // Dispatch `stepIndex + 1` because `viewSolverStep(N)` applies N steps.
       handleStepSelect(parseInt(value, 10) + 1)
     }
   }
@@ -115,8 +113,8 @@ export function SolverStepsPanel() {
     return null
   }
 
-  // The accordion's active item is based on the step index (0-based).
-  // `currentStepIndex` is the number of steps applied (1-based for steps, 0 for initial).
+  // `currentStepIndex` is 1-based for steps, 0 for initial state.
+  // The accordion's active item value is the 0-based step index.
   const activeAccordionItem =
     currentStepIndex !== null && currentStepIndex > 0
       ? (currentStepIndex - 1).toString()

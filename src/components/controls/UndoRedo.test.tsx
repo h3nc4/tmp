@@ -32,7 +32,6 @@ import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 import type { SudokuState } from '@/context/sudoku.types'
 
-// Mocks
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/hooks/useSudokuActions')
 

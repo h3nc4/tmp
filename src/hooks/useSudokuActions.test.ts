@@ -38,13 +38,12 @@ import * as actionCreators from '@/context/sudoku.actions'
 import type { SudokuState } from '@/context/sudoku.types'
 import { isMoveValid } from '@/lib/utils'
 
-// --- Mocks ---
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/lib/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/utils')>()
   return {
     ...actual,
-    isMoveValid: vi.fn(), // Mock this specific function
+    isMoveValid: vi.fn(),
   }
 })
 vi.mock('sonner', () => ({
@@ -68,8 +67,6 @@ describe('useSudokuActions', () => {
     },
   }
 
-  // This test file does not use @testing-library/user-event, so we must
-  // provide our own mock for the clipboard API.
   const mockClipboard = {
     writeText: vi.fn(),
     readText: vi.fn(),
@@ -255,7 +252,6 @@ describe('useSudokuActions', () => {
 
     it('shows an error toast if clipboard API is not available', async () => {
       const originalClipboard = navigator.clipboard
-      // Temporarily remove the property for this test
       Object.defineProperty(navigator, 'clipboard', {
         value: undefined,
         configurable: true,
@@ -268,8 +264,6 @@ describe('useSudokuActions', () => {
       expect(toast.error).toHaveBeenCalledWith(
         'Clipboard API not available in this browser or context.',
       )
-
-      // Restore it for other tests
       Object.defineProperty(navigator, 'clipboard', { value: originalClipboard })
     })
   })

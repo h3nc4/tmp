@@ -36,9 +36,6 @@ import type {
 } from './sudoku.actions.types'
 import type { InputMode, SolveResult } from './sudoku.types'
 
-// --- Internal State Management Actions ---
-// These action creators produce direct mutation commands for the reducer.
-
 /** Creates an action to set the definitive value of a cell. */
 export const setCellValue = (
   index: number,

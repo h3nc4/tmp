@@ -27,7 +27,6 @@ import {
 } from 'vitest'
 import { useSynchronizedHeight } from './useSynchronizedHeight'
 
-// Mock for ResizeObserver
 let mockResizeObserverCallback: ResizeObserverCallback | null = null
 const mockDisconnect = vi.fn()
 const mockObserve = vi.fn()
@@ -53,7 +52,6 @@ describe('useSynchronizedHeight', () => {
     vi.unstubAllGlobals()
   })
 
-  // A test component to attach refs to actual DOM nodes, letting React handle the lifecycle.
   const TestComponent = ({ isEnabled }: { isEnabled: boolean }) => {
     const { sourceRef, targetRef } = useSynchronizedHeight(isEnabled)
     return (
@@ -73,18 +71,15 @@ describe('useSynchronizedHeight', () => {
   })
 
   it('should synchronize height when isEnabled is true and refs are attached', () => {
-    // Start with the component disabled so the effect doesn't run initially.
     const { getByTestId, rerender } = render(<TestComponent isEnabled={false} />)
     const source = getByTestId('source')
     const target = getByTestId('target')
 
-    // Mock the height of the source element.
     Object.defineProperty(source, 'offsetHeight', {
       configurable: true,
       value: 500,
     })
 
-    // Now, enable the hook by re-rendering. This will trigger the useLayoutEffect.
     rerender(<TestComponent isEnabled={true} />)
 
     expect(target.style.height).toBe('500px')
@@ -96,7 +91,6 @@ describe('useSynchronizedHeight', () => {
     const source = getByTestId('source')
     const target = getByTestId('target')
 
-    // Set initial height and enable the hook
     Object.defineProperty(source, 'offsetHeight', {
       configurable: true,
       value: 500,
@@ -104,13 +98,11 @@ describe('useSynchronizedHeight', () => {
     rerender(<TestComponent isEnabled={true} />)
     expect(target.style.height).toBe('500px')
 
-    // Simulate a resize by changing the mocked height
     Object.defineProperty(source, 'offsetHeight', {
       configurable: true,
       value: 600,
     })
 
-    // Manually trigger the observer's callback
     act(() => {
       mockResizeObserverCallback?.([], {} as ResizeObserver)
     })
@@ -119,9 +111,7 @@ describe('useSynchronizedHeight', () => {
   })
 
   it('should disconnect the observer on unmount', () => {
-    // Render enabled to ensure the observer is set up
     const { unmount } = render(<TestComponent isEnabled={true} />)
-    // The effect runs, observer is created and attached
     expect(mockObserve).toHaveBeenCalledOnce()
 
     unmount()
@@ -133,7 +123,6 @@ describe('useSynchronizedHeight', () => {
     const source = getByTestId('source')
     const target = getByTestId('target')
 
-    // Set initial height and enable the hook
     Object.defineProperty(source, 'offsetHeight', {
       configurable: true,
       value: 500,
@@ -141,10 +130,8 @@ describe('useSynchronizedHeight', () => {
     rerender(<TestComponent isEnabled={true} />)
     expect(target.style.height).toBe('500px')
 
-    // Now disable the hook by re-rendering with a new prop
     rerender(<TestComponent isEnabled={false} />)
 
-    // The cleanup function from the effect should have run and cleared the style
     expect(target.style.height).toBe('')
     expect(mockDisconnect).toHaveBeenCalledOnce()
   })

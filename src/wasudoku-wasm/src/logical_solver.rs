@@ -22,11 +22,11 @@ use crate::board::Board;
 use crate::types::{CauseCell, Elimination, Placement, SolvingStep};
 use std::collections::HashSet;
 
+/// Bitmask representing all candidates (1-9) for a cell.
 const ALL_CANDIDATES: u16 = 0b111111111;
 
-// Pre-calculating indices for all 27 units (rows, columns, boxes)
-// avoids repeated calculations in the solver loops.
-
+// Pre-calculate and cache indices for all rows, columns, boxes, and peer cells.
+// This avoids repeated calculations in hot loops within the solver.
 lazy_static::lazy_static! {
     static ref ROW_UNITS: [[usize; 9]; 9] = {
         let mut units = [[0; 9]; 9];
@@ -57,6 +57,7 @@ lazy_static::lazy_static! {
         }
         units
     };
+    /// A collection of all 27 units (9 rows, 9 columns, 9 boxes).
     static ref ALL_UNITS: Vec<&'static [usize]> = {
         let mut units = Vec::with_capacity(27);
         units.extend(ROW_UNITS.iter().map(|u| &u[..]));
@@ -64,6 +65,7 @@ lazy_static::lazy_static! {
         units.extend(BOX_UNITS.iter().map(|u| &u[..]));
         units
     };
+    /// A map from a cell index to a vector of its 20 peers.
     static ref PEER_MAP: [Vec<usize>; 81] = {
         let mut map = [(); 81].map(|_| Vec::with_capacity(20));
         for i in 0..81 {
@@ -87,39 +89,39 @@ lazy_static::lazy_static! {
     };
 }
 
-/// Converts a bitmask of candidates into a Vec of numbers.
+/// Convert a bitmask of candidates into a `Vec` of numbers.
 fn mask_to_vec(mask: u16) -> Vec<u8> {
     (1..=9)
         .filter(|&num| (mask >> (num - 1)) & 1 == 1)
         .collect()
 }
 
-/// Represents a Sudoku board with candidate tracking for logical solving.
+/// A Sudoku board with candidate tracking for logical solving.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct LogicalBoard {
     /// The definitive numbers on the board (0 for empty).
     pub cells: [u8; 81],
     /// A bitmask for each cell representing possible candidates (1-9).
-    /// A 0 indicates the cell is filled.
+    /// A `0` indicates the cell is filled.
     pub candidates: [u16; 81],
 }
 
 impl LogicalBoard {
-    /// Creates a `LogicalBoard` from a simple `Board`, calculating initial candidates.
+    /// Create a `LogicalBoard` from a simple `Board` by calculating initial candidates.
     pub fn from_board(board: &Board) -> Self {
         let mut logical_board = LogicalBoard {
             cells: board.cells,
             candidates: [0; 81],
         };
 
-        // Initialize candidates for empty cells.
+        // Initialize candidates for all empty cells.
         for i in 0..81 {
             if logical_board.cells[i] == 0 {
                 logical_board.candidates[i] = ALL_CANDIDATES;
             }
         }
 
-        // Propagate constraints from existing numbers.
+        // Propagate constraints from existing numbers to establish the initial candidate state.
         for i in 0..81 {
             if logical_board.cells[i] != 0 {
                 logical_board.eliminate_from_peers(i, logical_board.cells[i]);
@@ -128,7 +130,7 @@ impl LogicalBoard {
         logical_board
     }
 
-    /// Places a number on the board and updates the candidates of its peers.
+    /// Place a number on the board and update the candidates of its peers.
     fn set_cell(&mut self, index: usize, value: u8) -> bool {
         if self.cells[index] != 0 {
             return false;
@@ -139,7 +141,7 @@ impl LogicalBoard {
         true
     }
 
-    /// Eliminates a candidate from all peer cells of a given index.
+    /// Eliminate a candidate from all peer cells of a given index.
     fn eliminate_from_peers(&mut self, index: usize, value: u8) {
         let elimination_mask = !(1 << (value - 1));
         for &peer_index in &PEER_MAP[index] {
@@ -147,7 +149,8 @@ impl LogicalBoard {
         }
     }
 
-    /// Finds the first available "Naked Single".
+    /// Find the first available "Naked Single" on the board.
+    /// A Naked Single is a cell that has only one possible candidate.
     fn find_naked_single(&self) -> Option<SolvingStep> {
         for i in 0..81 {
             if self.cells[i] == 0 && self.candidates[i].count_ones() == 1 {
@@ -175,7 +178,8 @@ impl LogicalBoard {
         None
     }
 
-    /// Finds a "Hidden Single" in a given group of cells.
+    /// Find a "Hidden Single" in a given group of cells (row, column, or box).
+    /// A Hidden Single is a candidate that appears only once within a unit.
     fn find_hidden_single_in_group(&self, group: &[usize]) -> Option<SolvingStep> {
         for num in 1..=9 {
             let mask = 1 << (num - 1);
@@ -199,7 +203,7 @@ impl LogicalBoard {
                     })
                     .collect::<Vec<_>>();
 
-                // Also eliminate other candidates from the cell itself
+                // Also eliminate other candidates from the cell itself.
                 for cand in 1..=9 {
                     if cand != value && (self.candidates[index] & (1 << (cand - 1))) != 0 {
                         eliminations.push(Elimination { index, value: cand });
@@ -217,7 +221,8 @@ impl LogicalBoard {
         None
     }
 
-    /// Generic function to find Naked Subsets (Pairs, Triples, etc.)
+    /// Find Naked Subsets (Pairs, Triples) in any unit.
+    /// A Naked Pair is two cells in the same unit that have the exact same two candidates.
     fn find_naked_subset(&self, size: usize) -> Option<SolvingStep> {
         let tech_name = format!(
             "Naked{}",
@@ -240,7 +245,7 @@ impl LogicalBoard {
                 continue;
             }
 
-            // This is a simplified combination generator
+            // A simplified combination generator for pairs.
             for i in 0..empty_cells.len() {
                 for j in (i + 1)..empty_cells.len() {
                     if size == 2 {
@@ -290,7 +295,8 @@ impl LogicalBoard {
         None
     }
 
-    /// Finds Pointing Pairs/Triples.
+    /// Find Pointing Pairs/Triples.
+    /// This occurs when a candidate within a box is confined to a single row or column.
     fn find_pointing_subset(&self) -> Option<SolvingStep> {
         for box_unit in BOX_UNITS.iter() {
             for num in 1..=9 {
@@ -384,7 +390,7 @@ impl LogicalBoard {
     }
 }
 
-/// Solves the board by repeatedly applying logical techniques and returns the steps.
+/// Solve the board by repeatedly applying logical techniques and return the steps.
 pub fn solve_with_steps(initial_board: &Board) -> (Vec<SolvingStep>, Board) {
     let mut board = LogicalBoard::from_board(initial_board);
     let mut steps = Vec::new();
@@ -424,7 +430,7 @@ pub fn solve_with_steps(initial_board: &Board) -> (Vec<SolvingStep>, Board) {
             continue;
         }
 
-        // If no techniques made a change, the logical solver is done.
+        // Exit if no logical technique made progress.
         break;
     }
 

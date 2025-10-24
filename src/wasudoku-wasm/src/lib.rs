@@ -27,48 +27,50 @@ use std::panic;
 use types::SolveResult;
 use wasm_bindgen::prelude::*;
 
-/// Called when the wasm module is instantiated.
-///
-/// This function is executed automatically by the wasm-bindgen runtime
-/// and is a good place to put initialization code, like setting up panic hooks.
+/// Set the panic hook to forward Rust panics to the browser console.
 #[wasm_bindgen(start)]
 pub fn main() {
     utils::set_panic_hook();
 }
 
-/// Solves a Sudoku puzzle and returns the logical steps taken.
+/// Solve a Sudoku puzzle and return the logical steps and solution.
 ///
 /// This function employs a hybrid strategy. It first applies logical solving
-/// techniques to generate a series of human-readable steps. If the puzzle
-/// is not fully solved by logic, it falls back to a high-speed
-/// backtracking algorithm to find the solution.
+/// techniques to generate human-readable steps. If logic alone cannot solve
+/// the puzzle, it falls back to a high-speed backtracking algorithm to find
+/// the final solution.
 ///
 /// ### Arguments
 ///
-/// * `board_str` - A string slice representing the Sudoku board (81 chars, '.' or '0' for empty).
+/// * `board_str` - An 81-character string representing the Sudoku board,
+///   with `.` or `0` for empty cells.
 ///
 /// ### Returns
 ///
-/// * `Ok(JsValue)` - A serialized `SolveResult` object containing the steps and an optional solution string.
-/// * `Err(JsValue)` - An error if the input is invalid, the puzzle is unsolvable, or a crash occurs.
+/// * A `JsValue` containing the serialized `SolveResult`, which includes
+///   the logical steps and an optional final solution string.
+///
+/// ### Errors
+///
+/// * A `JsValue` error if the input is invalid, the puzzle is unsolvable,
+///   or a panic occurs in the underlying solver.
 #[wasm_bindgen]
 pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
     let initial_board = Board::from_str(board_str).map_err(|e| JsValue::from_str(&e))?;
 
+    // Use `catch_unwind` to contain any panics within the solver logic,
+    // preventing the WASM module from crashing and allowing a graceful error return.
     let solve_result = panic::catch_unwind(move || {
         let (steps, mut board_after_logic) = logical_solver::solve_with_steps(&initial_board);
 
         // If logic was not sufficient, fall back to the backtracking algorithm.
         let final_solution = if board_after_logic.cells.contains(&0) {
             if solver::solve(&mut board_after_logic) {
-                Some(board_after_logic.to_string()) // Solved with backtracking.
+                Some(board_after_logic.to_string())
             } else {
-                // This case indicates the logical steps led to an unsolvable state,
-                // or the original puzzle was unsolvable.
                 return None;
             }
         } else {
-            // Logic was sufficient, the final board state is the solution.
             Some(board_after_logic.to_string())
         };
 

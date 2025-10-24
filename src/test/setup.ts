@@ -21,8 +21,8 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
-// JSDOM doesn't implement ResizeObserver, so we need to mock it for tests
-// that use components relying on it (e.g., Radix UI's ScrollArea).
+// JSDOM does not implement ResizeObserver. Mock it for tests of components
+// that rely on it such as UI libraries.
 const ResizeObserverMock = vi.fn(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),

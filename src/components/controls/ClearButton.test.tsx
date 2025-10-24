@@ -32,7 +32,6 @@ import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 import { toast } from 'sonner'
 
-// Mocks
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/hooks/useSudokuActions')
 vi.mock('sonner', () => ({ toast: { info: vi.fn() } }))

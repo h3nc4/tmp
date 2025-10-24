@@ -23,7 +23,6 @@ import { useSudokuFeedback } from './useSudokuFeedback'
 import type { SudokuState } from '@/context/sudoku.types'
 import { initialState } from '@/context/sudoku.reducer'
 
-// --- Mocks ---
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
@@ -61,14 +60,12 @@ describe('useSudokuFeedback', () => {
     expect(toast.error).toHaveBeenCalledWith(errorMessage)
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_ERROR' })
 
-    // Rerender with the error cleared to ensure the effect doesn't fire again
     const clearedState: SudokuState = {
       ...state,
       ui: { ...state.ui, lastError: null },
     }
     rerender({ state: clearedState, dispatch: mockDispatch })
 
-    // The mocks should not be called a second time
     expect(toast.error).toHaveBeenCalledOnce()
     expect(mockDispatch).toHaveBeenCalledOnce()
   })

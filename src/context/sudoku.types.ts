@@ -30,9 +30,6 @@ export type BoardState = readonly CellState[]
 export type InputMode = 'normal' | 'candidate' | 'center'
 export type GameMode = 'playing' | 'visualizing'
 
-// --- Solver Data Structures ---
-// These types mirror the Rust structs returned by the WASM module.
-
 export interface Placement {
   index: number
   value: number
@@ -59,8 +56,6 @@ export interface SolveResult {
   steps: SolvingStep[]
   solution: string | null
 }
-
-// --- State Domain Slices ---
 
 export interface HistoryState {
   readonly stack: readonly BoardState[]

@@ -21,13 +21,11 @@ use wasudoku_wasm::logical_solver::{self, LogicalBoard};
 use wasudoku_wasm::solver;
 use wasudoku_wasm::types::{Elimination, SolvingStep};
 
-/// Helper to create a `LogicalBoard` from a string for testing.
 fn board_from_str(s: &str) -> LogicalBoard {
     let simple_board = Board::from_str(s).unwrap();
     LogicalBoard::from_board(&simple_board)
 }
 
-/// Helper to parse a puzzle, run the logical solver, and assert the properties of a specific step.
 fn assert_nth_logical_step(
     puzzle_str: &str,
     step_index: usize,
@@ -114,7 +112,6 @@ fn test_hidden_single_detection_in_box() {
 fn test_naked_pair_detection() {
     let puzzle_str =
         ".....8..5..97...1..1.....687.51..........3..46......57.6...5.9..8........4.9.....";
-    // Step 32 is at index 31
     let step = assert_nth_logical_step(puzzle_str, 31, "NakedPair");
 
     // The pair {4, 6} exists at indices 14 (R2C6) and 32 (R4C6) in column 6.
@@ -138,7 +135,6 @@ fn test_naked_pair_detection() {
 fn test_pointing_pair_detection() {
     let puzzle_str =
         ".....8..5..97...1..1.....687.51..........3..46......57.6...5.9..8........4.9.....";
-    // Step 33 is at index 32
     let step = assert_nth_logical_step(puzzle_str, 32, "PointingPair");
 
     // The candidate '2' is confined to row 2 (cells R2C7, R2C9).
@@ -186,7 +182,7 @@ fn test_hybrid_solver_logic_solves_puzzle() {
 
 #[test]
 fn test_hybrid_solver_falls_back_to_backtracking() {
-    // A very hard puzzle that the current logical solver cannot finish.
+    // A hard puzzle that the current logical solver cannot finish.
     let puzzle_str =
         "8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..";
     let solution_str =

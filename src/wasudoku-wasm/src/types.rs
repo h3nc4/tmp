@@ -18,16 +18,16 @@
 
 use serde::Serialize;
 
-/// Represents the final result of the solver, to be sent to the frontend.
+/// The final result of the solver, sent to the frontend.
 #[derive(Serialize, Clone)]
 pub struct SolveResult {
     /// A list of logical steps taken to solve the puzzle.
     pub steps: Vec<SolvingStep>,
-    /// The final, fully solved board as a string.
+    /// The final, fully solved board as an 81-character string.
     pub solution: Option<String>,
 }
 
-/// Represents a single logical step in solving the puzzle.
+/// A single logical step in solving the puzzle.
 #[derive(Serialize, Clone)]
 pub struct SolvingStep {
     /// The name of the technique used (e.g., "NakedSingle").
@@ -36,30 +36,29 @@ pub struct SolvingStep {
     pub placements: Vec<Placement>,
     /// A list of candidates eliminated from cells in this step.
     pub eliminations: Vec<Elimination>,
-    /// The cells that form the basis of the technique
-    /// For a Pointing Pair, this would be the cells within the box that form the line.
+    /// The cells that form the basis of the logical deduction.
     pub cause: Vec<CauseCell>,
 }
 
-/// Represents placing a single number in a cell.
+/// A number placed in a cell.
 #[derive(Serialize, Clone)]
 pub struct Placement {
     pub index: usize,
     pub value: u8,
 }
 
-/// Represents eliminating a single candidate from a cell.
+/// A candidate eliminated from a cell.
 #[derive(Serialize, Clone)]
 pub struct Elimination {
     pub index: usize,
     pub value: u8,
 }
 
-/// Represents a cell that is part of the cause of a logical deduction.
+/// A cell that is part of the cause of a logical deduction.
 #[derive(Serialize, Clone)]
 pub struct CauseCell {
     pub index: usize,
-    /// The candidates in this cell that are relevant to the logical deduction.
+    /// The candidates in this cell that are relevant to the deduction.
     /// For a Naked Pair of {1, 8}, this would be `vec![1, 8]`.
     pub candidates: Vec<u8>,
 }

@@ -18,19 +18,18 @@
 
 import init, { solve_sudoku } from 'wasudoku-wasm'
 
-// Initialize the WASM module when the worker is created.
+// Initialize the WASM module on worker startup.
 const wasmReady = init()
 
 /**
  * Handles incoming messages, runs the solver, and posts the result back.
- * This function is exported for direct testing.
+ * Exported for direct testing.
  * @param event The message event from the main thread.
  */
 export async function handleMessage(
   event: MessageEvent<{ boardString: string }>,
 ) {
-  // Ignore messages from untrusted origins.
-  // The global `self` is available in a worker context.
+  // Enforce same-origin policy for security. `self` is the worker's global scope.
   const isSameOrigin = self.location.origin === event.origin
   const isFileOrTestOrigin = event.origin === 'null' || event.origin === ''
 
@@ -43,14 +42,11 @@ export async function handleMessage(
     await wasmReady
 
     const { boardString } = event.data
-    // solve_sudoku returns a JsValue which needs to be parsed.
     const result = solve_sudoku(boardString)
 
-    // Post the successful solution back to the main thread.
     self.postMessage({ type: 'solution', result })
   } catch (error) {
-    // If the solver throws an error (e.g., invalid input, no solution, crash),
-    // capture it and post it back to the main thread for graceful handling.
+    // Capture any solver error and post it back for graceful handling in the UI.
     const errorMessage = error instanceof Error ? error.message : String(error)
     self.postMessage({ type: 'error', error: errorMessage })
   }

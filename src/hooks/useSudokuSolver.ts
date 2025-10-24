@@ -24,9 +24,9 @@ import { solveSuccess, solveFailure } from '@/context/sudoku.actions'
 import SolverWorker from '@/workers/sudoku.worker?worker'
 
 /**
- * A hook to manage the Sudoku solver Web Worker. It handles initializing
- * the worker, posting the board to it when solving starts, and dispatching
- * actions based on the worker's response (success or error).
+ * Manages the Sudoku solver Web Worker. It handles initializing the worker,
+ * posting the board to it when solving starts, and dispatching actions based
+ * on the worker's response (success or error).
  *
  * @param state - The current Sudoku state.
  * @param dispatch - The dispatch function from the Sudoku reducer.

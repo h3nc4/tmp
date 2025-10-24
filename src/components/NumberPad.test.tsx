@@ -32,7 +32,6 @@ import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState, createEmptyBoard } from '@/context/sudoku.reducer'
 import type { SudokuState } from '@/context/sudoku.types'
 
-// Mocks
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/hooks/useSudokuActions')
 
@@ -45,7 +44,7 @@ describe('NumberPad component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseSudokuState.mockReturnValue(initialState) // activeCellIndex is null
+    mockUseSudokuState.mockReturnValue(initialState)
     mockUseSudokuActions.mockReturnValue({
       inputValue: mockInputValue,
       setHighlightedValue: mockSetHighlightedValue,
@@ -111,7 +110,6 @@ describe('NumberPad component', () => {
   })
 
   it('displays the remaining count for an incomplete number', () => {
-    // 7 threes on the board, so 2 remaining
     const partialBoard = createEmptyBoard().map((cell, i) => ({
       ...cell,
       value: i < 7 ? 3 : null,
@@ -127,7 +125,6 @@ describe('NumberPad component', () => {
   })
 
   it('does not display a count for a complete number', () => {
-    // 9 threes on the board
     const fullBoard = createEmptyBoard().map(() => ({
       ...initialState.board[0],
       value: 3,

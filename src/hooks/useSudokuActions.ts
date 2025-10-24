@@ -27,9 +27,9 @@ import { isMoveValid, boardStateToString } from '@/lib/utils'
 import type { InputMode } from '@/context/sudoku.types'
 
 /**
- * A hook that provides a stable, memoized API for dispatching all Sudoku actions.
+ * Provides a stable, memoized API for dispatching all Sudoku actions.
  * This hook acts as the "intent interpretation" layer, translating high-level
- * user actions into the specific low-level mutations that are sent to the reducer.
+ * user actions into the specific low-level mutations sent to the reducer.
  *
  * @returns An object containing functions to dispatch all possible user intents.
  */
@@ -37,8 +37,7 @@ export function useSudokuActions() {
   const state = useSudokuState()
   const dispatch = useSudokuDispatch()
 
-  // useMemo ensures that the returned object has a stable identity,
-  // preventing unnecessary re-renders in components that consume this hook.
+  // The returned object has a stable identity, preventing unnecessary re-renders.
   return useMemo(
     () => ({
       /** Sets the active cell and updates the highlighted value. */
@@ -52,7 +51,6 @@ export function useSudokuActions() {
 
         if (state.ui.inputMode === 'normal') {
           dispatch(actions.setCellValue(state.ui.activeCellIndex, value))
-          // Auto-advance focus if the move was valid
           if (
             isMoveValid(state.board, state.ui.activeCellIndex, value) &&
             state.ui.activeCellIndex < 80
@@ -86,7 +84,7 @@ export function useSudokuActions() {
         }
       },
 
-      /** Erases the active cell's content, with different behaviors for delete/backspace. */
+      /** Erases the active cell's content. */
       eraseActiveCell: (mode: 'delete' | 'backspace') => {
         if (state.ui.activeCellIndex === null) return
         dispatch(actions.eraseCell(state.ui.activeCellIndex))

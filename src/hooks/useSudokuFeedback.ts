@@ -23,9 +23,8 @@ import type { SudokuState } from '@/context/sudoku.types'
 import { clearError } from '@/context/sudoku.actions'
 
 /**
- * A hook to manage user-facing feedback, like toasts for errors.
- * It listens for changes in the `lastError` state property and displays
- * a toast when an error is set.
+ * Manages user-facing feedback, such as toasts for errors. It listens for changes
+ * in the `lastError` state property and displays a toast when an error is set.
  *
  * @param state - The current Sudoku state.
  * @param dispatch - The dispatch function from the Sudoku reducer.
@@ -39,7 +38,6 @@ export function useSudokuFeedback(
   useEffect(() => {
     if (lastError) {
       toast.error(lastError)
-      // Dispatch an action to clear the error so the toast doesn't re-appear.
       dispatch(clearError())
     }
   }, [lastError, dispatch])

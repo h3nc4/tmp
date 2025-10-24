@@ -24,9 +24,6 @@ import SolverWorker from '@/workers/sudoku.worker?worker'
 import type { SudokuState, SolveResult } from '@/context/sudoku.types'
 import { initialState } from '@/context/sudoku.reducer'
 
-// --- Mocks ---
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let messageHandler: (event: { data: any }) => void
 const mockWorkerInstance = {
   postMessage: vi.fn(),
@@ -39,7 +36,6 @@ const mockWorkerInstance = {
   onerror: null,
   onmessage: null,
   onmessageerror: null,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   __simulateMessage(data: any) {
     if (messageHandler) {
       messageHandler({ data })
@@ -69,7 +65,6 @@ describe('useSudokuSolver', () => {
   })
 
   afterEach(() => {
-    // This is important to ensure the worker instance is fresh for each test
     vi.clearAllMocks()
   })
 
@@ -135,7 +130,7 @@ describe('useSudokuSolver', () => {
 
   it('should do nothing if solution message is missing result object', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'solution' }) // No result object
+    mockWorkerInstance.__simulateMessage({ type: 'solution' })
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.success).not.toHaveBeenCalled()
   })
@@ -150,7 +145,7 @@ describe('useSudokuSolver', () => {
 
   it('should do nothing if error message is missing error string', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'error' }) // No error string
+    mockWorkerInstance.__simulateMessage({ type: 'error' })
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.error).not.toHaveBeenCalled()
   })
@@ -168,30 +163,25 @@ describe('useSudokuSolver', () => {
   })
 
   it('should handle case where worker is not available when solving starts', () => {
-    // 1. Mock the Worker constructor to throw an error during initialization.
     vi.mocked(SolverWorker).mockImplementationOnce(() => {
       throw new Error('Worker instantiation failed')
     })
 
-    // 2. Render the hook. The first useEffect will run and fail.
     const { rerender } = renderHook(
       (props) => useSudokuSolver(props.state, props.dispatch),
       { initialProps: { state: initialState, dispatch: mockDispatch } },
     )
 
-    // Check that the initialization failure was caught and reported.
     expect(toast.error).toHaveBeenCalledWith(
       'Solver functionality is unavailable.',
     )
 
-    // 3. Now, simulate the user trying to solve.
     const solvingState: SudokuState = {
       ...initialState,
       solver: { ...initialState.solver, isSolving: true },
     }
     rerender({ state: solvingState, dispatch: mockDispatch })
 
-    // 4. The second useEffect should now run, see that the workerRef is null, and report the error.
     expect(toast.error).toHaveBeenCalledWith('Solver worker is not available.')
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
   })

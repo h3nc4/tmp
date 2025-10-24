@@ -31,7 +31,6 @@ import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 
-// Mocks
 vi.mock('@/context/sudoku.hooks')
 vi.mock('@/hooks/useSudokuActions')
 
@@ -73,11 +72,8 @@ describe('InputModeToggle component', () => {
     render(<InputModeToggle />)
 
     const candidateButton = screen.getByRole('radio', { name: 'Candidate' })
-    // This second click simulates deselecting the item, which makes Radix ToggleGroup
-    // call onValueChange with an empty string.
     await user.click(candidateButton)
 
-    // The handler's guard `if (value)` should prevent calling the action.
     expect(mockSetInputMode).not.toHaveBeenCalled()
   })
 
