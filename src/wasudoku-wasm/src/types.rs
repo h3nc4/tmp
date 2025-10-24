@@ -36,7 +36,8 @@ pub struct SolvingStep {
     pub placements: Vec<Placement>,
     /// A list of candidates eliminated from cells in this step.
     pub eliminations: Vec<Elimination>,
-    /// The cells that form the basis of the technique (e.g., the two cells of a Naked Pair).
+    /// The cells that form the basis of the technique
+    /// For a Pointing Pair, this would be the cells within the box that form the line.
     pub cause: Vec<CauseCell>,
 }
 
@@ -58,5 +59,7 @@ pub struct Elimination {
 #[derive(Serialize, Clone)]
 pub struct CauseCell {
     pub index: usize,
+    /// The candidates in this cell that are relevant to the logical deduction.
+    /// For a Naked Pair of {1, 8}, this would be `vec![1, 8]`.
     pub candidates: Vec<u8>,
 }

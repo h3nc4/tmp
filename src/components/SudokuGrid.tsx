@@ -55,6 +55,21 @@ export function SudokuGrid() {
     return getRelatedCellIndices(ui.activeCellIndex)
   }, [ui.activeCellIndex])
 
+  const causeIndices = useMemo(() => {
+    if (
+      solver.gameMode !== 'visualizing' ||
+      solver.currentStepIndex === null ||
+      solver.currentStepIndex === 0
+    ) {
+      return new Set<number>()
+    }
+    const currentStep = solver.steps[solver.currentStepIndex - 1]
+    if (!currentStep?.cause) {
+      return new Set<number>()
+    }
+    return new Set(currentStep.cause.map((c) => c.index))
+  }, [solver.gameMode, solver.currentStepIndex, solver.steps])
+
   // Effect to declaratively manage focus based on the activeCellIndex state.
   useEffect(() => {
     if (ui.activeCellIndex !== null && cellRefs[ui.activeCellIndex]?.current) {
@@ -188,6 +203,7 @@ export function SudokuGrid() {
               displayCell.value !== null &&
               displayCell.value === ui.highlightedValue
             }
+            isCause={causeIndices.has(index)}
             onFocus={handleCellFocus}
             eliminatedCandidates={eliminatedCandidates}
           />

@@ -28,6 +28,7 @@ import {
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import type { SolvingStep } from '@/context/sudoku.types'
+import { formatCell } from '@/lib/utils'
 
 /**
  * Generates a human-readable explanation for a given solving step.
@@ -35,23 +36,52 @@ import type { SolvingStep } from '@/context/sudoku.types'
  * @returns A string explaining the step's logic.
  */
 const getStepExplanation = (step: SolvingStep): string => {
-  switch (step.technique) {
+  const { technique, placements, cause } = step
+
+  // Helper to format a list of numbers (e.g., {1, 2, 3})
+  const formatNums = (nums: number[]) => `{${[...nums].sort().join(', ')}}`
+  // Helper to format a list of cell coordinates
+  const formatCells = (indices: number[]) =>
+    indices.map(formatCell).join(', ')
+
+  switch (technique) {
     case 'NakedSingle': {
-      const { index, value } = step.placements[0]
-      const row = Math.floor(index / 9) + 1
-      const col = (index % 9) + 1
-      return `Cell R${row}C${col} had only one possible candidate remaining: ${value}. This is a Naked Single.`
+      const { index, value } = placements[0]
+      return `Cell ${formatCell(index)} had only one possible candidate remaining: ${value}. This is a Naked Single.`
     }
     case 'HiddenSingle': {
-      const { index, value } = step.placements[0]
-      const row = Math.floor(index / 9) + 1
-      const col = (index % 9) + 1
-      return `Within its row, column, or box, the number ${value} could only be placed in cell R${row}C${col}. This is a Hidden Single.`
+      const { index, value } = placements[0]
+      return `Within its row, column, or box, the number ${value} could only be placed in cell ${formatCell(index)}. This is a Hidden Single.`
+    }
+    case 'NakedPair': {
+      const cells = formatCells(cause.map((c) => c.index))
+      const candidates = formatNums(cause[0].candidates)
+      return `Naked Pair: Cells ${cells} can only contain the candidates ${candidates}. Therefore, these candidates were removed from other cells in the same unit.`
+    }
+    case 'HiddenPair': {
+      const cells = formatCells(cause.map((c) => c.index))
+      const candidates = formatNums(cause[0].candidates)
+      return `Hidden Pair: In their shared unit, the candidates ${candidates} only appear in cells ${cells}. Therefore, all other candidates were removed from these two cells.`
+    }
+    case 'NakedTriple': {
+      const cells = formatCells(cause.map((c) => c.index))
+      const candidates = formatNums(cause[0].candidates)
+      return `Naked Triple: Cells ${cells} form a triple with candidates ${candidates}. Therefore, these candidates were removed from other cells in the same unit.`
+    }
+    case 'HiddenTriple': {
+      const cells = formatCells(cause.map((c) => c.index))
+      const candidates = formatNums(cause[0].candidates)
+      return `Hidden Triple: In their shared unit, the candidates ${candidates} only appear in cells ${cells}. Therefore, all other candidates were removed from these three cells.`
+    }
+    case 'PointingPair':
+    case 'PointingTriple': {
+      const candidates = formatNums(cause[0].candidates)
+      return `Pointing Subgroup: The candidates ${candidates} in one box are confined to a single row or column. They were eliminated from the rest of that line.`
     }
     case 'Backtracking':
       return 'The available logical techniques were not sufficient to solve the puzzle. A backtracking (brute-force) algorithm was used to find the solution.'
     default:
-      return `Technique used: ${step.technique}.`
+      return `Technique used: ${technique}.`
   }
 }
 

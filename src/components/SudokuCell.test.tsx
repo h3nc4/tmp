@@ -33,6 +33,7 @@ describe('SudokuCell component', () => {
     isActive: false,
     isHighlighted: false,
     isNumberHighlighted: false,
+    isCause: false,
     onFocus: mockOnFocus,
   }
 
@@ -128,6 +129,11 @@ describe('SudokuCell component', () => {
     it('applies correct background when solving', () => {
       render(<SudokuCell {...defaultProps} isSolving />)
       expect(screen.getByTestId('cell-background')).toHaveClass('cursor-not-allowed bg-muted/50')
+    })
+
+    it('applies correct background for a cause cell in visualization', () => {
+      render(<SudokuCell {...defaultProps} isCause />)
+      expect(screen.getByTestId('cell-background')).toHaveClass('bg-purple-200 dark:bg-purple-800/80')
     })
 
     it('applies correct border for right edge of a box', () => {

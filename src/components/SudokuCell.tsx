@@ -41,6 +41,8 @@ interface SudokuCellProps {
   readonly isHighlighted: boolean
   /** Whether this cell's number matches the globally highlighted number. */
   readonly isNumberHighlighted: boolean
+  /** For visualization, whether this cell is part of the "cause" of the logical step. */
+  readonly isCause: boolean
   /** Callback function when the cell receives focus (e.g., via click). */
   readonly onFocus: (index: number) => void
   /** For visualization, a set of candidates eliminated in the current step. */
@@ -55,6 +57,7 @@ const getBackgroundStyles = ({
   isConflict,
   isActive,
   isSolving,
+  isCause,
   isNumberHighlighted,
   isHighlighted,
 }: Pick<
@@ -62,12 +65,14 @@ const getBackgroundStyles = ({
   | 'isConflict'
   | 'isActive'
   | 'isSolving'
+  | 'isCause'
   | 'isNumberHighlighted'
   | 'isHighlighted'
 >) => {
   if (isConflict) return '!bg-destructive/20'
   if (isActive) return 'bg-sky-200 dark:bg-sky-800/80'
   if (isSolving) return 'cursor-not-allowed bg-muted/50'
+  if (isCause) return 'bg-purple-200 dark:bg-purple-800/80'
   if (isNumberHighlighted) return 'bg-amber-100/70 dark:bg-amber-900/40'
   if (isHighlighted) return 'bg-sky-100 dark:bg-sky-900/60'
   return ''

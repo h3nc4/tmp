@@ -19,35 +19,79 @@
 //! A logical Sudoku solver that uses human-like techniques.
 
 use crate::board::Board;
-use crate::types::{Elimination, Placement, SolvingStep};
+use crate::types::{CauseCell, Elimination, Placement, SolvingStep};
 use std::collections::HashSet;
 
 const ALL_CANDIDATES: u16 = 0b111111111;
 
-/// Helper function to get all peers of a cell (row, col, box, excluding self).
-fn get_peer_indices(index: usize) -> Vec<usize> {
-    let mut peers = HashSet::new();
-    let row = index / 9;
-    let col = index % 9;
+// Pre-calculating indices for all 27 units (rows, columns, boxes)
+// avoids repeated calculations in the solver loops.
 
-    // Row peers
-    for c in 0..9 {
-        peers.insert(row * 9 + c);
-    }
-    // Column peers
-    for r in 0..9 {
-        peers.insert(r * 9 + col);
-    }
-    // Box peers
-    let start_row = (row / 3) * 3;
-    let start_col = (col / 3) * 3;
-    for r_offset in 0..3 {
-        for c_offset in 0..3 {
-            peers.insert((start_row + r_offset) * 9 + (start_col + c_offset));
+lazy_static::lazy_static! {
+    static ref ROW_UNITS: [[usize; 9]; 9] = {
+        let mut units = [[0; 9]; 9];
+        for i in 0..9 {
+            for j in 0..9 {
+                units[i][j] = i * 9 + j;
+            }
         }
-    }
-    peers.remove(&index);
-    peers.into_iter().collect()
+        units
+    };
+    static ref COL_UNITS: [[usize; 9]; 9] = {
+        let mut units = [[0; 9]; 9];
+        for i in 0..9 {
+            for j in 0..9 {
+                units[i][j] = j * 9 + i;
+            }
+        }
+        units
+    };
+    static ref BOX_UNITS: [[usize; 9]; 9] = {
+        let mut units = [[0; 9]; 9];
+        for i in 0..9 {
+            let start_row = (i / 3) * 3;
+            let start_col = (i % 3) * 3;
+            for j in 0..9 {
+                units[i][j] = (start_row + j / 3) * 9 + (start_col + j % 3);
+            }
+        }
+        units
+    };
+    static ref ALL_UNITS: Vec<&'static [usize]> = {
+        let mut units = Vec::with_capacity(27);
+        units.extend(ROW_UNITS.iter().map(|u| &u[..]));
+        units.extend(COL_UNITS.iter().map(|u| &u[..]));
+        units.extend(BOX_UNITS.iter().map(|u| &u[..]));
+        units
+    };
+    static ref PEER_MAP: [Vec<usize>; 81] = {
+        let mut map = [(); 81].map(|_| Vec::with_capacity(20));
+        for i in 0..81 {
+            let mut peers = HashSet::new();
+            let row = i / 9;
+            let col = i % 9;
+
+            for c in 0..9 { peers.insert(row * 9 + c); }
+            for r in 0..9 { peers.insert(r * 9 + col); }
+            let start_row = (row / 3) * 3;
+            let start_col = (col / 3) * 3;
+            for r_offset in 0..3 {
+                for c_offset in 0..3 {
+                    peers.insert((start_row + r_offset) * 9 + (start_col + c_offset));
+                }
+            }
+            peers.remove(&i);
+            map[i] = peers.into_iter().collect();
+        }
+        map
+    };
+}
+
+/// Converts a bitmask of candidates into a Vec of numbers.
+fn mask_to_vec(mask: u16) -> Vec<u8> {
+    (1..=9)
+        .filter(|&num| (mask >> (num - 1)) & 1 == 1)
+        .collect()
 }
 
 /// Represents a Sudoku board with candidate tracking for logical solving.
@@ -78,66 +122,47 @@ impl LogicalBoard {
         // Propagate constraints from existing numbers.
         for i in 0..81 {
             if logical_board.cells[i] != 0 {
-                logical_board.eliminate_candidates(i, logical_board.cells[i]);
+                logical_board.eliminate_from_peers(i, logical_board.cells[i]);
             }
         }
-
         logical_board
     }
 
     /// Places a number on the board and updates the candidates of its peers.
-    fn set_cell(&mut self, index: usize, value: u8) {
+    fn set_cell(&mut self, index: usize, value: u8) -> bool {
+        if self.cells[index] != 0 {
+            return false;
+        }
         self.cells[index] = value;
         self.candidates[index] = 0;
-        self.eliminate_candidates(index, value);
+        self.eliminate_from_peers(index, value);
+        true
     }
 
     /// Eliminates a candidate from all peer cells of a given index.
-    fn eliminate_candidates(&mut self, index: usize, value: u8) {
-        let row = index / 9;
-        let col = index % 9;
+    fn eliminate_from_peers(&mut self, index: usize, value: u8) {
         let elimination_mask = !(1 << (value - 1));
-
-        // Eliminate from row
-        for c in 0..9 {
-            self.candidates[row * 9 + c] &= elimination_mask;
-        }
-
-        // Eliminate from column
-        for r in 0..9 {
-            self.candidates[r * 9 + col] &= elimination_mask;
-        }
-
-        // Eliminate from box
-        let start_row = (row / 3) * 3;
-        let start_col = (col / 3) * 3;
-        for r_offset in 0..3 {
-            for c_offset in 0..3 {
-                self.candidates[(start_row + r_offset) * 9 + (start_col + c_offset)] &=
-                    elimination_mask;
-            }
+        for &peer_index in &PEER_MAP[index] {
+            self.candidates[peer_index] &= elimination_mask;
         }
     }
 
     /// Finds the first available "Naked Single".
-    /// A naked single is a cell that has only one possible candidate.
     fn find_naked_single(&self) -> Option<SolvingStep> {
         for i in 0..81 {
             if self.cells[i] == 0 && self.candidates[i].count_ones() == 1 {
                 let value = (self.candidates[i].trailing_zeros() + 1) as u8;
-                let mut eliminations = vec![];
-
-                // Eliminate this value from all peers that have it as a candidate.
-                for &peer_index in &get_peer_indices(i) {
-                    if self.cells[peer_index] == 0
-                        && (self.candidates[peer_index] & (1 << (value - 1))) != 0
-                    {
-                        eliminations.push(Elimination {
-                            index: peer_index,
-                            value,
-                        });
-                    }
-                }
+                let eliminations = PEER_MAP[i]
+                    .iter()
+                    .filter(|&&peer_idx| {
+                        self.cells[peer_idx] == 0
+                            && (self.candidates[peer_idx] & (1 << (value - 1))) != 0
+                    })
+                    .map(|&peer_idx| Elimination {
+                        index: peer_idx,
+                        value,
+                    })
+                    .collect();
 
                 return Some(SolvingStep {
                     technique: "NakedSingle".to_string(),
@@ -150,88 +175,209 @@ impl LogicalBoard {
         None
     }
 
-    /// Checks a single group (row, column, or box) for a hidden single.
-    fn find_hidden_single_in_group(
-        &self,
-        group_indices: impl IntoIterator<Item = usize>,
-    ) -> Option<(usize, u8)> {
-        let indices: Vec<usize> = group_indices.into_iter().collect();
+    /// Finds a "Hidden Single" in a given group of cells.
+    fn find_hidden_single_in_group(&self, group: &[usize]) -> Option<SolvingStep> {
         for num in 1..=9 {
-            let candidate_mask = 1 << (num - 1);
-            let mut found_at: Option<usize> = None;
-            let mut count = 0;
-
-            for &index in &indices {
-                if self.cells[index] == 0 && (self.candidates[index] & candidate_mask) != 0 {
-                    count += 1;
-                    found_at = Some(index);
+            let mask = 1 << (num - 1);
+            let mut potential_indices = Vec::new();
+            for &index in group {
+                if self.cells[index] == 0 && (self.candidates[index] & mask) != 0 {
+                    potential_indices.push(index);
                 }
             }
+            if potential_indices.len() == 1 {
+                let index = potential_indices[0];
+                let value = num;
+                let mut eliminations = PEER_MAP[index]
+                    .iter()
+                    .filter(|&&p_idx| {
+                        self.cells[p_idx] == 0 && (self.candidates[p_idx] & mask) != 0
+                    })
+                    .map(|&p_idx| Elimination {
+                        index: p_idx,
+                        value,
+                    })
+                    .collect::<Vec<_>>();
 
-            if count == 1 {
-                return Some((found_at.unwrap(), num));
+                // Also eliminate other candidates from the cell itself
+                for cand in 1..=9 {
+                    if cand != value && (self.candidates[index] & (1 << (cand - 1))) != 0 {
+                        eliminations.push(Elimination { index, value: cand });
+                    }
+                }
+
+                return Some(SolvingStep {
+                    technique: "HiddenSingle".to_string(),
+                    placements: vec![Placement { index, value }],
+                    eliminations,
+                    cause: vec![],
+                });
             }
         }
         None
     }
 
-    /// Creates a `SolvingStep` for a found hidden single.
-    fn create_hidden_single_step(&self, index: usize, value: u8) -> SolvingStep {
-        let mut eliminations = vec![];
+    /// Generic function to find Naked Subsets (Pairs, Triples, etc.)
+    fn find_naked_subset(&self, size: usize) -> Option<SolvingStep> {
+        let tech_name = format!(
+            "Naked{}",
+            match size {
+                2 => "Pair",
+                3 => "Triple",
+                _ => "Subset",
+            }
+        );
+        for unit in ALL_UNITS.iter() {
+            let empty_cells: Vec<usize> = unit
+                .iter()
+                .filter(|&&i| {
+                    self.cells[i] == 0 && self.candidates[i].count_ones() as usize <= size
+                })
+                .cloned()
+                .collect();
 
-        // 1. Eliminate other candidates from this cell.
-        for cand in 1..=9 {
-            if cand != value && (self.candidates[index] & (1 << (cand - 1))) != 0 {
-                eliminations.push(Elimination { index, value: cand });
+            if empty_cells.len() <= size {
+                continue;
+            }
+
+            // This is a simplified combination generator
+            for i in 0..empty_cells.len() {
+                for j in (i + 1)..empty_cells.len() {
+                    if size == 2 {
+                        let c1_idx = empty_cells[i];
+                        let c2_idx = empty_cells[j];
+                        if self.candidates[c1_idx] == self.candidates[c2_idx]
+                            && self.candidates[c1_idx].count_ones() == 2
+                        {
+                            let combined_mask = self.candidates[c1_idx];
+                            let mut eliminations = Vec::new();
+                            let cause_cells = vec![c1_idx, c2_idx];
+                            for &cell_idx in unit.iter() {
+                                if !cause_cells.contains(&cell_idx) && self.cells[cell_idx] == 0 {
+                                    if (self.candidates[cell_idx] & combined_mask) != 0 {
+                                        for cand in mask_to_vec(combined_mask) {
+                                            if (self.candidates[cell_idx] & (1 << (cand - 1))) != 0
+                                            {
+                                                eliminations.push(Elimination {
+                                                    index: cell_idx,
+                                                    value: cand,
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !eliminations.is_empty() {
+                                let cause_cands = mask_to_vec(combined_mask);
+                                return Some(SolvingStep {
+                                    technique: tech_name,
+                                    placements: vec![],
+                                    eliminations,
+                                    cause: cause_cells
+                                        .iter()
+                                        .map(|&idx| CauseCell {
+                                            index: idx,
+                                            candidates: cause_cands.clone(),
+                                        })
+                                        .collect(),
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        // 2. Eliminate this value from all peers.
-        for &peer_index in &get_peer_indices(index) {
-            if self.cells[peer_index] == 0
-                && (self.candidates[peer_index] & (1 << (value - 1))) != 0
-            {
-                eliminations.push(Elimination {
-                    index: peer_index,
-                    value,
-                });
-            }
-        }
-
-        SolvingStep {
-            technique: "HiddenSingle".to_string(),
-            placements: vec![Placement { index, value }],
-            eliminations,
-            cause: vec![],
-        }
+        None
     }
 
-    /// Finds the first available "Hidden Single".
-    fn find_hidden_single(&self) -> Option<SolvingStep> {
-        // Check rows
-        for r in 0..9 {
-            if let Some((index, value)) =
-                self.find_hidden_single_in_group((0..9).map(|c| r * 9 + c))
-            {
-                return Some(self.create_hidden_single_step(index, value));
-            }
-        }
-        // Check columns
-        for c in 0..9 {
-            if let Some((index, value)) =
-                self.find_hidden_single_in_group((0..9).map(|r| r * 9 + c))
-            {
-                return Some(self.create_hidden_single_step(index, value));
-            }
-        }
-        // Check boxes
-        for b in 0..9 {
-            let start_row = (b / 3) * 3;
-            let start_col = (b % 3) * 3;
-            if let Some((index, value)) = self.find_hidden_single_in_group(
-                (0..9).map(|i| (start_row + i / 3) * 9 + (start_col + i % 3)),
-            ) {
-                return Some(self.create_hidden_single_step(index, value));
+    /// Finds Pointing Pairs/Triples.
+    fn find_pointing_subset(&self) -> Option<SolvingStep> {
+        for box_unit in BOX_UNITS.iter() {
+            for num in 1..=9 {
+                let mask = 1 << (num - 1);
+                let cells_with_cand: Vec<usize> = box_unit
+                    .iter()
+                    .filter(|&&i| self.cells[i] == 0 && (self.candidates[i] & mask) != 0)
+                    .cloned()
+                    .collect();
+
+                if cells_with_cand.len() < 2 || cells_with_cand.len() > 3 {
+                    continue;
+                }
+
+                let first_row = cells_with_cand[0] / 9;
+                let first_col = cells_with_cand[0] % 9;
+
+                let all_in_same_row = cells_with_cand.iter().all(|&i| i / 9 == first_row);
+                let all_in_same_col = cells_with_cand.iter().all(|&i| i % 9 == first_col);
+
+                if all_in_same_row {
+                    let mut elims = Vec::new();
+                    for col in 0..9 {
+                        let idx = first_row * 9 + col;
+                        if !box_unit.contains(&idx)
+                            && self.cells[idx] == 0
+                            && (self.candidates[idx] & mask) != 0
+                        {
+                            elims.push(Elimination {
+                                index: idx,
+                                value: num,
+                            });
+                        }
+                    }
+                    if !elims.is_empty() {
+                        return Some(SolvingStep {
+                            technique: if cells_with_cand.len() == 2 {
+                                "PointingPair".to_string()
+                            } else {
+                                "PointingTriple".to_string()
+                            },
+                            placements: vec![],
+                            eliminations: elims,
+                            cause: cells_with_cand
+                                .iter()
+                                .map(|&idx| CauseCell {
+                                    index: idx,
+                                    candidates: vec![num],
+                                })
+                                .collect(),
+                        });
+                    }
+                }
+
+                if all_in_same_col {
+                    let mut elims = Vec::new();
+                    for row in 0..9 {
+                        let idx = row * 9 + first_col;
+                        if !box_unit.contains(&idx)
+                            && self.cells[idx] == 0
+                            && (self.candidates[idx] & mask) != 0
+                        {
+                            elims.push(Elimination {
+                                index: idx,
+                                value: num,
+                            });
+                        }
+                    }
+                    if !elims.is_empty() {
+                        return Some(SolvingStep {
+                            technique: if cells_with_cand.len() == 2 {
+                                "PointingPair".to_string()
+                            } else {
+                                "PointingTriple".to_string()
+                            },
+                            placements: vec![],
+                            eliminations: elims,
+                            cause: cells_with_cand
+                                .iter()
+                                .map(|&idx| CauseCell {
+                                    index: idx,
+                                    candidates: vec![num],
+                                })
+                                .collect(),
+                        });
+                    }
+                }
             }
         }
         None
@@ -245,15 +391,34 @@ pub fn solve_with_steps(initial_board: &Board) -> (Vec<SolvingStep>, Board) {
 
     loop {
         if let Some(step) = board.find_naked_single() {
-            for placement in &step.placements {
-                board.set_cell(placement.index, placement.value);
+            board.set_cell(step.placements[0].index, step.placements[0].value);
+            steps.push(step);
+            continue;
+        }
+
+        let mut hidden_single_found = false;
+        for unit in ALL_UNITS.iter() {
+            if let Some(step) = board.find_hidden_single_in_group(unit) {
+                board.set_cell(step.placements[0].index, step.placements[0].value);
+                steps.push(step);
+                hidden_single_found = true;
+                break;
+            }
+        }
+        if hidden_single_found {
+            continue;
+        }
+
+        if let Some(step) = board.find_naked_subset(2) {
+            for elim in &step.eliminations {
+                board.candidates[elim.index] &= !(1 << (elim.value - 1));
             }
             steps.push(step);
             continue;
         }
-        if let Some(step) = board.find_hidden_single() {
-            for placement in &step.placements {
-                board.set_cell(placement.index, placement.value);
+        if let Some(step) = board.find_pointing_subset() {
+            for elim in &step.eliminations {
+                board.candidates[elim.index] &= !(1 << (elim.value - 1));
             }
             steps.push(step);
             continue;

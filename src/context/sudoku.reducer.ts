@@ -353,27 +353,43 @@ const handleViewSolverStep = (
 ): SudokuState => {
   if (state.solver.gameMode !== 'visualizing') return state
 
-  let boardForStep = state.initialBoard.map((c) => ({ ...c }))
-  for (let i = 0; i < action.index; i++) {
-    state.solver.steps[i].placements.forEach(
-      (p) => (boardForStep[p.index].value = p.value),
-    )
-  }
-
+  // 1. Determine the board state with placements for visualization.
+  let boardForStep = state.initialBoard.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
   if (action.index === state.solver.steps.length) {
-    boardForStep = state.board.map((c) => ({ ...c }))
+    // If viewing the final solution, just use the fully solved board.
+    boardForStep = state.board.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
+  } else {
+    // Otherwise, apply all placements up to the current step.
+    for (let i = 0; i < action.index; i++) {
+      for (const p of state.solver.steps[i].placements) {
+        boardForStep[p.index].value = p.value;
+      }
+    }
   }
 
-  const boardBeforeStep = state.initialBoard.map((c) => ({ ...c }))
+  // 2. Determine the candidates to display. These are the candidates *before* the current step is applied.
+
+  // Start with a board containing placements from all *previous* steps.
+  const boardBeforeCurrentStep = state.initialBoard.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
   for (let i = 0; i < action.index - 1; i++) {
-    state.solver.steps[i].placements.forEach(
-      (p) => (boardBeforeStep[p.index].value = p.value),
-    )
+    for (const p of state.solver.steps[i].placements) {
+      boardBeforeCurrentStep[p.index].value = p.value;
+    }
   }
 
-  const candidates = calculateCandidates(boardBeforeStep)
+  // Calculate the base candidates from the placements made so far.
+  const candidates = calculateCandidates(boardBeforeCurrentStep);
+
+  // Now, layer on the *eliminations* from all previous steps to get the accurate candidate state.
+  for (let i = 0; i < action.index - 1; i++) {
+    for (const elim of state.solver.steps[i].eliminations) {
+      candidates[elim.index]?.delete(elim.value);
+    }
+  }
+
+  // 3. The eliminations to highlight are from the current step itself.
   const elims =
-    action.index > 0 ? state.solver.steps[action.index - 1].eliminations : []
+    action.index > 0 ? state.solver.steps[action.index - 1].eliminations : [];
 
   return {
     ...state,
@@ -384,8 +400,8 @@ const handleViewSolverStep = (
       candidatesForViz: candidates,
       eliminationsForViz: elims,
     },
-  }
-}
+  };
+};
 
 const handleExitVisualization = (state: SudokuState): SudokuState => ({
   ...state,

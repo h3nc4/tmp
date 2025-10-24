@@ -529,6 +529,40 @@ describe('sudokuReducer', () => {
         expect(state.solver.eliminationsForViz).toEqual(steps[1].eliminations)
       })
 
+      it('should correctly apply prior eliminations when viewing a later step', () => {
+        const stepsWithElims: SolvingStep[] = [
+          { // Step 1: A pointing pair eliminates 5 from index 15, but places no number.
+            technique: 'PointingPair',
+            placements: [],
+            eliminations: [{ index: 15, value: 5 }],
+            cause: [],
+          },
+          { // Step 2: Now that 5 is gone, index 15 is a naked single of 6.
+            technique: 'NakedSingle',
+            placements: [{ index: 15, value: 6 }],
+            eliminations: [],
+            cause: [],
+          },
+        ]
+        const state: SudokuState = {
+          ...initialState,
+          solver: {
+            ...initialState.solver,
+            gameMode: 'visualizing',
+            steps: stepsWithElims,
+          },
+        }
+
+        // View step 2. We want to see the candidates *before* step 2 was applied.
+        const newState = sudokuReducer(state, { type: 'VIEW_SOLVER_STEP', index: 2 });
+        const candidatesForCell15 = newState.solver.candidatesForViz?.[15];
+
+        // Before the fix, this would fail. `calculateCandidates` would not know about
+        // the elimination from step 1, and would include 5 as a candidate.
+        // With the fix, the elimination from step 1 is applied, so 5 should be absent.
+        expect(candidatesForCell15?.has(5)).toBe(false);
+      });
+
       it('should handle VIEW_SOLVER_STEP for the initial state (index 0)', () => {
         const state = sudokuReducer(visualizingState, {
           type: 'VIEW_SOLVER_STEP',
@@ -590,7 +624,7 @@ describe('sudokuReducer', () => {
         })
 
         // The visualization board should now be the fully solved board
-        expect(stateAfterFinalStep.solver.visualizationBoard).toEqual(solvedBoard)
+        expect(stateAfterFinalStep.solver.visualizationBoard).toEqual(solvedBoard.map(c => ({ ...c, candidates: new Set(), centers: new Set() })))
         expect(stateAfterFinalStep.solver.currentStepIndex).toBe(2)
       })
 

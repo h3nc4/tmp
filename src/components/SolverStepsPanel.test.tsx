@@ -53,6 +53,56 @@ const mockSteps: SolvingStep[] = [
     cause: [],
   },
   {
+    technique: 'NakedPair',
+    placements: [],
+    eliminations: [],
+    cause: [
+      { index: 1, candidates: [4, 6] },
+      { index: 2, candidates: [4, 6] },
+    ],
+  },
+  {
+    technique: 'HiddenPair',
+    placements: [],
+    eliminations: [],
+    cause: [
+      { index: 20, candidates: [7, 8] },
+      { index: 21, candidates: [7, 8] },
+    ],
+  },
+  {
+    technique: 'NakedTriple',
+    placements: [],
+    eliminations: [],
+    cause: [
+      { index: 30, candidates: [1, 2, 3] },
+      { index: 31, candidates: [1, 2, 3] },
+      { index: 32, candidates: [1, 2, 3] },
+    ],
+  },
+  {
+    technique: 'HiddenTriple',
+    placements: [],
+    eliminations: [],
+    cause: [
+      { index: 40, candidates: [5, 6, 9] },
+      { index: 41, candidates: [5, 6, 9] },
+      { index: 42, candidates: [5, 6, 9] },
+    ],
+  },
+  {
+    technique: 'PointingPair',
+    placements: [],
+    eliminations: [],
+    cause: [{ index: 60, candidates: [8] }],
+  },
+  {
+    technique: 'PointingTriple',
+    placements: [],
+    eliminations: [],
+    cause: [{ index: 50, candidates: [1] }],
+  },
+  {
     technique: 'Backtracking',
     placements: [],
     eliminations: [],
@@ -104,7 +154,7 @@ describe('SolverStepsPanel component', () => {
       screen.getByRole('button', { name: /Step 1: NakedSingle/ }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Step 3: Backtracking/ }),
+      screen.getByRole('button', { name: /Step 9: Backtracking/ }),
     ).toBeInTheDocument()
   })
 
@@ -121,7 +171,7 @@ describe('SolverStepsPanel component', () => {
     const user = userEvent.setup()
     render(<SolverStepsPanel />)
     await user.click(screen.getByRole('button', { name: 'Solution' }))
-    expect(mockViewSolverStep).toHaveBeenCalledWith(3)
+    expect(mockViewSolverStep).toHaveBeenCalledWith(mockSteps.length)
   })
 
   it('calls viewSolverStep when an accordion trigger is clicked', async () => {
@@ -174,34 +224,46 @@ describe('SolverStepsPanel component', () => {
     ).toHaveAttribute('data-state', 'inactive')
   })
 
-  it('shows the correct explanation when an accordion item is expanded', async () => {
-    // Start with no item selected and mock the state change that would happen on click
-    mockUseSudokuState.mockReturnValue({
-      ...defaultState,
-      solver: { ...defaultState.solver, currentStepIndex: 1 },
+  describe('Step Explanations', () => {
+    const testCases: {
+      stepIndex: number
+      expectedText: RegExp
+    }[] = [
+        { stepIndex: 1, expectedText: /Cell R1C1 had only one possible candidate/ },
+        { stepIndex: 3, expectedText: /Naked Pair: Cells R1C2, R1C3 can only contain the candidates \{4, 6\}/ },
+        { stepIndex: 4, expectedText: /Hidden Pair: In their shared unit, the candidates \{7, 8\} only appear in cells R3C3, R3C4/ },
+        { stepIndex: 5, expectedText: /Naked Triple: Cells R4C4, R4C5, R4C6 form a triple with candidates \{1, 2, 3\}/ },
+        { stepIndex: 6, expectedText: /Hidden Triple: In their shared unit, the candidates \{5, 6, 9\} only appear in cells R5C5, R5C6, R5C7/ },
+        { stepIndex: 7, expectedText: /Pointing Subgroup: The candidates \{8\} in one box are confined/ },
+        { stepIndex: 8, expectedText: /Pointing Subgroup: The candidates \{1\} in one box are confined/ },
+      ]
+
+    for (const { stepIndex, expectedText } of testCases) {
+      it(`shows the correct explanation for step ${stepIndex}`, async () => {
+        mockUseSudokuState.mockReturnValue({
+          ...defaultState,
+          solver: { ...defaultState.solver, currentStepIndex: stepIndex },
+        })
+        render(<SolverStepsPanel />)
+        expect(await screen.findByText(expectedText)).toBeInTheDocument()
+      })
+    }
+
+    it('shows the correct explanation for a default/unknown case', async () => {
+      const magicSteps = [
+        { technique: 'Magic', placements: [], eliminations: [], cause: [] },
+      ]
+      mockUseSudokuState.mockReturnValue({
+        ...defaultState,
+        solver: {
+          ...defaultState.solver,
+          steps: magicSteps,
+          currentStepIndex: 1,
+        },
+      })
+      render(<SolverStepsPanel />)
+      expect(await screen.findByText('Technique used: Magic.')).toBeInTheDocument()
     })
-    const { rerender } = render(<SolverStepsPanel />)
-
-    // Now, wait for the content to appear
-    expect(
-      await screen.findByText(/Cell R1C1 had only one possible candidate/),
-    ).toBeInTheDocument()
-
-    // Test default case for unknown technique
-    const magicSteps = [
-      { technique: 'Magic', placements: [], eliminations: [], cause: [] },
-    ]
-    mockUseSudokuState.mockReturnValue({
-      ...defaultState,
-      solver: {
-        ...defaultState.solver,
-        steps: magicSteps,
-        currentStepIndex: 1,
-      },
-    })
-    rerender(<SolverStepsPanel />)
-
-    expect(await screen.findByText('Technique used: Magic.')).toBeInTheDocument()
   })
 
   it('does not call viewSolverStep when an accordion item is closed', async () => {

@@ -32,7 +32,7 @@ import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { initialState } from '@/context/sudoku.reducer'
 import * as sudokuActions from '@/context/sudoku.actions'
-import type { SudokuState, CellState } from '@/context/sudoku.types'
+import type { SudokuState, CellState, SolvingStep } from '@/context/sudoku.types'
 import { toast } from 'sonner'
 
 // Mocks
@@ -45,6 +45,7 @@ interface MockSudokuCellProps {
   onFocus: (index: number) => void
   isHighlighted: boolean
   isNumberHighlighted: boolean
+  isCause: boolean
   cell: CellState
   eliminatedCandidates?: ReadonlySet<number>
 }
@@ -361,6 +362,88 @@ describe('SudokuGrid component', () => {
       expect(cell0Props.eliminatedCandidates).toEqual(new Set())
     })
   })
+
+  describe('causeIndices calculation', () => {
+    const mockStep: SolvingStep = {
+      technique: 'NakedPair',
+      placements: [],
+      eliminations: [],
+      cause: [
+        { index: 10, candidates: [1, 2] },
+        { index: 11, candidates: [1, 2] },
+      ],
+    }
+
+    it('passes isCause=true to the correct cells', () => {
+      const visualizingState: SudokuState = {
+        ...defaultState,
+        solver: {
+          ...defaultState.solver,
+          gameMode: 'visualizing',
+          visualizationBoard: initialState.board,
+          steps: [mockStep],
+          currentStepIndex: 1, // Viewing the first step
+        },
+      }
+      mockUseSudokuState.mockReturnValue(visualizingState)
+      render(<SudokuGrid />)
+
+      const cell10Props = mockSudokuCellRender.mock.calls[10][0]
+      const cell11Props = mockSudokuCellRender.mock.calls[11][0]
+      const cell12Props = mockSudokuCellRender.mock.calls[12][0]
+
+      expect(cell10Props.isCause).toBe(true)
+      expect(cell11Props.isCause).toBe(true)
+      expect(cell12Props.isCause).toBe(false)
+    })
+
+    it('returns an empty set if currentStepIndex is 0', () => {
+      const visualizingState: SudokuState = {
+        ...defaultState,
+        solver: {
+          ...defaultState.solver,
+          gameMode: 'visualizing',
+          visualizationBoard: initialState.board,
+          steps: [mockStep],
+          currentStepIndex: 0, // Viewing initial state
+        },
+      }
+      mockUseSudokuState.mockReturnValue(visualizingState)
+      render(<SudokuGrid />)
+
+      mockSudokuCellRender.mock.calls.forEach((call) => {
+        const props = call[0] as MockSudokuCellProps
+        expect(props.isCause).toBe(false)
+      })
+    })
+
+    it('returns an empty set if the current step has no cause property', () => {
+      const stepWithoutCause: SolvingStep = {
+        technique: 'NakedSingle',
+        placements: [],
+        eliminations: [],
+        cause: undefined as unknown as [], // Simulate missing property
+      }
+      const visualizingState: SudokuState = {
+        ...defaultState,
+        solver: {
+          ...defaultState.solver,
+          gameMode: 'visualizing',
+          visualizationBoard: initialState.board,
+          steps: [stepWithoutCause],
+          currentStepIndex: 1,
+        },
+      }
+      mockUseSudokuState.mockReturnValue(visualizingState)
+      render(<SudokuGrid />)
+
+      mockSudokuCellRender.mock.calls.forEach((call) => {
+        const props = call[0] as MockSudokuCellProps
+        expect(props.isCause).toBe(false)
+      })
+    })
+  })
+
 
   it('focuses the correct cell when activeCellIndex changes', () => {
     // Spy on the focus method of all input elements

@@ -58,6 +58,17 @@ export function getRelatedCellIndices(index: number): Set<number> {
   return relatedIndices
 }
 
+/**
+ * Formats a cell index into a human-readable "R1C1" string.
+ * @param index - The cell index (0-80).
+ * @returns The formatted string.
+ */
+export const formatCell = (index: number) => {
+  const row = Math.floor(index / 9) + 1
+  const col = (index % 9) + 1
+  return `R${row}C${col}`
+}
+
 const ROW_INDICES = Array.from({ length: 9 }, (_, i) =>
   Array.from({ length: 9 }, (_, k) => i * 9 + k),
 )

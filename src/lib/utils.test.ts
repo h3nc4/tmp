@@ -23,6 +23,7 @@ import {
   boardStateFromString,
   boardStateToString,
   calculateCandidates,
+  formatCell,
   getRelatedCellIndices,
   isBoardStringValid,
   isMoveValid,
@@ -51,6 +52,18 @@ describe('Sudoku Utilities', () => {
     it('should return an empty set for an out-of-bounds index', () => {
       expect(getRelatedCellIndices(-1).size).toBe(0)
       expect(getRelatedCellIndices(81).size).toBe(0)
+    })
+  })
+
+  describe('formatCell', () => {
+    it('should format index 0 as R1C1', () => {
+      expect(formatCell(0)).toBe('R1C1')
+    })
+    it('should format index 80 as R9C9', () => {
+      expect(formatCell(80)).toBe('R9C9')
+    })
+    it('should format index 10 as R2C2', () => {
+      expect(formatCell(10)).toBe('R2C2')
     })
   })
 
