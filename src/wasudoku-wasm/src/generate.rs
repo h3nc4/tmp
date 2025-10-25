@@ -114,6 +114,47 @@ fn create_minimal_puzzle_with_limit(solution: &Board, min_clues: usize) -> Board
     puzzle
 }
 
+/// Attempts to generate a Hard puzzle from a given solution.
+fn try_generate_hard(solution: &Board) -> Option<Board> {
+    let minimal_puzzle = create_minimal_puzzle_with_limit(solution, 22);
+    let (level, solved_board) = logical_solver::get_difficulty(&minimal_puzzle);
+
+    // Hard puzzles should use intermediate techniques.
+    if level == TechniqueLevel::Intermediate && is_solved(&solved_board) {
+        Some(minimal_puzzle)
+    } else {
+        None
+    }
+}
+
+/// Attempts to generate an Extreme puzzle from a given solution.
+fn try_generate_extreme(solution: &Board) -> Option<Board> {
+    let minimal_puzzle = create_minimal_puzzle(solution);
+    let clues_count = minimal_puzzle.cells.iter().filter(|&&c| c != 0).count();
+
+    if clues_count < 17 || clues_count > 35 {
+        return None;
+    }
+
+    let (_level, solved_board) = logical_solver::get_difficulty(&minimal_puzzle);
+    // Extreme puzzles should not be completely solvable by basic/intermediate techniques.
+    let is_completely_solved = solved_board.cells.iter().all(|&c| c != 0);
+
+    if is_completely_solved {
+        None
+    } else {
+        Some(minimal_puzzle)
+    }
+}
+
+/// Validates that a puzzle has a unique solution (for Easy/Medium difficulties).
+fn validate_puzzle_uniqueness(puzzle: &Board, difficulty: Difficulty) -> bool {
+    match difficulty {
+        Difficulty::Easy | Difficulty::Medium => solver::count_solutions(puzzle) == 1,
+        Difficulty::Hard | Difficulty::Extreme => true,
+    }
+}
+
 /// Generates a puzzle of a specific difficulty.
 pub fn generate(difficulty: Difficulty) -> Board {
     loop {
@@ -122,49 +163,13 @@ pub fn generate(difficulty: Difficulty) -> Board {
         let puzzle_candidate = match difficulty {
             Difficulty::Easy => Some(generate_easy_medium(&solution, 40)),
             Difficulty::Medium => Some(generate_easy_medium(&solution, 32)),
-            Difficulty::Hard => {
-                let minimal_puzzle = create_minimal_puzzle_with_limit(&solution, 22);
-                let (level, solved_board) = logical_solver::get_difficulty(&minimal_puzzle);
-
-                // Hard puzzles should use intermediate techniques.
-                if level == TechniqueLevel::Intermediate && is_solved(&solved_board) {
-                    Some(minimal_puzzle)
-                } else {
-                    None // Discard and retry with a new seed.
-                }
-            }
-            Difficulty::Extreme => {
-                let minimal_puzzle = create_minimal_puzzle(&solution);
-                let clues_count = minimal_puzzle.cells.iter().filter(|&&c| c != 0).count();
-                if clues_count < 17 || clues_count > 35 {
-                    None
-                } else {
-                    let (_level, solved_board) = logical_solver::get_difficulty(&minimal_puzzle);
-
-                    // Extreme puzzles should not be completely solvable by basic/intermediate techniques.
-                    let is_completely_solved = solved_board.cells.iter().all(|&c| c != 0);
-                    if !is_completely_solved {
-                        Some(minimal_puzzle)
-                    } else {
-                        None // Discard and retry with a new seed.
-                    }
-                }
-            }
+            Difficulty::Hard => try_generate_hard(&solution),
+            Difficulty::Extreme => try_generate_extreme(&solution),
         };
 
-        // If a valid puzzle was created for the difficulty, return it.
-        // For Easy/Medium, verify uniqueness.
-        // For Hard/Extreme, uniqueness is already verified.
         if let Some(puzzle) = puzzle_candidate {
-            match difficulty {
-                Difficulty::Easy | Difficulty::Medium => {
-                    if solver::count_solutions(&puzzle) == 1 {
-                        return puzzle;
-                    }
-                }
-                Difficulty::Hard | Difficulty::Extreme => {
-                    return puzzle;
-                }
+            if validate_puzzle_uniqueness(&puzzle, difficulty) {
+                return puzzle;
             }
         }
     }

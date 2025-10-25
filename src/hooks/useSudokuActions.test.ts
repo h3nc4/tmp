@@ -299,6 +299,14 @@ describe('useSudokuActions', () => {
       expect(mockDispatch).toHaveBeenCalledWith(actionCreators.solveStart())
     })
 
+    it('generatePuzzle dispatches GENERATE_PUZZLE_START', () => {
+      const actions = getActions()
+      act(() => actions.generatePuzzle('easy'))
+      expect(mockDispatch).toHaveBeenCalledWith(
+        actionCreators.generatePuzzleStart('easy'),
+      )
+    })
+
     it('exitVisualization dispatches EXIT_VISUALIZATION', () => {
       const actions = getActions()
       act(() => actions.exitVisualization())

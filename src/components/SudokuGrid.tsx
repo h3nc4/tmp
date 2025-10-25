@@ -98,6 +98,7 @@ export function SudokuGrid() {
           toast.error('Invalid board format in clipboard.')
         }
       } catch (err) {
+        console.error('Failed to read from clipboard:', err)
         toast.error('Could not read from clipboard.')
       }
     },

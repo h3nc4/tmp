@@ -170,7 +170,7 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should ignore messages from a foreign origin', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
     await simulateMessage({ type: 'solve', boardString: '...' }, 'http://example.com')
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -182,19 +182,21 @@ describe('Sudoku Worker Logic', () => {
     consoleErrorSpy.mockRestore()
   })
 
-  it('should not do anything if event origin is undefined', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const event = {
-      data: { type: 'solve', boardString: '...' },
-    } as MessageEvent
-    Object.defineProperty(event, 'origin', { value: undefined })
-    await handleMessage(event)
+  it('should correctly handle a null origin for file:// contexts', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const boardString = '.'.repeat(81)
+    const result = { steps: [], solution: '1'.repeat(81) }
+    solve_sudoku.mockReturnValue(result)
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Message from untrusted origin 'undefined' ignored.",
-    )
-    expect(solve_sudoku).not.toHaveBeenCalled()
-    expect(mockPostMessage).not.toHaveBeenCalled()
+    // Simulate an event where event.origin is the string "null"
+    await simulateMessage({ type: 'solve', boardString }, 'null')
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(solve_sudoku).toHaveBeenCalledWith(boardString)
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'solution',
+      result,
+    })
     consoleErrorSpy.mockRestore()
   })
 })

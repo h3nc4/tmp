@@ -83,6 +83,28 @@ describe('Sudoku Action Creators', () => {
     expect(actions.solveFailure()).toEqual(expectedAction)
   })
 
+  it('should create a GENERATE_PUZZLE_START action', () => {
+    const expectedAction: SudokuAction = {
+      type: 'GENERATE_PUZZLE_START',
+      difficulty: 'easy',
+    }
+    expect(actions.generatePuzzleStart('easy')).toEqual(expectedAction)
+  })
+
+  it('should create a GENERATE_PUZZLE_SUCCESS action', () => {
+    const puzzleString = '.'.repeat(81)
+    const expectedAction: SudokuAction = {
+      type: 'GENERATE_PUZZLE_SUCCESS',
+      puzzleString,
+    }
+    expect(actions.generatePuzzleSuccess(puzzleString)).toEqual(expectedAction)
+  })
+
+  it('should create a GENERATE_PUZZLE_FAILURE action', () => {
+    const expectedAction: SudokuAction = { type: 'GENERATE_PUZZLE_FAILURE' }
+    expect(actions.generatePuzzleFailure()).toEqual(expectedAction)
+  })
+
   it('should create a SET_ACTIVE_CELL action', () => {
     const expectedAction: SudokuAction = { type: 'SET_ACTIVE_CELL', index: 10 }
     expect(actions.setActiveCell(10)).toEqual(expectedAction)

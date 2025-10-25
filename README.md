@@ -6,27 +6,31 @@ WASudoku is a Sudoku solver that runs locally in your browser using WebAssembly.
 
 ### Core Engine
 
-- **WASM Solver:** The solver logic is written in Rust and runs as a WebAssembly module in the background via a Web Worker, keeping the UI responsive.
+- **WASM Solver:** The solver logic is written in Rust and compiled to WebAssembly. It runs in a background Web Worker, ensuring the UI remains responsive during calculations.
+- **Hybrid Solving Strategy:** The engine first uses logical, human-like techniques to find a solution path. If logic alone is insufficient, it seamlessly falls back to a backtracking algorithm.
+- **Puzzle Generation:** Generates unique, solvable puzzles with a single solution for various difficulty levels (Easy, Medium, Hard, Extreme) directly in the browser.
 
 ### User Interface & Experience
 
-- **Responsive UI:** The interface is built with Tailwind CSS and shadcn/ui for a clean and responsive layout. Also supports light and dark modes.
-- **Keyboard Navigation:** Use arrow keys to navigate between cells, and Backspace/Delete to clear. Typing or deleting a number moves focus to the next/previous cell.
-- **Number Pad:** An on-screen number pad allows users on mobile devices to input numbers easily.
-- **Local Storage:** The game state, including the board and undo/redo history, is saved in local storage.
-- **Installable (PWA):** The app can be installed on your device for an offline experience.
+- **Responsive & Modern UI:** Built with React, Vite, Tailwind CSS, and shadcn/ui for a clean, accessible, and responsive layout that works on any device.
+- **Light & Dark Modes:** Supports both light and dark themes.
+- **Installable (PWA):** As a Progressive Web App, WASudoku can be installed on your desktop or mobile device for a native, offline-first experience.
+- **Local Storage Persistence:** Your current board state, including all numbers, pencil marks, and undo/redo history, is automatically saved to your browser's local storage.
 
 ### Gameplay Features
 
-- **Conflict Highlighting:** The board highlights numbers that break Sudoku rules in any row, column, or 3x3 box.
-- **Solver Visualization:** After a puzzle is solved, the interface reveals the logical steps taken:
-  - Explore the logical steps the solver took, such as "Naked Single".
-  - Navigate step-by-step to see the board's state at each stage of the solution.
+- **Solver Visualization:** After a puzzle is solved, the interface reveals all logical steps the solver took. Navigate step-by-step to see the board's state at each stage and understand the reasoning behind each move.
+- **Conflict Highlighting:** The board highlights any numbers that break Sudoku rules in a row, column, or 3x3 box.
 - **Undo/Redo:** Step backward and forward through any moves.
 - **Multiple Input Modes:**
   - **Normal:** Enter the final numbers.
-  - **Candidate:** Add small "corner" notes.
-  - **Center:** Add "center" notes.
+  - **Candidate:** Add small "corner" notes for potential numbers.
+  - **Center:** Add "center" notes, used for advanced techniques.
+- **Controls:**
+  - **Navigation:** Use arrow keys to navigate between cells, and Backspace/Delete to clear. Typing a number automatically advances focus to the next cell.
+  - **Number Pad:** An on-screen number pad makes input easy on touch devices and displays a count of remaining numbers to be placed.
+  - **Clipboard Support:** Paste an 81-character puzzle string directly onto the grid to start solving.
+  - **Export Puzzle:** Copy the current puzzle state as an 81-character string for sharing or saving.
 
 ## Architecture
 

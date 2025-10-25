@@ -104,7 +104,32 @@ describe('useSudokuSolver', () => {
     })
   })
 
-  it('should not post a message if not solving', () => {
+  it('should post a message to the worker when isGenerating becomes true', () => {
+    const generatingState: SudokuState = {
+      ...initialState,
+      solver: {
+        ...initialState.solver,
+        isGenerating: true,
+        generationDifficulty: 'medium',
+      },
+    }
+    const { rerender } = renderHook(
+      (props) => useSudokuSolver(props.state, props.dispatch),
+      { initialProps: { state: initialState, dispatch: mockDispatch } },
+    )
+
+    expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled()
+
+    rerender({ state: generatingState, dispatch: mockDispatch })
+
+    expect(mockWorkerInstance.postMessage).toHaveBeenCalledOnce()
+    expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith({
+      type: 'generate',
+      difficulty: 'medium',
+    })
+  })
+
+  it('should not post a message if not solving or generating', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
     expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled()
   })
@@ -129,6 +154,23 @@ describe('useSudokuSolver', () => {
     expect(toast.success).toHaveBeenCalledWith('Sudoku solved successfully!')
   })
 
+  it('should dispatch GENERATE_PUZZLE_SUCCESS on receiving a puzzle_generated message', () => {
+    renderHook(() => useSudokuSolver(initialState, mockDispatch))
+
+    const puzzleString = '1'.repeat(81)
+
+    mockWorkerInstance.__simulateMessage({
+      type: 'puzzle_generated',
+      puzzleString,
+    })
+
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'GENERATE_PUZZLE_SUCCESS',
+      puzzleString,
+    })
+    expect(toast.success).toHaveBeenCalledWith('New puzzle generated!')
+  })
+
   it('should do nothing if solution message is missing result object', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
     mockWorkerInstance.__simulateMessage({ type: 'solution' })
@@ -136,7 +178,7 @@ describe('useSudokuSolver', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  it('should dispatch SOLVE_FAILURE on receiving an error message', () => {
+  it('should dispatch SOLVE_FAILURE on receiving an error message during solving', () => {
     const solvingState: SudokuState = {
       ...initialState,
       solver: { ...initialState.solver, isSolving: true },
@@ -146,6 +188,24 @@ describe('useSudokuSolver', () => {
     const errorMessage = 'No solution found'
     mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage })
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
+    expect(toast.error).toHaveBeenCalledWith(`Operation failed: ${errorMessage}`)
+  })
+
+  it('should dispatch GENERATE_PUZZLE_FAILURE on worker error during generation', () => {
+    const generatingState: SudokuState = {
+      ...initialState,
+      solver: {
+        ...initialState.solver,
+        isGenerating: true,
+        generationDifficulty: 'hard',
+      },
+    }
+    renderHook(() => useSudokuSolver(generatingState, mockDispatch))
+
+    const errorMessage = 'Generation failed'
+    mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage })
+
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GENERATE_PUZZLE_FAILURE' })
     expect(toast.error).toHaveBeenCalledWith(`Operation failed: ${errorMessage}`)
   })
 
@@ -196,5 +256,39 @@ describe('useSudokuSolver', () => {
       'Solver functionality is unavailable.',
     )
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
+  })
+
+  it('should handle case where worker is not available when generating starts', () => {
+    vi.mocked(SolverWorker).mockImplementation(() => {
+      throw new Error('Worker instantiation failed')
+    })
+
+    const { rerender } = renderHook(
+      (props) => useSudokuSolver(props.state, props.dispatch),
+      { initialProps: { state: initialState, dispatch: mockDispatch } },
+    )
+
+    // First call happens on mount.
+    expect(toast.error).toHaveBeenCalledWith(
+      'Solver functionality is unavailable.',
+    )
+    expect(toast.error).toHaveBeenCalledTimes(1)
+
+    const generatingState: SudokuState = {
+      ...initialState,
+      solver: {
+        ...initialState.solver,
+        isGenerating: true,
+        generationDifficulty: 'easy',
+      },
+    }
+    rerender({ state: generatingState, dispatch: mockDispatch })
+
+    // Second call happens in the trigger `useEffect`.
+    expect(toast.error).toHaveBeenCalledTimes(2)
+    expect(toast.error).toHaveBeenLastCalledWith(
+      'Solver functionality is unavailable.',
+    )
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GENERATE_PUZZLE_FAILURE' })
   })
 })

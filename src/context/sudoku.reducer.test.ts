@@ -450,6 +450,51 @@ describe('sudokuReducer', () => {
       })
     })
 
+    describe('Generator Actions', () => {
+      it('should handle GENERATE_PUZZLE_START', () => {
+        const state = sudokuReducer(initialState, {
+          type: 'GENERATE_PUZZLE_START',
+          difficulty: 'hard',
+        })
+        expect(state.solver.isGenerating).toBe(true)
+        expect(state.solver.generationDifficulty).toBe('hard')
+      })
+
+      it('should handle GENERATE_PUZZLE_SUCCESS', () => {
+        const generatingState: SudokuState = {
+          ...initialState,
+          solver: {
+            ...initialState.solver,
+            isGenerating: true,
+            generationDifficulty: 'easy',
+          },
+        }
+        const puzzleString = '1'.repeat(81)
+        const state = sudokuReducer(generatingState, {
+          type: 'GENERATE_PUZZLE_SUCCESS',
+          puzzleString,
+        })
+
+        expect(state.solver.isGenerating).toBe(false)
+        expect(state.board[0].value).toBe(1)
+        expect(state.initialBoard[0].value).toBe(1)
+        expect(state.history.stack).toHaveLength(1)
+        expect(state.history.index).toBe(0)
+      })
+
+      it('should handle GENERATE_PUZZLE_FAILURE', () => {
+        const generatingState: SudokuState = {
+          ...initialState,
+          solver: { ...initialState.solver, isGenerating: true },
+        }
+        const state = sudokuReducer(generatingState, {
+          type: 'GENERATE_PUZZLE_FAILURE',
+        })
+        expect(state.solver.isGenerating).toBe(false)
+        expect(state.ui.lastError).toBe('Failed to generate a new puzzle.')
+      })
+    })
+
     describe('Visualization Actions', () => {
       const steps: SolvingStep[] = [
         {

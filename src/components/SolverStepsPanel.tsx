@@ -39,7 +39,7 @@ const getStepExplanation = (step: SolvingStep): string => {
   const { technique, placements, cause } = step
 
   // Helper to format a list of numbers (e.g., {1, 2, 3})
-  const formatNums = (nums: number[]) => `{${[...nums].sort().join(', ')}}`
+  const formatNums = (nums: number[]) => `{${[...nums].sort((a, b) => a - b).join(', ')}}`
   // Helper to format a list of cell coordinates
   const formatCells = (indices: number[]) =>
     indices.map(formatCell).join(', ')

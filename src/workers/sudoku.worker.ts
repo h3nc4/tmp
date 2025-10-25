@@ -16,6 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/* v8 ignore next */
 import init, { solve_sudoku, generate_sudoku } from 'wasudoku-wasm'
 
 // Initialize the WASM module on worker startup.
