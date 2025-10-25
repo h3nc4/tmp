@@ -33,6 +33,9 @@ import type {
   ViewSolverStepAction,
   ExitVisualizationAction,
   ImportBoardAction,
+  GeneratePuzzleStartAction,
+  GeneratePuzzleSuccessAction,
+  GeneratePuzzleFailureAction,
 } from './sudoku.actions.types'
 import type { InputMode, SolveResult } from './sudoku.types'
 
@@ -99,6 +102,27 @@ export const solveSuccess = (result: SolveResult): SolveSuccessAction => ({
 /** Creates an action to signal a failed solve attempt. */
 export const solveFailure = (): SolveFailureAction => ({
   type: 'SOLVE_FAILURE',
+})
+
+/** Creates an action to signal the start of the puzzle generation process. */
+export const generatePuzzleStart = (
+  difficulty: string,
+): GeneratePuzzleStartAction => ({
+  type: 'GENERATE_PUZZLE_START',
+  difficulty,
+})
+
+/** Creates an action for when the generator successfully creates a puzzle. */
+export const generatePuzzleSuccess = (
+  puzzleString: string,
+): GeneratePuzzleSuccessAction => ({
+  type: 'GENERATE_PUZZLE_SUCCESS',
+  puzzleString,
+})
+
+/** Creates an action for when the puzzle generator fails. */
+export const generatePuzzleFailure = (): GeneratePuzzleFailureAction => ({
+  type: 'GENERATE_PUZZLE_FAILURE',
 })
 
 /** Creates an action to set the active cell. */

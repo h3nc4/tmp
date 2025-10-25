@@ -17,7 +17,7 @@
 */
 
 use wasudoku_wasm::board::Board;
-use wasudoku_wasm::solver::solve;
+use wasudoku_wasm::solver::{count_solutions, solve, solve_randomized};
 
 #[test]
 fn test_solve_easy_puzzle() {
@@ -115,6 +115,39 @@ fn test_board_from_str_conflict_in_box() {
     let puzzle_str =
         "53..7....61.195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
     assert!(Board::from_str(puzzle_str).is_err());
+}
+
+#[test]
+fn test_solve_randomized_solves_empty_board() {
+    let mut board = Board { cells: [0; 81] };
+    let numbers: [u8; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let solved = solve_randomized(&mut board, &numbers);
+    assert!(solved);
+    assert!(!board.cells.contains(&0));
+}
+
+#[test]
+fn test_count_solutions() {
+    // Puzzle with a unique solution
+    let puzzle_str =
+        "8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..";
+    let board = Board::from_str(puzzle_str).unwrap();
+    assert_eq!(count_solutions(&board), 1);
+
+    // Puzzle with multiple solutions
+    let multi_solution_str =
+        ".................................................................................";
+    let board = Board::from_str(multi_solution_str).unwrap();
+    assert!(
+        count_solutions(&board) > 1,
+        "Expected more than one solution for an empty board"
+    );
+
+    // Puzzle with no solution
+    let no_solution_str =
+        "...................................123456789.....................................";
+    let board = Board::from_str(no_solution_str).unwrap();
+    assert_eq!(count_solutions(&board), 0);
 }
 
 #[test]

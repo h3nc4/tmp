@@ -66,6 +66,61 @@ pub fn solve(board: &mut Board) -> bool {
     }
 }
 
+/// Solve a Sudoku puzzle using backtracking with a randomized number order.
+/// Used for generating a variety of solved boards.
+pub fn solve_randomized(board: &mut Board, numbers: &[u8; 9]) -> bool {
+    match find_most_constrained_cell(board) {
+        FindResult::Solved => true,
+        FindResult::Unsolvable => false,
+        FindResult::Cell(row, col) => {
+            for &num in numbers {
+                if board.is_valid_move(row, col, num) {
+                    board.cells[row * 9 + col] = num;
+                    if solve_randomized(board, numbers) {
+                        return true;
+                    }
+                    board.cells[row * 9 + col] = 0; // Backtrack
+                }
+            }
+            false
+        }
+    }
+}
+
+/// Count the number of solutions for a given board. Stops counting if more than 1 solution is found.
+pub fn count_solutions(board: &Board) -> u8 {
+    let mut counter = 0;
+    let mut board_clone = *board;
+    count_solutions_recursive(&mut board_clone, &mut counter);
+    counter
+}
+
+fn count_solutions_recursive(board: &mut Board, counter: &mut u8) {
+    if *counter > 1 {
+        return;
+    }
+
+    match find_most_constrained_cell(board) {
+        FindResult::Solved => {
+            *counter += 1;
+        }
+        FindResult::Unsolvable => (),
+        FindResult::Cell(row, col) => {
+            for num in 1..=9 {
+                if board.is_valid_move(row, col, num) {
+                    board.cells[row * 9 + col] = num;
+                    count_solutions_recursive(board, counter);
+                    if *counter > 1 {
+                        return;
+                    }
+                }
+            }
+            board.cells[row * 9 + col] = 0; // Backtrack
+        }
+    }
+}
+
+
 /// Count the number of valid moves (1-9) for a given cell.
 fn count_possibilities(board: &Board, row: usize, col: usize) -> u8 {
     let mut possibilities = 0;

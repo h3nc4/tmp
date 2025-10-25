@@ -22,12 +22,17 @@ import { Button } from '@/components/ui/button'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+
+interface ClearButtonProps {
+  readonly className?: string
+}
 
 /**
  * A button to clear the entire Sudoku board.
  * It derives its enabled/disabled state from the global context.
  */
-export function ClearButton() {
+export function ClearButton({ className }: ClearButtonProps) {
   const { solver, derived } = useSudokuState()
   const { clearBoard } = useSudokuActions()
 
@@ -47,7 +52,7 @@ export function ClearButton() {
     <Button
       variant="secondary"
       onClick={handleClear}
-      className="flex-1"
+      className={cn('w-full', className)}
       disabled={isClearDisabled}
       title={clearButtonTitle}
       onMouseDown={(e) => e.preventDefault()}

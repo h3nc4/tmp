@@ -99,6 +99,7 @@ describe('useSudokuSolver', () => {
     expect(mockWorkerInstance.postMessage).toHaveBeenCalledOnce()
     const expectedBoardString = '.'.repeat(81)
     expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith({
+      type: 'solve',
       boardString: expectedBoardString,
     })
   })
@@ -136,11 +137,16 @@ describe('useSudokuSolver', () => {
   })
 
   it('should dispatch SOLVE_FAILURE on receiving an error message', () => {
-    renderHook(() => useSudokuSolver(initialState, mockDispatch))
+    const solvingState: SudokuState = {
+      ...initialState,
+      solver: { ...initialState.solver, isSolving: true },
+    }
+    renderHook(() => useSudokuSolver(solvingState, mockDispatch))
+
     const errorMessage = 'No solution found'
     mockWorkerInstance.__simulateMessage({ type: 'error', error: errorMessage })
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
-    expect(toast.error).toHaveBeenCalledWith(`Solving failed: ${errorMessage}`)
+    expect(toast.error).toHaveBeenCalledWith(`Operation failed: ${errorMessage}`)
   })
 
   it('should do nothing if error message is missing error string', () => {
@@ -151,7 +157,7 @@ describe('useSudokuSolver', () => {
   })
 
   it('should handle worker initialization failure', () => {
-    vi.mocked(SolverWorker).mockImplementationOnce(() => {
+    vi.mocked(SolverWorker).mockImplementation(() => {
       throw new Error('Worker failed')
     })
 
@@ -163,7 +169,7 @@ describe('useSudokuSolver', () => {
   })
 
   it('should handle case where worker is not available when solving starts', () => {
-    vi.mocked(SolverWorker).mockImplementationOnce(() => {
+    vi.mocked(SolverWorker).mockImplementation(() => {
       throw new Error('Worker instantiation failed')
     })
 
@@ -172,9 +178,11 @@ describe('useSudokuSolver', () => {
       { initialProps: { state: initialState, dispatch: mockDispatch } },
     )
 
+    // First call happens on mount.
     expect(toast.error).toHaveBeenCalledWith(
       'Solver functionality is unavailable.',
     )
+    expect(toast.error).toHaveBeenCalledTimes(1)
 
     const solvingState: SudokuState = {
       ...initialState,
@@ -182,7 +190,11 @@ describe('useSudokuSolver', () => {
     }
     rerender({ state: solvingState, dispatch: mockDispatch })
 
-    expect(toast.error).toHaveBeenCalledWith('Solver worker is not available.')
+    // Second call happens in the trigger `useEffect`.
+    expect(toast.error).toHaveBeenCalledTimes(2)
+    expect(toast.error).toHaveBeenLastCalledWith(
+      'Solver functionality is unavailable.',
+    )
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
   })
 })

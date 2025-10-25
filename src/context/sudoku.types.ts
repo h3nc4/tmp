@@ -71,6 +71,8 @@ export interface UiState {
 
 export interface SolverState {
   readonly isSolving: boolean
+  readonly isGenerating: boolean
+  readonly generationDifficulty: string | null
   readonly isSolved: boolean
   readonly solveFailed: boolean
   readonly gameMode: GameMode

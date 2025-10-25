@@ -31,6 +31,7 @@ import { InputModeToggle } from './components/controls/InputModeToggle'
 import { SolverStepsPanel } from './components/SolverStepsPanel'
 import { useSynchronizedHeight } from './hooks/useSynchronizedHeight'
 import { useSudokuActions } from './hooks/useSudokuActions'
+import { NewPuzzleButton } from './components/controls/NewPuzzleButton'
 
 function App() {
   const { ui, solver } = useSudokuState()
@@ -97,8 +98,11 @@ function App() {
                 <UndoRedo />
               </div>
               <NumberPad />
-              <div className="flex w-full flex-row gap-2">
-                <SolveButton />
+              <div className="flex flex-col gap-2">
+                <div className="flex w-full flex-row gap-2">
+                  <NewPuzzleButton />
+                  <SolveButton />
+                </div>
                 <ClearButton />
               </div>
             </div>

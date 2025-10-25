@@ -46,6 +46,9 @@ vi.mock('./components/SudokuGrid', () => ({
 vi.mock('./components/NumberPad', () => ({
   NumberPad: vi.fn(() => <button>NumberPad</button>),
 }))
+vi.mock('./components/controls/NewPuzzleButton', () => ({
+  NewPuzzleButton: vi.fn(() => <button>New Puzzle</button>),
+}))
 vi.mock('./components/controls/SolveButton', () => ({
   SolveButton: vi.fn(() => <button>Solve</button>),
 }))
@@ -100,6 +103,9 @@ describe('App component', () => {
     ).toBeInTheDocument()
     expect(screen.getByTestId('sudoku-grid')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'NumberPad' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'New Puzzle' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Solve' })).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Export Board' }),

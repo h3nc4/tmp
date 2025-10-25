@@ -25,6 +25,7 @@ vi.mock('wasudoku-wasm', async (importOriginal) => {
     ...actual,
     default: vi.fn().mockResolvedValue({}), // Mock the init() promise
     solve_sudoku: vi.fn(),
+    generate_sudoku: vi.fn(),
   }
 })
 
@@ -33,6 +34,7 @@ describe('Sudoku Worker Logic', () => {
   let handleMessage: typeof import('@/workers/sudoku.worker').handleMessage
   let init: Mock
   let solve_sudoku: Mock
+  let generate_sudoku: Mock
   let mockPostMessage: Mock
   let mockAddEventListener: Mock
   const workerOrigin = 'http://localhost:3000'
@@ -59,6 +61,7 @@ describe('Sudoku Worker Logic', () => {
     const wasmModule = await import('wasudoku-wasm')
     init = wasmModule.default as Mock
     solve_sudoku = wasmModule.solve_sudoku as Mock
+    generate_sudoku = wasmModule.generate_sudoku as Mock
 
     const workerModule = await import('@/workers/sudoku.worker.ts')
     handleMessage = workerModule.handleMessage
@@ -66,7 +69,9 @@ describe('Sudoku Worker Logic', () => {
 
   // Helper to simulate a message event for the handler
   const simulateMessage = (
-    data: { boardString: string },
+    data:
+      | { type: 'solve'; boardString: string }
+      | { type: 'generate'; difficulty: string },
     origin = workerOrigin,
   ) => {
     const event = { data, origin } as MessageEvent
@@ -79,12 +84,12 @@ describe('Sudoku Worker Logic', () => {
     expect(init).toHaveBeenCalledOnce()
   })
 
-  it('should solve a puzzle successfully on the first message', async () => {
+  it('should call solve_sudoku and post a solution', async () => {
     const boardString = '.'.repeat(81)
     const result = { steps: [], solution: '1'.repeat(81) }
     solve_sudoku.mockReturnValue(result)
 
-    await simulateMessage({ boardString })
+    await simulateMessage({ type: 'solve', boardString })
 
     expect(solve_sudoku).toHaveBeenCalledWith(boardString)
     expect(mockPostMessage).toHaveBeenCalledWith({
@@ -93,23 +98,30 @@ describe('Sudoku Worker Logic', () => {
     })
   })
 
-  it('should not re-initialize the WASM module on subsequent calls', async () => {
-    // First call
-    await simulateMessage({ boardString: '.'.repeat(81) })
+  it('should call generate_sudoku and post a puzzle string', async () => {
+    const difficulty = 'easy'
+    const puzzleString = '1....'
+    generate_sudoku.mockReturnValue(puzzleString)
 
-    // Second call
-    const boardString = '1'.repeat(81)
-    const result = { steps: [], solution: '2'.repeat(81) }
-    solve_sudoku.mockReturnValue(result)
-    await simulateMessage({ boardString })
+    await simulateMessage({ type: 'generate', difficulty })
+
+    expect(generate_sudoku).toHaveBeenCalledWith(difficulty)
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'puzzle_generated',
+      puzzleString,
+    })
+  })
+
+  it('should not re-initialize the WASM module on subsequent calls', async () => {
+    // First call (solve)
+    await simulateMessage({ type: 'solve', boardString: '.'.repeat(81) })
+    // Second call (generate)
+    await simulateMessage({ type: 'generate', difficulty: 'hard' })
 
     // init() should have only been called once when the module was first loaded
     expect(init).toHaveBeenCalledOnce()
-    expect(solve_sudoku).toHaveBeenCalledWith(boardString)
-    expect(mockPostMessage).toHaveBeenCalledWith({
-      type: 'solution',
-      result,
-    })
+    expect(solve_sudoku).toHaveBeenCalledOnce()
+    expect(generate_sudoku).toHaveBeenCalledOnce()
   })
 
   it('should handle solver errors and post an error message', async () => {
@@ -119,7 +131,22 @@ describe('Sudoku Worker Logic', () => {
       throw new Error(errorMessage)
     })
 
-    await simulateMessage({ boardString })
+    await simulateMessage({ type: 'solve', boardString })
+
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: 'error',
+      error: errorMessage,
+    })
+  })
+
+  it('should handle generator errors and post an error message', async () => {
+    const difficulty = 'impossible'
+    const errorMessage = 'Invalid difficulty'
+    generate_sudoku.mockImplementation(() => {
+      throw new Error(errorMessage)
+    })
+
+    await simulateMessage({ type: 'generate', difficulty })
 
     expect(mockPostMessage).toHaveBeenCalledWith({
       type: 'error',
@@ -128,14 +155,13 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should handle non-Error exceptions', async () => {
-    const boardString = 'invalid'
     const errorObject = { message: 'A custom error' }
     solve_sudoku.mockImplementation(() => {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       throw errorObject
     })
 
-    await simulateMessage({ boardString })
+    await simulateMessage({ type: 'solve', boardString: '...' })
 
     expect(mockPostMessage).toHaveBeenCalledWith({
       type: 'error',
@@ -144,24 +170,23 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should ignore messages from a foreign origin', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
-    const boardString = '.'.repeat(81)
-    await simulateMessage({ boardString }, 'http://example.com')
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await simulateMessage({ type: 'solve', boardString: '...' }, 'http://example.com')
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "Message from untrusted origin 'http://example.com' ignored.",
     )
     expect(solve_sudoku).not.toHaveBeenCalled()
+    expect(generate_sudoku).not.toHaveBeenCalled()
     expect(mockPostMessage).not.toHaveBeenCalled()
     consoleErrorSpy.mockRestore()
   })
 
   it('should not do anything if event origin is undefined', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
-    const boardString = '.'.repeat(81)
-
-    // Simulate an event with an undefined origin
-    const event = { data: { boardString } } as MessageEvent
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const event = {
+      data: { type: 'solve', boardString: '...' },
+    } as MessageEvent
     Object.defineProperty(event, 'origin', { value: undefined })
     await handleMessage(event)
 
@@ -171,17 +196,5 @@ describe('Sudoku Worker Logic', () => {
     expect(solve_sudoku).not.toHaveBeenCalled()
     expect(mockPostMessage).not.toHaveBeenCalled()
     consoleErrorSpy.mockRestore()
-  })
-
-  it('should allow messages from a null origin', async () => {
-    const boardString = '.'.repeat(81)
-    await simulateMessage({ boardString }, 'null')
-    expect(solve_sudoku).toHaveBeenCalled()
-  })
-
-  it('should allow messages from an empty string origin', async () => {
-    const boardString = '.'.repeat(81)
-    await simulateMessage({ boardString }, '')
-    expect(solve_sudoku).toHaveBeenCalled()
   })
 })

@@ -89,6 +89,14 @@ lazy_static::lazy_static! {
     };
 }
 
+/// Represents the logical difficulty of a solving technique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TechniqueLevel {
+    None,         // No logical moves found
+    Basic,        // Naked/Hidden Singles
+    Intermediate, // Pointing Subsets, Naked/Hidden Pairs/Triples
+}
+
 /// Convert a bitmask of candidates into a `Vec` of numbers.
 fn mask_to_vec(mask: u16) -> Vec<u8> {
     (1..=9)
@@ -435,4 +443,22 @@ pub fn solve_with_steps(initial_board: &Board) -> (Vec<SolvingStep>, Board) {
     }
 
     (steps, Board { cells: board.cells })
+}
+
+/// Determines the logical difficulty of solving a board by finding the hardest
+/// technique required to make any progress.
+pub fn get_difficulty(initial_board: &Board) -> (TechniqueLevel, Board) {
+    let (steps, final_board) = solve_with_steps(initial_board);
+
+    let max_level = steps
+        .iter()
+        .map(|step| match step.technique.as_str() {
+            "NakedSingle" | "HiddenSingle" => TechniqueLevel::Basic,
+            "PointingPair" | "PointingTriple" | "NakedPair" => TechniqueLevel::Intermediate,
+            _ => TechniqueLevel::None,
+        })
+        .max()
+        .unwrap_or(TechniqueLevel::None);
+
+    (max_level, final_board)
 }

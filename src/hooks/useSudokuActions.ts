@@ -118,6 +118,10 @@ export function useSudokuActions() {
       redo: () => dispatch(actions.redo()),
       /** Starts the solver. */
       solve: () => dispatch(actions.solveStart()),
+      /** Starts the puzzle generator. */
+      generatePuzzle: (difficulty: string) => {
+        dispatch(actions.generatePuzzleStart(difficulty))
+      },
       /** Exits the solver visualization mode. */
       exitVisualization: () => dispatch(actions.exitVisualization()),
       /** Changes the input mode. */

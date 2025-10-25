@@ -25,6 +25,8 @@ import type {
   ViewSolverStepAction,
   SetActiveCellAction,
   ImportBoardAction,
+  GeneratePuzzleSuccessAction,
+  GeneratePuzzleStartAction,
 } from './sudoku.actions.types'
 import type {
   BoardState,
@@ -79,6 +81,8 @@ export const initialState: SudokuState = {
   },
   solver: {
     isSolving: false,
+    isGenerating: false,
+    generationDifficulty: null,
     isSolved: false,
     solveFailed: false,
     gameMode: 'playing',
@@ -272,6 +276,38 @@ const handleImportBoard = (
   }
 }
 
+const handleGeneratePuzzleStart = (
+  state: SudokuState,
+  action: GeneratePuzzleStartAction,
+): SudokuState => ({
+  ...state,
+  solver: {
+    ...state.solver,
+    isGenerating: true,
+    generationDifficulty: action.difficulty,
+  },
+})
+
+const handleGeneratePuzzleSuccess = (
+  _state: SudokuState,
+  action: GeneratePuzzleSuccessAction,
+): SudokuState => {
+  const newBoard = boardStateFromString(action.puzzleString)
+  return {
+    ...initialState,
+    board: newBoard,
+    initialBoard: newBoard,
+    history: {
+      stack: [newBoard],
+      index: 0,
+    },
+    solver: {
+      ...initialState.solver,
+      isGenerating: false,
+    },
+  }
+}
+
 const handleUndo = (state: SudokuState): SudokuState => {
   if (state.history.index > 0) {
     const newHistoryIndex = state.history.index - 1
@@ -457,6 +493,19 @@ export function sudokuReducer(
       newState = {
         ...state,
         solver: { ...state.solver, isSolving: false, solveFailed: true },
+      }
+      break
+    case 'GENERATE_PUZZLE_START':
+      newState = handleGeneratePuzzleStart(state, action)
+      break
+    case 'GENERATE_PUZZLE_SUCCESS':
+      newState = handleGeneratePuzzleSuccess(state, action)
+      break
+    case 'GENERATE_PUZZLE_FAILURE':
+      newState = {
+        ...state,
+        solver: { ...state.solver, isGenerating: false },
+        ui: { ...state.ui, lastError: 'Failed to generate a new puzzle.' },
       }
       break
     case 'VIEW_SOLVER_STEP':

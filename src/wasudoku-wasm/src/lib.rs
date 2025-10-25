@@ -17,12 +17,14 @@
 */
 
 pub mod board;
+pub mod generate;
 pub mod logical_solver;
 pub mod solver;
 pub mod types;
 mod utils;
 
 use board::Board;
+use generate::Difficulty;
 use std::panic;
 use types::SolveResult;
 use wasm_bindgen::prelude::*;
@@ -84,5 +86,40 @@ pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
         Ok(Some(result)) => Ok(serde_wasm_bindgen::to_value(&result).unwrap()),
         Ok(None) => Err(JsValue::from_str("No solution found for the given puzzle.")),
         Err(_) => Err(JsValue::from_str("Solver crashed due to a critical error.")),
+    }
+}
+
+/// Generate a new Sudoku puzzle with a unique solution.
+///
+/// ### Arguments
+///
+/// * `difficulty_str` - A string representing the desired difficulty:
+///   "easy", "medium", "hard", or "extreme".
+///
+/// ### Returns
+///
+/// * A `String` containing the 81-character puzzle.
+///
+/// ### Errors
+///
+/// * A `JsValue` error if the difficulty string is invalid or if the
+///   generator panics.
+#[wasm_bindgen]
+pub fn generate_sudoku(difficulty_str: &str) -> Result<String, JsValue> {
+    let difficulty = match difficulty_str {
+        "easy" => Difficulty::Easy,
+        "medium" => Difficulty::Medium,
+        "hard" => Difficulty::Hard,
+        "extreme" => Difficulty::Extreme,
+        _ => return Err(JsValue::from_str("Invalid difficulty level.")),
+    };
+
+    let result = panic::catch_unwind(|| generate::generate(difficulty));
+
+    match result {
+        Ok(board) => Ok(board.to_string()),
+        Err(_) => Err(JsValue::from_str(
+            "Generator crashed due to a critical error.",
+        )),
     }
 }

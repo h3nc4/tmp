@@ -19,7 +19,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use wasm_bindgen_test::*;
-use wasudoku_wasm::solve_sudoku;
+use wasudoku_wasm::{generate_sudoku, solve_sudoku};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -104,5 +104,23 @@ fn test_solve_sudoku_panic_handling() {
     assert_eq!(
         result.err().unwrap().as_string().unwrap(),
         "Solver crashed due to a critical error."
+    );
+}
+
+#[wasm_bindgen_test]
+fn test_generate_sudoku_valid() {
+    let puzzle_str = generate_sudoku("easy").unwrap();
+    assert_eq!(puzzle_str.len(), 81);
+    // Further validation (like checking if it has a unique solution) would be more complex
+    // and is better suited for Rust-side unit tests. Here we just check the interface.
+}
+
+#[wasm_bindgen_test]
+fn test_generate_sudoku_invalid_difficulty() {
+    let result = generate_sudoku("invalid_difficulty");
+    assert!(result.is_err());
+    assert_eq!(
+        result.err().unwrap().as_string().unwrap(),
+        "Invalid difficulty level."
     );
 }

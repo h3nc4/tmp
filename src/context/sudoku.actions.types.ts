@@ -76,6 +76,23 @@ export interface SolveFailureAction {
   type: 'SOLVE_FAILURE'
 }
 
+/** Action to begin the puzzle generation process. */
+export interface GeneratePuzzleStartAction {
+  type: 'GENERATE_PUZZLE_START'
+  difficulty: string
+}
+
+/** Action for when the generator successfully creates a puzzle. */
+export interface GeneratePuzzleSuccessAction {
+  type: 'GENERATE_PUZZLE_SUCCESS'
+  puzzleString: string
+}
+
+/** Action for when the puzzle generator fails. */
+export interface GeneratePuzzleFailureAction {
+  type: 'GENERATE_PUZZLE_FAILURE'
+}
+
 /** Action to set the currently focused/active cell. */
 export interface SetActiveCellAction {
   type: 'SET_ACTIVE_CELL'
@@ -122,6 +139,9 @@ export type SudokuAction =
   | SolveStartAction
   | SolveSuccessAction
   | SolveFailureAction
+  | GeneratePuzzleStartAction
+  | GeneratePuzzleSuccessAction
+  | GeneratePuzzleFailureAction
   | SetActiveCellAction
   | SetInputModeAction
   | ClearErrorAction

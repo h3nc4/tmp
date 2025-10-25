@@ -16,19 +16,21 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import init, { solve_sudoku } from 'wasudoku-wasm'
+import init, { solve_sudoku, generate_sudoku } from 'wasudoku-wasm'
 
 // Initialize the WASM module on worker startup.
 const wasmReady = init()
+
+type WorkerMessage =
+  | { type: 'solve'; boardString: string }
+  | { type: 'generate'; difficulty: string }
 
 /**
  * Handles incoming messages, runs the solver, and posts the result back.
  * Exported for direct testing.
  * @param event The message event from the main thread.
  */
-export async function handleMessage(
-  event: MessageEvent<{ boardString: string }>,
-) {
+export async function handleMessage(event: MessageEvent<WorkerMessage>) {
   // Enforce same-origin policy for security. `self` is the worker's global scope.
   const isSameOrigin = self.location.origin === event.origin
   const isFileOrTestOrigin = event.origin === 'null' || event.origin === ''
@@ -40,11 +42,15 @@ export async function handleMessage(
 
   try {
     await wasmReady
+    const { type } = event.data
 
-    const { boardString } = event.data
-    const result = solve_sudoku(boardString)
-
-    self.postMessage({ type: 'solution', result })
+    if (type === 'solve') {
+      const result = solve_sudoku(event.data.boardString)
+      self.postMessage({ type: 'solution', result })
+    } else if (type === 'generate') {
+      const puzzleString = generate_sudoku(event.data.difficulty)
+      self.postMessage({ type: 'puzzle_generated', puzzleString })
+    }
   } catch (error) {
     // Capture any solver error and post it back for graceful handling in the UI.
     const errorMessage = error instanceof Error ? error.message : String(error)
