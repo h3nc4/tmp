@@ -48,10 +48,7 @@ export function useSynchronizedHeight(isEnabled: boolean) {
       // Cleanup: disconnect the observer and remove the inline style.
       return () => {
         resizeObserver.disconnect()
-        // Check if the element still exists before trying to modify its style.
-        if (targetRef.current) {
-          targetRef.current.style.height = ''
-        }
+        targetEl.style.height = ''
       }
     }
   }, [isEnabled])

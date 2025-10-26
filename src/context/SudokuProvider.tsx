@@ -16,23 +16,12 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { createContext, useReducer, type Dispatch } from 'react'
+import React, { useReducer } from 'react'
 import { sudokuReducer, loadInitialState } from './sudoku.reducer'
-import type { SudokuState } from './sudoku.types'
-import type { SudokuAction } from './sudoku.actions.types'
 import { useSudokuPersistence } from '@/hooks/useSudokuPersistence'
 import { useSudokuSolver } from '@/hooks/useSudokuSolver'
 import { useSudokuFeedback } from '@/hooks/useSudokuFeedback'
-
-/** Context to provide the Sudoku game state to consumer components. */
-export const SudokuStateContext = createContext<SudokuState | undefined>(
-  undefined,
-)
-
-/** Context to provide the dispatch function for Sudoku actions. */
-export const SudokuDispatchContext = createContext<
-  Dispatch<SudokuAction> | undefined
->(undefined)
+import { SudokuDispatchContext, SudokuStateContext } from './sudoku.context'
 
 type SudokuProviderProps = {
   readonly children: React.ReactNode

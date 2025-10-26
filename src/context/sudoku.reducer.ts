@@ -200,14 +200,18 @@ const handleTogglePencilMark = (
   const targetCell = newBoard[action.index]
 
   if (action.mode === 'candidate') {
-    targetCell.candidates.has(action.value)
-      ? targetCell.candidates.delete(action.value)
-      : targetCell.candidates.add(action.value)
+    if (targetCell.candidates.has(action.value)) {
+      targetCell.candidates.delete(action.value)
+    } else {
+      targetCell.candidates.add(action.value)
+    }
   } else {
     targetCell.candidates.clear()
-    targetCell.centers.has(action.value)
-      ? targetCell.centers.delete(action.value)
-      : targetCell.centers.add(action.value)
+    if (targetCell.centers.has(action.value)) {
+      targetCell.centers.delete(action.value)
+    } else {
+      targetCell.centers.add(action.value)
+    }
   }
 
   return {
@@ -353,11 +357,11 @@ const handleSolveSuccess = (
     }))
 
   const boardAfterLogic = state.initialBoard.map((cell) => ({ ...cell }))
-  steps.forEach((step) =>
-    step.placements.forEach(
-      (p) => (boardAfterLogic[p.index].value = p.value),
-    ),
-  )
+  for (const step of steps) {
+    for (const p of step.placements) {
+      boardAfterLogic[p.index].value = p.value
+    }
+  }
 
   const finalSteps = [...steps]
   if (!boardAfterLogic.every((cell) => cell.value !== null)) {

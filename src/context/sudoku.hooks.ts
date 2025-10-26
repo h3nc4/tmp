@@ -20,7 +20,7 @@ import { useContext } from 'react'
 import {
   SudokuStateContext,
   SudokuDispatchContext,
-} from './SudokuProvider'
+} from './sudoku.context'
 
 /**
  * Custom hook to access the Sudoku game state.

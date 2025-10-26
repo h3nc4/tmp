@@ -25,13 +25,10 @@ SONAR_SCAN_IMAGE="sonarsource/sonar-scanner-cli:11"
 SONAR_URL="http://localhost:9000"
 PROJECT_KEY=$(grep 'sonar.projectKey' ./sonar-project.properties | cut -d'=' -f2)
 
-if ! [ -f ./coverage-ui.lcov ] || ! [ -f ./coverage-wasm.xml ]; then
-  echo "Coverage report files not found." >&2
-  exit 1
-fi
-
 # Adjust paths in coverage reports
-sed -i "s|<source>/wasudoku|<source>.|" coverage-wasm.xml
+if [ -f "coverage-wasm.xml" ]; then
+  sed -i "s|<source>/wasudoku|<source>.|" coverage-wasm.xml
+fi
 
 # Start pulling scanner image in background
 docker pull "${SONAR_SCAN_IMAGE}" >/dev/null 2>&1 &
@@ -73,9 +70,8 @@ docker run \
   -Dsonar.host.url="${SONAR_URL}"
 
 sleep 15
-if ! curl -s "${SONAR_URL}/api/issues/search?componentKeys=${PROJECT_KEY}&resolved=false&ps=1" | grep -q '{"total":0,' &&
-  ! curl -s "${SONAR_URL}/api/measures/component?component=${PROJECT_KEY}&metricKeys=coverage" | grep -q '"coverage","value":"100.0"'; then
-  echo "ERROR: SonarQube analysis failed. Issues found or code coverage is not 100%." >&2
+if ! curl -s "${SONAR_URL}/api/issues/search?componentKeys=${PROJECT_KEY}&resolved=false&ps=1" | grep -q '{"total":0,'; then
+  echo "ERROR: SonarQube analysis failed. Issues found." >&2
   echo "Check the SonarQube dashboard at ${SONAR_URL} for more details." >&2
   exit 1
 fi

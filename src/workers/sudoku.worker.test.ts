@@ -155,17 +155,16 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should handle non-Error exceptions', async () => {
-    const errorObject = { message: 'A custom error' }
+    const errorString = 'A custom non-error was thrown'
     solve_sudoku.mockImplementation(() => {
-      // eslint-disable-next-line @typescript-eslint/no-throw-literal
-      throw errorObject
+      throw errorString
     })
 
     await simulateMessage({ type: 'solve', boardString: '...' })
 
     expect(mockPostMessage).toHaveBeenCalledWith({
       type: 'error',
-      error: String(errorObject),
+      error: errorString,
     })
   })
 

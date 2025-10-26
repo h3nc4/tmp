@@ -24,7 +24,12 @@ import SolverWorker from '@/workers/sudoku.worker?worker'
 import type { SudokuState, SolveResult } from '@/context/sudoku.types'
 import { initialState } from '@/context/sudoku.reducer'
 
-let messageHandler: (event: { data: any }) => void
+type WorkerMessageData =
+  | { type: 'solution'; result: SolveResult }
+  | { type: 'puzzle_generated'; puzzleString: string }
+  | { type: 'error'; error: string }
+
+let messageHandler: (event: { data: WorkerMessageData }) => void
 const mockWorkerInstance = {
   postMessage: vi.fn(),
   addEventListener: vi.fn((_event: string, handler) => {
@@ -36,7 +41,7 @@ const mockWorkerInstance = {
   onerror: null,
   onmessage: null,
   onmessageerror: null,
-  __simulateMessage(data: any) {
+  __simulateMessage(data: WorkerMessageData) {
     if (messageHandler) {
       messageHandler({ data })
     }
@@ -173,7 +178,7 @@ describe('useSudokuSolver', () => {
 
   it('should do nothing if solution message is missing result object', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'solution' })
+    mockWorkerInstance.__simulateMessage({ type: 'solution', result: undefined as unknown as SolveResult })
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.success).not.toHaveBeenCalled()
   })
@@ -211,7 +216,7 @@ describe('useSudokuSolver', () => {
 
   it('should do nothing if error message is missing error string', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'error' })
+    mockWorkerInstance.__simulateMessage({ type: 'error', error: undefined as unknown as string })
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.error).not.toHaveBeenCalled()
   })

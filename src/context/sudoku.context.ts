@@ -16,26 +16,16 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import { createContext, type Dispatch } from 'react'
+import type { SudokuState } from './sudoku.types'
+import type { SudokuAction } from './sudoku.actions.types'
 
-export default defineConfig([
-  globalIgnores(['dist', 'src/wasudoku-wasm/pkg']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs['recommended-latest'],
-      reactRefresh.configs.vite,
-    ],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-  },
-])
+/** Context to provide the Sudoku game state to consumer components. */
+export const SudokuStateContext = createContext<SudokuState | undefined>(
+  undefined,
+)
+
+/** Context to provide the dispatch function for Sudoku actions. */
+export const SudokuDispatchContext = createContext<
+  Dispatch<SudokuAction> | undefined
+>(undefined)
