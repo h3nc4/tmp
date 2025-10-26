@@ -22,7 +22,7 @@ use wasudoku_wasm::solver;
 use wasudoku_wasm::types::{Elimination, SolvingStep};
 
 fn board_from_str(s: &str) -> LogicalBoard {
-    let simple_board = Board::from_str(s).unwrap();
+    let simple_board: Board = s.parse().unwrap();
     LogicalBoard::from_board(&simple_board)
 }
 
@@ -31,7 +31,7 @@ fn assert_nth_logical_step(
     step_index: usize,
     expected_technique: &str,
 ) -> SolvingStep {
-    let initial_board = Board::from_str(puzzle_str).unwrap();
+    let initial_board: Board = puzzle_str.parse().unwrap();
     let (steps, _) = logical_solver::solve_with_steps(&initial_board);
 
     assert!(
@@ -153,7 +153,7 @@ fn test_pointing_pair_detection() {
 
 /// Replicates the hybrid solving logic from `lib.rs` for native testing.
 fn solve_natively(puzzle_str: &str) -> Option<Board> {
-    let initial_board = Board::from_str(puzzle_str).ok()?;
+    let initial_board: Board = puzzle_str.parse().ok()?;
     let (_, mut board_after_logic) = logical_solver::solve_with_steps(&initial_board);
 
     if !board_after_logic.cells.contains(&0) {

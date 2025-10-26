@@ -30,29 +30,29 @@ const ALL_CANDIDATES: u16 = 0b111111111;
 lazy_static::lazy_static! {
     static ref ROW_UNITS: [[usize; 9]; 9] = {
         let mut units = [[0; 9]; 9];
-        for i in 0..9 {
-            for j in 0..9 {
-                units[i][j] = i * 9 + j;
+        for (i, row) in units.iter_mut().enumerate() {
+            for (j, cell) in row.iter_mut().enumerate() {
+                *cell = i * 9 + j;
             }
         }
         units
     };
     static ref COL_UNITS: [[usize; 9]; 9] = {
         let mut units = [[0; 9]; 9];
-        for i in 0..9 {
-            for j in 0..9 {
-                units[i][j] = j * 9 + i;
+        for (i, row) in units.iter_mut().enumerate() {
+            for (j, cell) in row.iter_mut().enumerate() {
+                *cell = j * 9 + i;
             }
         }
         units
     };
     static ref BOX_UNITS: [[usize; 9]; 9] = {
         let mut units = [[0; 9]; 9];
-        for i in 0..9 {
+        for (i, unit) in units.iter_mut().enumerate() {
             let start_row = (i / 3) * 3;
             let start_col = (i % 3) * 3;
-            for j in 0..9 {
-                units[i][j] = (start_row + j / 3) * 9 + (start_col + j % 3);
+            for (j, cell) in unit.iter_mut().enumerate() {
+                *cell = (start_row + j / 3) * 9 + (start_col + j % 3);
             }
         }
         units
@@ -68,7 +68,7 @@ lazy_static::lazy_static! {
     /// A map from a cell index to a vector of its 20 peers.
     static ref PEER_MAP: [Vec<usize>; 81] = {
         let mut map = [(); 81].map(|_| Vec::with_capacity(20));
-        for i in 0..81 {
+        for (i, peers_vec) in map.iter_mut().enumerate() {
             let mut peers = HashSet::new();
             let row = i / 9;
             let col = i % 9;
@@ -83,7 +83,7 @@ lazy_static::lazy_static! {
                 }
             }
             peers.remove(&i);
-            map[i] = peers.into_iter().collect();
+            *peers_vec = peers.into_iter().collect();
         }
         map
     };

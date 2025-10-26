@@ -132,7 +132,7 @@ fn try_generate_extreme(solution: &Board) -> Option<Board> {
     let minimal_puzzle = create_minimal_puzzle(solution);
     let clues_count = minimal_puzzle.cells.iter().filter(|&&c| c != 0).count();
 
-    if clues_count < 17 || clues_count > 35 {
+    if !(17..=35).contains(&clues_count) {
         return None;
     }
 
@@ -167,10 +167,10 @@ pub fn generate(difficulty: Difficulty) -> Board {
             Difficulty::Extreme => try_generate_extreme(&solution),
         };
 
-        if let Some(puzzle) = puzzle_candidate {
-            if validate_puzzle_uniqueness(&puzzle, difficulty) {
-                return puzzle;
-            }
+        if let Some(puzzle) = puzzle_candidate
+            && validate_puzzle_uniqueness(&puzzle, difficulty)
+        {
+            return puzzle;
         }
     }
 }

@@ -22,7 +22,7 @@ use wasudoku_wasm::board::Board;
 fn solved_board() -> Board {
     let puzzle_str =
         "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
-    Board::from_str(puzzle_str).unwrap()
+    puzzle_str.parse().unwrap()
 }
 
 #[test]
@@ -57,6 +57,6 @@ fn test_is_valid_move_false_for_box_conflict() {
 fn test_display_board() {
     let puzzle_str =
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-    let board = Board::from_str(puzzle_str).unwrap();
+    let board: Board = puzzle_str.parse().unwrap();
     assert_eq!(board.to_string(), puzzle_str);
 }

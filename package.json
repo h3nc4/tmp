@@ -10,6 +10,7 @@
     "prebuild": "npm run wasm:build:prod",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:rust": "cd src/wasudoku-wasm && cargo clippy -- -D warnings",
     "preview": "vite preview",
     "test:rust": "cd src/wasudoku-wasm && cargo llvm-cov --features test-panic --cobertura --output-path ../../coverage-wasm.xml; cd - >/dev/null",
     "test:frontend": "vitest run --coverage; mv coverage/lcov.info coverage-ui.lcov; rm -rf coverage",

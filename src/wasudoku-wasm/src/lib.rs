@@ -58,7 +58,9 @@ pub fn main() {
 ///   or a panic occurs in the underlying solver.
 #[wasm_bindgen]
 pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
-    let initial_board = Board::from_str(board_str).map_err(|e| JsValue::from_str(&e))?;
+    let initial_board: Board = board_str
+        .parse::<Board>()
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     // Use `catch_unwind` to contain any panics within the solver logic,
     // preventing the WASM module from crashing and allowing a graceful error return.
@@ -66,7 +68,7 @@ pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
         let (steps, mut board_after_logic) = logical_solver::solve_with_steps(&initial_board);
 
         // If logic was not sufficient, fall back to the backtracking algorithm.
-        let final_solution = if board_after_logic.cells.contains(&0) {
+        let end_solution = if board_after_logic.cells.contains(&0) {
             if solver::solve(&mut board_after_logic) {
                 Some(board_after_logic.to_string())
             } else {
@@ -78,7 +80,7 @@ pub fn solve_sudoku(board_str: &str) -> Result<JsValue, JsValue> {
 
         Some(SolveResult {
             steps,
-            solution: final_solution,
+            solution: end_solution,
         })
     });
 

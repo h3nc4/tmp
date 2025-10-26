@@ -17,6 +17,7 @@
 */
 
 use std::fmt;
+use std::str::FromStr;
 
 /// A 9x9 Sudoku board.
 ///
@@ -28,17 +29,51 @@ pub struct Board {
 }
 
 impl Board {
-    /// Parse and validate an 81-character string into a `Board`.
+    /// Check if placing a number in a cell is valid according to Sudoku rules.
     ///
-    /// The string is parsed row by row, with `.` or `0` representing empty
-    /// cells. The board is validated in a single pass to ensure no initial
-    /// rule conflicts exist.
-    ///
-    /// ### Errors
-    ///
-    /// Returns an `Err` if the string is not 81 characters, contains invalid
-    /// characters, or describes a board with initial conflicts.
-    pub fn from_str(s: &str) -> Result<Self, String> {
+    /// A move is valid if the number does not already exist in the cell's
+    /// row, column, or 3x3 box.
+    pub fn is_valid_move(&self, row: usize, col: usize, num: u8) -> bool {
+        for x in 0..9 {
+            if self.cells[row * 9 + x] == num {
+                return false;
+            }
+        }
+
+        for x in 0..9 {
+            if self.cells[x * 9 + col] == num {
+                return false;
+            }
+        }
+
+        let start_row = row - row % 3;
+        let start_col = col - col % 3;
+        for i in 0..3 {
+            for j in 0..3 {
+                if self.cells[(start_row + i) * 9 + (start_col + j)] == num {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+
+/// Parse and validate an 81-character string into a `Board`.
+///
+/// The string is parsed row by row, with `.` or `0` representing empty
+/// cells. The board is validated in a single pass to ensure no initial
+/// rule conflicts exist.
+///
+/// ### Errors
+///
+/// Returns an `Err` if the string is not 81 characters, contains invalid
+/// characters, or describes a board with initial conflicts.
+impl FromStr for Board {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 81 {
             return Err(format!(
                 "Invalid board string length: expected 81, got {}",
@@ -85,36 +120,6 @@ impl Board {
         }
 
         Ok(Board { cells })
-    }
-
-    /// Check if placing a number in a cell is valid according to Sudoku rules.
-    ///
-    /// A move is valid if the number does not already exist in the cell's
-    /// row, column, or 3x3 box.
-    pub fn is_valid_move(&self, row: usize, col: usize, num: u8) -> bool {
-        for x in 0..9 {
-            if self.cells[row * 9 + x] == num {
-                return false;
-            }
-        }
-
-        for x in 0..9 {
-            if self.cells[x * 9 + col] == num {
-                return false;
-            }
-        }
-
-        let start_row = row - row % 3;
-        let start_col = col - col % 3;
-        for i in 0..3 {
-            for j in 0..3 {
-                if self.cells[(start_row + i) * 9 + (start_col + j)] == num {
-                    return false;
-                }
-            }
-        }
-
-        true
     }
 }
 
