@@ -18,7 +18,7 @@
 
 use serde::Serialize;
 
-/// The final result of the solver, sent to the frontend.
+/// The final result of the solver, sent to the UI.
 #[derive(Serialize, Clone)]
 pub struct SolveResult {
     /// A list of logical steps taken to solve the puzzle.

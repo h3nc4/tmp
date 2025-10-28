@@ -28,12 +28,7 @@ import type {
   GeneratePuzzleSuccessAction,
   GeneratePuzzleStartAction,
 } from './sudoku.actions.types'
-import type {
-  BoardState,
-  SudokuState,
-  SavedGameState,
-  HistoryState,
-} from './sudoku.types'
+import type { BoardState, SudokuState, SavedGameState, HistoryState } from './sudoku.types'
 import {
   getRelatedCellIndices,
   validateBoard,
@@ -127,7 +122,11 @@ export function loadInitialState(): SudokuState {
           ...initialState,
           history: savedState.history,
           board: currentBoard,
-          initialBoard: currentBoard.map(cell => ({ value: cell.value, candidates: new Set<number>(), centers: new Set<number>() })),
+          initialBoard: currentBoard.map((cell) => ({
+            value: cell.value,
+            candidates: new Set<number>(),
+            centers: new Set<number>(),
+          })),
           derived: getDerivedBoardState(currentBoard),
         }
       }
@@ -138,10 +137,7 @@ export function loadInitialState(): SudokuState {
   return initialState
 }
 
-function updateHistory(
-  historyState: HistoryState,
-  newBoard: BoardState,
-): HistoryState {
+function updateHistory(historyState: HistoryState, newBoard: BoardState): HistoryState {
   let newStack = historyState.stack.slice(0, historyState.index + 1)
   newStack.push(newBoard)
 
@@ -155,10 +151,7 @@ function updateHistory(
   }
 }
 
-const handleSetCellValue = (
-  state: SudokuState,
-  action: SetCellValueAction,
-): SudokuState => {
+const handleSetCellValue = (state: SudokuState, action: SetCellValueAction): SudokuState => {
   if (state.board[action.index].value === action.value) return state
 
   const newBoard = state.board.map((cell) => ({
@@ -222,16 +215,9 @@ const handleTogglePencilMark = (
   }
 }
 
-const handleEraseCell = (
-  state: SudokuState,
-  action: EraseCellAction,
-): SudokuState => {
+const handleEraseCell = (state: SudokuState, action: EraseCellAction): SudokuState => {
   const cell = state.board[action.index]
-  if (
-    cell.value === null &&
-    cell.candidates.size === 0 &&
-    cell.centers.size === 0
-  ) {
+  if (cell.value === null && cell.candidates.size === 0 && cell.centers.size === 0) {
     return state
   }
 
@@ -239,10 +225,10 @@ const handleEraseCell = (
     i === action.index
       ? { value: null, candidates: new Set<number>(), centers: new Set<number>() }
       : {
-        value: cell.value,
-        candidates: new Set(cell.candidates),
-        centers: new Set(cell.centers),
-      },
+          value: cell.value,
+          candidates: new Set(cell.candidates),
+          centers: new Set(cell.centers),
+        },
   )
 
   return {
@@ -264,10 +250,7 @@ const handleClearBoard = (state: SudokuState): SudokuState => {
   }
 }
 
-const handleImportBoard = (
-  _state: SudokuState,
-  action: ImportBoardAction,
-): SudokuState => {
+const handleImportBoard = (_state: SudokuState, action: ImportBoardAction): SudokuState => {
   const newBoard = boardStateFromString(action.boardString)
   return {
     ...initialState,
@@ -337,10 +320,7 @@ const handleRedo = (state: SudokuState): SudokuState => {
   return state
 }
 
-const handleSolveSuccess = (
-  state: SudokuState,
-  action: SolveSuccessAction,
-): SudokuState => {
+const handleSolveSuccess = (state: SudokuState, action: SolveSuccessAction): SudokuState => {
   const { steps, solution } = action.result
   if (!solution) {
     return {
@@ -348,13 +328,11 @@ const handleSolveSuccess = (
       solver: { ...state.solver, isSolving: false, solveFailed: true },
     }
   }
-  const solvedBoard: BoardState = solution
-    .split('')
-    .map((char) => ({
-      value: char === '.' ? null : parseInt(char, 10),
-      candidates: new Set<number>(),
-      centers: new Set<number>(),
-    }))
+  const solvedBoard: BoardState = solution.split('').map((char) => ({
+    value: char === '.' ? null : parseInt(char, 10),
+    candidates: new Set<number>(),
+    centers: new Set<number>(),
+  }))
 
   const boardAfterLogic = state.initialBoard.map((cell) => ({ ...cell }))
   for (const step of steps) {
@@ -388,40 +366,48 @@ const handleSolveSuccess = (
   }
 }
 
-const handleViewSolverStep = (
-  state: SudokuState,
-  action: ViewSolverStepAction,
-): SudokuState => {
+const handleViewSolverStep = (state: SudokuState, action: ViewSolverStepAction): SudokuState => {
   if (state.solver.gameMode !== 'visualizing') return state
 
-  let boardForStep = state.initialBoard.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
+  let boardForStep = state.initialBoard.map((c) => ({
+    ...c,
+    candidates: new Set<number>(),
+    centers: new Set<number>(),
+  }))
   if (action.index === state.solver.steps.length) {
-    boardForStep = state.board.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
+    boardForStep = state.board.map((c) => ({
+      ...c,
+      candidates: new Set<number>(),
+      centers: new Set<number>(),
+    }))
   } else {
     for (let i = 0; i < action.index; i++) {
       for (const p of state.solver.steps[i].placements) {
-        boardForStep[p.index].value = p.value;
+        boardForStep[p.index].value = p.value
       }
     }
   }
 
-  const boardBeforeCurrentStep = state.initialBoard.map((c) => ({ ...c, candidates: new Set<number>(), centers: new Set<number>() }));
+  const boardBeforeCurrentStep = state.initialBoard.map((c) => ({
+    ...c,
+    candidates: new Set<number>(),
+    centers: new Set<number>(),
+  }))
   for (let i = 0; i < action.index - 1; i++) {
     for (const p of state.solver.steps[i].placements) {
-      boardBeforeCurrentStep[p.index].value = p.value;
+      boardBeforeCurrentStep[p.index].value = p.value
     }
   }
 
-  const candidates = calculateCandidates(boardBeforeCurrentStep);
+  const candidates = calculateCandidates(boardBeforeCurrentStep)
 
   for (let i = 0; i < action.index - 1; i++) {
     for (const elim of state.solver.steps[i].eliminations) {
-      candidates[elim.index]?.delete(elim.value);
+      candidates[elim.index]?.delete(elim.value)
     }
   }
 
-  const elims =
-    action.index > 0 ? state.solver.steps[action.index - 1].eliminations : [];
+  const elims = action.index > 0 ? state.solver.steps[action.index - 1].eliminations : []
 
   return {
     ...state,
@@ -432,8 +418,8 @@ const handleViewSolverStep = (
       candidatesForViz: candidates,
       eliminationsForViz: elims,
     },
-  };
-};
+  }
+}
 
 const handleExitVisualization = (state: SudokuState): SudokuState => ({
   ...state,
@@ -441,24 +427,17 @@ const handleExitVisualization = (state: SudokuState): SudokuState => ({
   solver: { ...initialState.solver },
 })
 
-const handleSetActiveCell = (
-  state: SudokuState,
-  action: SetActiveCellAction,
-): SudokuState => ({
+const handleSetActiveCell = (state: SudokuState, action: SetActiveCellAction): SudokuState => ({
   ...state,
   ui: {
     ...state.ui,
     activeCellIndex: action.index,
-    highlightedValue:
-      action.index !== null ? state.board[action.index].value : null,
+    highlightedValue: action.index !== null ? state.board[action.index].value : null,
     lastError: null,
   },
 })
 
-export function sudokuReducer(
-  state: SudokuState,
-  action: SudokuAction,
-): SudokuState {
+export function sudokuReducer(state: SudokuState, action: SudokuAction): SudokuState {
   let newState: SudokuState
 
   switch (action.type) {

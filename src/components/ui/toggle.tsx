@@ -16,20 +16,19 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as React from "react"
-import * as TogglePrimitive from "@radix-ui/react-toggle"
-import { type VariantProps } from "class-variance-authority"
+import * as React from 'react'
+import * as TogglePrimitive from '@radix-ui/react-toggle'
+import { type VariantProps } from 'class-variance-authority'
 
-import { cn } from "@/lib/utils"
-import { toggleVariants } from "@/lib/cva"
+import { cn } from '@/lib/utils'
+import { toggleVariants } from '@/lib/cva'
 
 function Toggle({
   className,
   variant,
   size,
   ...props
-}: React.ComponentProps<typeof TogglePrimitive.Root> &
-  VariantProps<typeof toggleVariants>) {
+}: React.ComponentProps<typeof TogglePrimitive.Root> & VariantProps<typeof toggleVariants>) {
   return (
     <TogglePrimitive.Root
       data-slot="toggle"

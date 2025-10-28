@@ -18,14 +18,7 @@
 
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { SolveButton } from './SolveButton'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
@@ -74,9 +67,7 @@ describe('SolveButton component', () => {
         },
       })
       render(<SolveButton />)
-      expect(
-        screen.getByRole('button', { name: 'Solve Puzzle' }),
-      ).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Solve Puzzle' })).not.toBeDisabled()
     })
 
     it('is disabled and shows conflict title when there are conflicts', () => {
@@ -164,9 +155,7 @@ describe('SolveButton component', () => {
 
       // Should disappear immediately
       expect(screen.queryByText('Solving...')).not.toBeInTheDocument()
-      expect(
-        screen.getByRole('button', { name: 'Solve Puzzle' }),
-      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Solve Puzzle' })).toBeInTheDocument()
 
       vi.useRealTimers()
     })
@@ -181,21 +170,15 @@ describe('SolveButton component', () => {
     it('renders an "Exit Visualization" button', () => {
       mockUseSudokuState.mockReturnValue(visualizingState)
       render(<SolveButton />)
-      expect(
-        screen.getByRole('button', { name: /exit visualization/i }),
-      ).toBeInTheDocument()
-      expect(
-        screen.queryByRole('button', { name: /solve puzzle/i }),
-      ).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /exit visualization/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /solve puzzle/i })).not.toBeInTheDocument()
     })
 
     it('calls exitVisualization on click', async () => {
       const user = userEvent.setup()
       mockUseSudokuState.mockReturnValue(visualizingState)
       render(<SolveButton />)
-      await user.click(
-        screen.getByRole('button', { name: /exit visualization/i }),
-      )
+      await user.click(screen.getByRole('button', { name: /exit visualization/i }))
       expect(mockExitVisualization).toHaveBeenCalled()
     })
   })

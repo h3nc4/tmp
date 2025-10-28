@@ -91,10 +91,7 @@ export function NewPuzzleButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {DIFFICULTY_LEVELS.map((level) => (
-          <DropdownMenuItem
-            key={level}
-            onSelect={() => handleSelectDifficulty(level)}
-          >
+          <DropdownMenuItem key={level} onSelect={() => handleSelectDifficulty(level)}>
             {level}
           </DropdownMenuItem>
         ))}

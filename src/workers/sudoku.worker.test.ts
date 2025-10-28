@@ -69,9 +69,7 @@ describe('Sudoku Worker Logic', () => {
 
   // Helper to simulate a message event for the handler
   const simulateMessage = (
-    data:
-      | { type: 'solve'; boardString: string }
-      | { type: 'generate'; difficulty: string },
+    data: { type: 'solve'; boardString: string } | { type: 'generate'; difficulty: string },
     origin = workerOrigin,
   ) => {
     const event = { data, origin } as MessageEvent
@@ -169,7 +167,7 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should ignore messages from a foreign origin', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     await simulateMessage({ type: 'solve', boardString: '...' }, 'http://example.com')
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -182,7 +180,7 @@ describe('Sudoku Worker Logic', () => {
   })
 
   it('should correctly handle a null origin for file:// contexts', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const boardString = '.'.repeat(81)
     const result = { steps: [], solution: '1'.repeat(81) }
     solve_sudoku.mockReturnValue(result)

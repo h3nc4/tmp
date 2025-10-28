@@ -18,14 +18,7 @@
 
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-  beforeEach,
-} from 'vitest'
+import { describe, expect, it, vi, type Mock, beforeEach } from 'vitest'
 import { NumberPad } from './NumberPad'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
@@ -86,12 +79,8 @@ describe('NumberPad component', () => {
     mockUseSudokuState.mockReturnValue(state)
     render(<NumberPad />)
 
-    expect(
-      screen.getByRole('button', { name: 'Enter number 3' }),
-    ).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Enter number 4' }),
-    ).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Enter number 3' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Enter number 4' })).not.toBeDisabled()
   })
 
   it('disables all number buttons when in visualizing mode', () => {
@@ -103,9 +92,7 @@ describe('NumberPad component', () => {
     render(<NumberPad />)
 
     for (let i = 1; i <= 9; i++) {
-      expect(
-        screen.getByRole('button', { name: `Enter number ${i}` }),
-      ).toBeDisabled()
+      expect(screen.getByRole('button', { name: `Enter number ${i}` })).toBeDisabled()
     }
   })
 

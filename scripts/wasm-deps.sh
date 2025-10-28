@@ -18,7 +18,8 @@
 
 set -e
 
-dev_tools="cargo-llvm-cov 0.6.21"
+dev_tools="cargo-llvm-cov 0.6.21
+cargo-audit 0.21.2"
 
 tools="wasm-pack 0.13.1
 wasm-opt 0.116.1"

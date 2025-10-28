@@ -41,8 +41,7 @@ const getStepExplanation = (step: SolvingStep): string => {
   // Helper to format a list of numbers (e.g., {1, 2, 3})
   const formatNums = (nums: number[]) => `{${[...nums].sort((a, b) => a - b).join(', ')}}`
   // Helper to format a list of cell coordinates
-  const formatCells = (indices: number[]) =>
-    indices.map(formatCell).join(', ')
+  const formatCells = (indices: number[]) => indices.map(formatCell).join(', ')
 
   switch (technique) {
     case 'NakedSingle': {
@@ -116,12 +115,10 @@ export function SolverStepsPanel() {
   // `currentStepIndex` is 1-based for steps, 0 for initial state.
   // The accordion's active item value is the 0-based step index.
   const activeAccordionItem =
-    currentStepIndex !== null && currentStepIndex > 0
-      ? (currentStepIndex - 1).toString()
-      : ''
+    currentStepIndex !== null && currentStepIndex > 0 ? (currentStepIndex - 1).toString() : ''
 
   return (
-    <div className="flex h-full flex-col gap-2 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+    <div className="bg-card text-card-foreground flex h-full flex-col gap-2 rounded-lg border p-4 shadow-sm">
       <h2 className="text-lg font-semibold">Solving Steps</h2>
       <Button
         variant={currentStepIndex === 0 ? 'secondary' : 'ghost'}
@@ -139,16 +136,11 @@ export function SolverStepsPanel() {
           onValueChange={handleAccordionChange}
         >
           {steps.map((step, index) => (
-            <AccordionItem
-              key={`step-${index}-${step.technique}`}
-              value={index.toString()}
-            >
+            <AccordionItem key={`step-${index}-${step.technique}`} value={index.toString()}>
               <AccordionTrigger>
                 Step {index + 1}: {step.technique}
               </AccordionTrigger>
-              <AccordionContent>
-                {getStepExplanation(step)}
-              </AccordionContent>
+              <AccordionContent>{getStepExplanation(step)}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>

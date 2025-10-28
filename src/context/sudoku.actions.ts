@@ -40,10 +40,7 @@ import type {
 import type { InputMode, SolveResult } from './sudoku.types'
 
 /** Creates an action to set the definitive value of a cell. */
-export const setCellValue = (
-  index: number,
-  value: number,
-): SetCellValueAction => ({
+export const setCellValue = (index: number, value: number): SetCellValueAction => ({
   type: 'SET_CELL_VALUE',
   index,
   value,
@@ -105,17 +102,13 @@ export const solveFailure = (): SolveFailureAction => ({
 })
 
 /** Creates an action to signal the start of the puzzle generation process. */
-export const generatePuzzleStart = (
-  difficulty: string,
-): GeneratePuzzleStartAction => ({
+export const generatePuzzleStart = (difficulty: string): GeneratePuzzleStartAction => ({
   type: 'GENERATE_PUZZLE_START',
   difficulty,
 })
 
 /** Creates an action for when the generator successfully creates a puzzle. */
-export const generatePuzzleSuccess = (
-  puzzleString: string,
-): GeneratePuzzleSuccessAction => ({
+export const generatePuzzleSuccess = (puzzleString: string): GeneratePuzzleSuccessAction => ({
   type: 'GENERATE_PUZZLE_SUCCESS',
   puzzleString,
 })
@@ -143,9 +136,7 @@ export const clearError = (): ClearErrorAction => ({
 })
 
 /** Creates an action to set the highlighted number value. */
-export const setHighlightedValue = (
-  value: number | null,
-): SetHighlightedValueAction => ({
+export const setHighlightedValue = (value: number | null): SetHighlightedValueAction => ({
   type: 'SET_HIGHLIGHTED_VALUE',
   value,
 })

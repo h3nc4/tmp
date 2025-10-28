@@ -24,5 +24,5 @@ docker run \
   -e "BUBBLEWRAP_KEY_PASSWORD=${KEYSTORE_PASSWORD}" \
   -e "VERSION=${1#v}" \
   -v "$(pwd)":/app \
-  ghcr.io/googlechromelabs/bubblewrap:latest \
+  ghcr.io/googlechromelabs/bubblewrap:1.24.1 \
   -c 'printf "%s\n" "${VERSION}" | bubblewrap update && yes | bubblewrap build'

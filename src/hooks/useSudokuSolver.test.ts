@@ -74,9 +74,7 @@ describe('useSudokuSolver', () => {
   })
 
   it('should initialize and terminate the worker on mount/unmount', () => {
-    const { unmount } = renderHook(() =>
-      useSudokuSolver(initialState, mockDispatch),
-    )
+    const { unmount } = renderHook(() => useSudokuSolver(initialState, mockDispatch))
     expect(SolverWorker).toHaveBeenCalledOnce()
     expect(mockWorkerInstance.addEventListener).toHaveBeenCalledWith(
       'message',
@@ -92,10 +90,9 @@ describe('useSudokuSolver', () => {
       ...initialState,
       solver: { ...initialState.solver, isSolving: true },
     }
-    const { rerender } = renderHook(
-      (props) => useSudokuSolver(props.state, props.dispatch),
-      { initialProps: { state: initialState, dispatch: mockDispatch } },
-    )
+    const { rerender } = renderHook((props) => useSudokuSolver(props.state, props.dispatch), {
+      initialProps: { state: initialState, dispatch: mockDispatch },
+    })
 
     expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled()
 
@@ -118,10 +115,9 @@ describe('useSudokuSolver', () => {
         generationDifficulty: 'medium',
       },
     }
-    const { rerender } = renderHook(
-      (props) => useSudokuSolver(props.state, props.dispatch),
-      { initialProps: { state: initialState, dispatch: mockDispatch } },
-    )
+    const { rerender } = renderHook((props) => useSudokuSolver(props.state, props.dispatch), {
+      initialProps: { state: initialState, dispatch: mockDispatch },
+    })
 
     expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled()
 
@@ -178,7 +174,10 @@ describe('useSudokuSolver', () => {
 
   it('should do nothing if solution message is missing result object', () => {
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
-    mockWorkerInstance.__simulateMessage({ type: 'solution', result: undefined as unknown as SolveResult })
+    mockWorkerInstance.__simulateMessage({
+      type: 'solution',
+      result: undefined as unknown as SolveResult,
+    })
     expect(mockDispatch).not.toHaveBeenCalled()
     expect(toast.success).not.toHaveBeenCalled()
   })
@@ -228,9 +227,7 @@ describe('useSudokuSolver', () => {
 
     renderHook(() => useSudokuSolver(initialState, mockDispatch))
 
-    expect(toast.error).toHaveBeenCalledWith(
-      'Solver functionality is unavailable.',
-    )
+    expect(toast.error).toHaveBeenCalledWith('Solver functionality is unavailable.')
   })
 
   it('should handle case where worker is not available when solving starts', () => {
@@ -238,15 +235,12 @@ describe('useSudokuSolver', () => {
       throw new Error('Worker instantiation failed')
     })
 
-    const { rerender } = renderHook(
-      (props) => useSudokuSolver(props.state, props.dispatch),
-      { initialProps: { state: initialState, dispatch: mockDispatch } },
-    )
+    const { rerender } = renderHook((props) => useSudokuSolver(props.state, props.dispatch), {
+      initialProps: { state: initialState, dispatch: mockDispatch },
+    })
 
     // First call happens on mount.
-    expect(toast.error).toHaveBeenCalledWith(
-      'Solver functionality is unavailable.',
-    )
+    expect(toast.error).toHaveBeenCalledWith('Solver functionality is unavailable.')
     expect(toast.error).toHaveBeenCalledTimes(1)
 
     const solvingState: SudokuState = {
@@ -257,9 +251,7 @@ describe('useSudokuSolver', () => {
 
     // Second call happens in the trigger `useEffect`.
     expect(toast.error).toHaveBeenCalledTimes(2)
-    expect(toast.error).toHaveBeenLastCalledWith(
-      'Solver functionality is unavailable.',
-    )
+    expect(toast.error).toHaveBeenLastCalledWith('Solver functionality is unavailable.')
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SOLVE_FAILURE' })
   })
 
@@ -268,15 +260,12 @@ describe('useSudokuSolver', () => {
       throw new Error('Worker instantiation failed')
     })
 
-    const { rerender } = renderHook(
-      (props) => useSudokuSolver(props.state, props.dispatch),
-      { initialProps: { state: initialState, dispatch: mockDispatch } },
-    )
+    const { rerender } = renderHook((props) => useSudokuSolver(props.state, props.dispatch), {
+      initialProps: { state: initialState, dispatch: mockDispatch },
+    })
 
     // First call happens on mount.
-    expect(toast.error).toHaveBeenCalledWith(
-      'Solver functionality is unavailable.',
-    )
+    expect(toast.error).toHaveBeenCalledWith('Solver functionality is unavailable.')
     expect(toast.error).toHaveBeenCalledTimes(1)
 
     const generatingState: SudokuState = {
@@ -291,9 +280,7 @@ describe('useSudokuSolver', () => {
 
     // Second call happens in the trigger `useEffect`.
     expect(toast.error).toHaveBeenCalledTimes(2)
-    expect(toast.error).toHaveBeenLastCalledWith(
-      'Solver functionality is unavailable.',
-    )
+    expect(toast.error).toHaveBeenLastCalledWith('Solver functionality is unavailable.')
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'GENERATE_PUZZLE_FAILURE' })
   })
 })

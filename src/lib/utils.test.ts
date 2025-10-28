@@ -142,9 +142,7 @@ describe('Sudoku Utilities', () => {
 
     it('should return false for boards with different values', () => {
       const board1 = createEmptyBoard()
-      const board2 = createEmptyBoard().map((cell, i) =>
-        i === 0 ? { ...cell, value: 5 } : cell,
-      )
+      const board2 = createEmptyBoard().map((cell, i) => (i === 0 ? { ...cell, value: 5 } : cell))
       expect(areBoardsEqual(board1, board2)).toBe(false)
     })
 
@@ -195,17 +193,13 @@ describe('Sudoku Utilities', () => {
     })
 
     it('should return null for filled cells', () => {
-      const board = createEmptyBoard().map((cell, i) =>
-        i === 0 ? { ...cell, value: 5 } : cell,
-      )
+      const board = createEmptyBoard().map((cell, i) => (i === 0 ? { ...cell, value: 5 } : cell))
       const candidates = calculateCandidates(board)
       expect(candidates[0]).toBeNull()
     })
 
     it('should eliminate candidates from peers of a filled cell', () => {
-      const board = createEmptyBoard().map((cell, i) =>
-        i === 0 ? { ...cell, value: 5 } : cell,
-      )
+      const board = createEmptyBoard().map((cell, i) => (i === 0 ? { ...cell, value: 5 } : cell))
       const candidates = calculateCandidates(board)
 
       // Cell 1 (same row) should not have 5 as a candidate

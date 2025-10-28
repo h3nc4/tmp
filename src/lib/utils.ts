@@ -134,11 +134,7 @@ export function validateBoard(board: BoardState): Set<number> {
  * @param value The number to place in the cell.
  * @returns `true` if the move is valid (no immediate conflict), `false` otherwise.
  */
-export function isMoveValid(
-  board: BoardState,
-  index: number,
-  value: number,
-): boolean {
+export function isMoveValid(board: BoardState, index: number, value: number): boolean {
   const row = Math.floor(index / 9)
   const col = index % 9
 
@@ -179,10 +175,7 @@ export function isMoveValid(
  * @param setB The second set.
  * @returns `true` if the sets contain the same elements, `false` otherwise.
  */
-function areSetsEqual<T>(
-  setA: ReadonlySet<T>,
-  setB: ReadonlySet<T>,
-): boolean {
+function areSetsEqual<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): boolean {
   if (setA.size !== setB.size) {
     return false
   }
@@ -200,10 +193,7 @@ function areSetsEqual<T>(
  * @param boardB The second board state.
  * @returns `true` if the boards are identical, `false` otherwise.
  */
-export function areBoardsEqual(
-  boardA: BoardState,
-  boardB: BoardState,
-): boolean {
+export function areBoardsEqual(boardA: BoardState, boardB: BoardState): boolean {
   if (boardA === boardB) return true
   if (boardA.length !== boardB.length) return false
 
@@ -228,9 +218,7 @@ export function areBoardsEqual(
  * @param board The board state with initial values.
  * @returns An array where each element is a Set of candidates for that cell, or null if the cell is filled.
  */
-export function calculateCandidates(
-  board: BoardState,
-): Array<Set<number> | null> {
+export function calculateCandidates(board: BoardState): Array<Set<number> | null> {
   const candidates: Array<Set<number> | null> = Array(81)
     .fill(null)
     .map(() => new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]))

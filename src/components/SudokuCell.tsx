@@ -62,12 +62,7 @@ const getBackgroundStyles = ({
   isHighlighted,
 }: Pick<
   SudokuCellProps,
-  | 'isConflict'
-  | 'isActive'
-  | 'isSolving'
-  | 'isCause'
-  | 'isNumberHighlighted'
-  | 'isHighlighted'
+  'isConflict' | 'isActive' | 'isSolving' | 'isCause' | 'isNumberHighlighted' | 'isHighlighted'
 >) => {
   if (isConflict) return '!bg-destructive/20'
   if (isActive) return 'bg-sky-200 dark:bg-sky-800/80'
@@ -99,8 +94,7 @@ const getInputTextStyles = ({
     'text-xl md:text-2xl': !(hasPencilMarks && cell.value === null),
     'text-primary font-bold': isInitial,
     'text-foreground': cell.value !== null && !isInitial,
-    'font-bold text-amber-600 dark:text-amber-400':
-      isNumberHighlighted && !isInitial,
+    'font-bold text-amber-600 dark:text-amber-400': isNumberHighlighted && !isInitial,
     'text-sky-600 dark:text-sky-400': isSolverResult,
     '!text-destructive': isConflict,
   })
@@ -112,13 +106,7 @@ const getInputTextStyles = ({
  * It receives a ref to allow the parent to manage focus.
  */
 const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>((props, ref) => {
-  const {
-    cell,
-    index,
-    onFocus,
-    eliminatedCandidates,
-    ...styleProps
-  } = props
+  const { cell, index, onFocus, eliminatedCandidates, ...styleProps } = props
   const handleFocus = () => onFocus(index)
 
   const row = Math.floor(index / 9)
@@ -159,11 +147,11 @@ const SudokuCell = forwardRef<HTMLInputElement, SudokuCellProps>((props, ref) =>
         value={cell.value === null ? '' : String(cell.value)}
         onFocus={handleFocus}
         className={cn(
-          'absolute inset-0 z-10 size-full aspect-square rounded-none border-border bg-transparent p-0 text-center font-semibold transition-colors duration-200',
+          'border-border absolute inset-0 z-10 aspect-square size-full rounded-none bg-transparent p-0 text-center font-semibold transition-colors duration-200',
           'focus:z-20 focus:shadow-inner',
           'caret-transparent',
-          col % 3 === 2 && col !== 8 && 'border-r-2 border-r-primary',
-          row % 3 === 2 && row !== 8 && 'border-b-2 border-b-primary',
+          col % 3 === 2 && col !== 8 && 'border-r-primary border-r-2',
+          row % 3 === 2 && row !== 8 && 'border-b-primary border-b-2',
           textClasses,
         )}
         aria-label={`Sudoku cell at row ${row + 1}, column ${col + 1}`}

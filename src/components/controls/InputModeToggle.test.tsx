@@ -18,14 +18,7 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { InputModeToggle } from './InputModeToggle'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'

@@ -133,7 +133,9 @@ describe('SudokuCell component', () => {
 
     it('applies correct background for a cause cell in visualization', () => {
       render(<SudokuCell {...defaultProps} isCause />)
-      expect(screen.getByTestId('cell-background')).toHaveClass('bg-purple-200 dark:bg-purple-800/80')
+      expect(screen.getByTestId('cell-background')).toHaveClass(
+        'bg-purple-200 dark:bg-purple-800/80',
+      )
     })
 
     it('applies correct border for right edge of a box', () => {

@@ -18,14 +18,7 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { SolverStepsPanel } from './SolverStepsPanel'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
@@ -141,29 +134,17 @@ describe('SolverStepsPanel component', () => {
 
   it('renders the panel with initial, final, and all step buttons', () => {
     render(<SolverStepsPanel />)
-    expect(
-      screen.getByRole('heading', { name: 'Solving Steps' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Initial Board State' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Solution' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /Step 1: NakedSingle/ }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /Step 9: Backtracking/ }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Solving Steps' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Initial Board State' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Solution' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Step 1: NakedSingle/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Step 9: Backtracking/ })).toBeInTheDocument()
   })
 
   it('calls viewSolverStep(0) when "Initial Board State" is clicked', async () => {
     const user = userEvent.setup()
     render(<SolverStepsPanel />)
-    await user.click(
-      screen.getByRole('button', { name: 'Initial Board State' }),
-    )
+    await user.click(screen.getByRole('button', { name: 'Initial Board State' }))
     expect(mockViewSolverStep).toHaveBeenCalledWith(0)
   })
 
@@ -203,12 +184,14 @@ describe('SolverStepsPanel component', () => {
       solver: { ...defaultState.solver, currentStepIndex: 0 },
     })
     rerender(<SolverStepsPanel />)
-    expect(
-      screen.getByRole('button', { name: 'Initial Board State' }),
-    ).toHaveAttribute('data-state', 'active')
-    expect(
-      screen.getByRole('button', { name: 'Solution' }),
-    ).toHaveAttribute('data-state', 'inactive')
+    expect(screen.getByRole('button', { name: 'Initial Board State' })).toHaveAttribute(
+      'data-state',
+      'active',
+    )
+    expect(screen.getByRole('button', { name: 'Solution' })).toHaveAttribute(
+      'data-state',
+      'inactive',
+    )
 
     // When viewing final state
     mockUseSudokuState.mockReturnValue({
@@ -216,12 +199,11 @@ describe('SolverStepsPanel component', () => {
       solver: { ...defaultState.solver, currentStepIndex: mockSteps.length },
     })
     rerender(<SolverStepsPanel />)
-    expect(
-      screen.getByRole('button', { name: 'Solution' }),
-    ).toHaveAttribute('data-state', 'active')
-    expect(
-      screen.getByRole('button', { name: 'Initial Board State' }),
-    ).toHaveAttribute('data-state', 'inactive')
+    expect(screen.getByRole('button', { name: 'Solution' })).toHaveAttribute('data-state', 'active')
+    expect(screen.getByRole('button', { name: 'Initial Board State' })).toHaveAttribute(
+      'data-state',
+      'inactive',
+    )
   })
 
   describe('Step Explanations', () => {
@@ -229,14 +211,35 @@ describe('SolverStepsPanel component', () => {
       stepIndex: number
       expectedText: RegExp
     }[] = [
-        { stepIndex: 1, expectedText: /Cell R1C1 had only one possible candidate/ },
-        { stepIndex: 3, expectedText: /Naked Pair: Cells R1C2, R1C3 can only contain the candidates \{4, 6\}/ },
-        { stepIndex: 4, expectedText: /Hidden Pair: In their shared unit, the candidates \{7, 8\} only appear in cells R3C3, R3C4/ },
-        { stepIndex: 5, expectedText: /Naked Triple: Cells R4C4, R4C5, R4C6 form a triple with candidates \{1, 2, 3\}/ },
-        { stepIndex: 6, expectedText: /Hidden Triple: In their shared unit, the candidates \{5, 6, 9\} only appear in cells R5C5, R5C6, R5C7/ },
-        { stepIndex: 7, expectedText: /Pointing Subgroup: The candidates \{8\} in one box are confined/ },
-        { stepIndex: 8, expectedText: /Pointing Subgroup: The candidates \{1\} in one box are confined/ },
-      ]
+      { stepIndex: 1, expectedText: /Cell R1C1 had only one possible candidate/ },
+      {
+        stepIndex: 3,
+        expectedText: /Naked Pair: Cells R1C2, R1C3 can only contain the candidates \{4, 6\}/,
+      },
+      {
+        stepIndex: 4,
+        expectedText:
+          /Hidden Pair: In their shared unit, the candidates \{7, 8\} only appear in cells R3C3, R3C4/,
+      },
+      {
+        stepIndex: 5,
+        expectedText:
+          /Naked Triple: Cells R4C4, R4C5, R4C6 form a triple with candidates \{1, 2, 3\}/,
+      },
+      {
+        stepIndex: 6,
+        expectedText:
+          /Hidden Triple: In their shared unit, the candidates \{5, 6, 9\} only appear in cells R5C5, R5C6, R5C7/,
+      },
+      {
+        stepIndex: 7,
+        expectedText: /Pointing Subgroup: The candidates \{8\} in one box are confined/,
+      },
+      {
+        stepIndex: 8,
+        expectedText: /Pointing Subgroup: The candidates \{1\} in one box are confined/,
+      },
+    ]
 
     for (const { stepIndex, expectedText } of testCases) {
       it(`shows the correct explanation for step ${stepIndex}`, async () => {
@@ -250,9 +253,7 @@ describe('SolverStepsPanel component', () => {
     }
 
     it('shows the correct explanation for a default/unknown case', async () => {
-      const magicSteps = [
-        { technique: 'Magic', placements: [], eliminations: [], cause: [] },
-      ]
+      const magicSteps = [{ technique: 'Magic', placements: [], eliminations: [], cause: [] }]
       mockUseSudokuState.mockReturnValue({
         ...defaultState,
         solver: {

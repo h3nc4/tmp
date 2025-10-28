@@ -26,11 +26,7 @@ import { SudokuProvider } from './context/SudokuProvider.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      storageKey="wasudoku-ui-theme"
-    >
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="wasudoku-ui-theme">
       <SudokuProvider>
         <App />
       </SudokuProvider>

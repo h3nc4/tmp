@@ -17,22 +17,10 @@
  */
 
 import { renderHook, act } from '@testing-library/react'
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  beforeAll,
-  afterAll,
-  type Mock,
-} from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll, type Mock } from 'vitest'
 import { toast } from 'sonner'
 import { useSudokuActions } from './useSudokuActions'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import { initialState } from '@/context/sudoku.reducer'
 import * as actionCreators from '@/context/sudoku.actions'
 import type { SudokuState } from '@/context/sudoku.types'
@@ -115,9 +103,7 @@ describe('useSudokuActions', () => {
       act(() => actions.inputValue(5))
 
       expect(mockDispatch).toHaveBeenCalledWith(actionCreators.setCellValue(0, 5))
-      expect(mockDispatch).not.toHaveBeenCalledWith(
-        actionCreators.setActiveCell(1),
-      )
+      expect(mockDispatch).not.toHaveBeenCalledWith(actionCreators.setActiveCell(1))
     })
 
     it('dispatches togglePencilMark in candidate mode', () => {
@@ -128,9 +114,7 @@ describe('useSudokuActions', () => {
       const actions = getActions()
       act(() => actions.inputValue(3))
 
-      expect(mockDispatch).toHaveBeenCalledWith(
-        actionCreators.togglePencilMark(0, 3, 'candidate'),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(actionCreators.togglePencilMark(0, 3, 'candidate'))
     })
 
     it('does not dispatch anything if no cell is active', () => {
@@ -161,9 +145,7 @@ describe('useSudokuActions', () => {
         const actions = getActions()
         act(() => actions.navigate(direction as 'right'))
 
-        expect(mockDispatch).toHaveBeenCalledWith(
-          actionCreators.setActiveCell(expectedIndex),
-        )
+        expect(mockDispatch).toHaveBeenCalledWith(actionCreators.setActiveCell(expectedIndex))
       },
     )
 
@@ -302,33 +284,25 @@ describe('useSudokuActions', () => {
     it('generatePuzzle dispatches GENERATE_PUZZLE_START', () => {
       const actions = getActions()
       act(() => actions.generatePuzzle('easy'))
-      expect(mockDispatch).toHaveBeenCalledWith(
-        actionCreators.generatePuzzleStart('easy'),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(actionCreators.generatePuzzleStart('easy'))
     })
 
     it('exitVisualization dispatches EXIT_VISUALIZATION', () => {
       const actions = getActions()
       act(() => actions.exitVisualization())
-      expect(mockDispatch).toHaveBeenCalledWith(
-        actionCreators.exitVisualization(),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(actionCreators.exitVisualization())
     })
 
     it('setInputMode dispatches SET_INPUT_MODE', () => {
       const actions = getActions()
       act(() => actions.setInputMode('candidate'))
-      expect(mockDispatch).toHaveBeenCalledWith(
-        actionCreators.setInputMode('candidate'),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(actionCreators.setInputMode('candidate'))
     })
 
     it('setHighlightedValue dispatches SET_HIGHLIGHTED_VALUE', () => {
       const actions = getActions()
       act(() => actions.setHighlightedValue(5))
-      expect(mockDispatch).toHaveBeenCalledWith(
-        actionCreators.setHighlightedValue(5),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(actionCreators.setHighlightedValue(5))
     })
 
     it('viewSolverStep dispatches VIEW_SOLVER_STEP', () => {

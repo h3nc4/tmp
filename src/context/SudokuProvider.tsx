@@ -42,9 +42,7 @@ export function SudokuProvider({ children }: SudokuProviderProps) {
 
   return (
     <SudokuStateContext.Provider value={state}>
-      <SudokuDispatchContext.Provider value={dispatch}>
-        {children}
-      </SudokuDispatchContext.Provider>
+      <SudokuDispatchContext.Provider value={dispatch}>{children}</SudokuDispatchContext.Provider>
     </SudokuStateContext.Provider>
   )
 }

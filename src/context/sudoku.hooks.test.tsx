@@ -23,7 +23,7 @@ import { useSudokuState, useSudokuDispatch } from './sudoku.hooks'
 import { initialState } from './sudoku.reducer'
 
 beforeAll(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => { })
+  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterAll(() => {

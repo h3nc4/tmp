@@ -18,14 +18,7 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { ClearButton } from './ClearButton'
 import { useSudokuState } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
@@ -64,9 +57,7 @@ describe('ClearButton component', () => {
       derived: { ...initialState.derived, isBoardEmpty: false },
     })
     render(<ClearButton />)
-    expect(
-      screen.getByRole('button', { name: 'Clear Board' }),
-    ).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear Board' })).not.toBeDisabled()
   })
 
   it('calls clearBoard and shows toast on click', async () => {

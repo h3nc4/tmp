@@ -19,19 +19,19 @@
 /// <reference types="vitest" />
 /// <reference types="vite/client" />
 
-import path from "path"
-import tailwindcss from "@tailwindcss/vite"
+import path from 'path'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/WASudoku/",
+  base: '/WASudoku/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "wasudoku-wasm": path.resolve(__dirname, "./src/wasudoku-wasm/pkg"),
+      '@': path.resolve(__dirname, './src'),
+      'wasudoku-wasm': path.resolve(__dirname, './src/wasudoku-wasm/pkg'),
     },
   },
   worker: {

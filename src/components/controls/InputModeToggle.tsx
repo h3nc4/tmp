@@ -43,25 +43,13 @@ export function InputModeToggle() {
       aria-label="Input Mode"
       disabled={solver.gameMode === 'visualizing'}
     >
-      <ToggleGroupItem
-        value="normal"
-        className="flex-1"
-        onMouseDown={(e) => e.preventDefault()}
-      >
+      <ToggleGroupItem value="normal" className="flex-1" onMouseDown={(e) => e.preventDefault()}>
         Normal
       </ToggleGroupItem>
-      <ToggleGroupItem
-        value="candidate"
-        className="flex-1"
-        onMouseDown={(e) => e.preventDefault()}
-      >
+      <ToggleGroupItem value="candidate" className="flex-1" onMouseDown={(e) => e.preventDefault()}>
         Candidate
       </ToggleGroupItem>
-      <ToggleGroupItem
-        value="center"
-        className="flex-1"
-        onMouseDown={(e) => e.preventDefault()}
-      >
+      <ToggleGroupItem value="center" className="flex-1" onMouseDown={(e) => e.preventDefault()}>
         Center
       </ToggleGroupItem>
     </ToggleGroup>

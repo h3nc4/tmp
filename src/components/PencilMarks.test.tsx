@@ -22,22 +22,12 @@ import { PencilMarks } from './PencilMarks'
 
 describe('PencilMarks component', () => {
   it('renders nothing when both sets are empty', () => {
-    const { container } = render(
-      <PencilMarks
-        candidates={new Set()}
-        centers={new Set()}
-      />,
-    )
+    const { container } = render(<PencilMarks candidates={new Set()} centers={new Set()} />)
     expect(container.firstChild).toBeNull()
   })
 
   it('renders candidate marks correctly', () => {
-    render(
-      <PencilMarks
-        candidates={new Set([1, 5, 9])}
-        centers={new Set()}
-      />,
-    )
+    render(<PencilMarks candidates={new Set([1, 5, 9])} centers={new Set()} />)
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
     expect(screen.getByText('9')).toBeInTheDocument()
@@ -45,12 +35,7 @@ describe('PencilMarks component', () => {
   })
 
   it('renders center marks correctly and gives them priority', () => {
-    render(
-      <PencilMarks
-        candidates={new Set([1, 2])}
-        centers={new Set([7, 8])}
-      />,
-    )
+    render(<PencilMarks candidates={new Set([1, 2])} centers={new Set([7, 8])} />)
     // Should render center marks
     expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByText('8')).toBeInTheDocument()
@@ -61,10 +46,7 @@ describe('PencilMarks component', () => {
 
   it('renders small font for many center marks', () => {
     const { container } = render(
-      <PencilMarks
-        candidates={new Set()}
-        centers={new Set([1, 2, 3, 4, 5])}
-      />,
+      <PencilMarks candidates={new Set()} centers={new Set([1, 2, 3, 4, 5])} />,
     )
     const span = container.querySelector('span')
     expect(span).toHaveClass('text-[0.6rem]')
@@ -72,10 +54,7 @@ describe('PencilMarks component', () => {
 
   it('renders normal font for few center marks', () => {
     const { container } = render(
-      <PencilMarks
-        candidates={new Set()}
-        centers={new Set([1, 2, 3])}
-      />,
+      <PencilMarks candidates={new Set()} centers={new Set([1, 2, 3])} />,
     )
     const span = container.querySelector('span')
     expect(span).toHaveClass('text-xs')

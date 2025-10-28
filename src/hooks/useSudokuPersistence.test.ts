@@ -46,7 +46,7 @@ describe('useSudokuPersistence', () => {
   beforeEach(() => {
     localStorageMock.clear()
     setItemSpy = vi.spyOn(localStorageMock, 'setItem')
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
@@ -57,10 +57,7 @@ describe('useSudokuPersistence', () => {
   it('should save the initial state to local storage on first render', () => {
     renderHook(() => useSudokuPersistence(initialState))
     expect(setItemSpy).toHaveBeenCalledOnce()
-    expect(setItemSpy).toHaveBeenCalledWith(
-      'wasudoku-game-state',
-      expect.any(String),
-    )
+    expect(setItemSpy).toHaveBeenCalledWith('wasudoku-game-state', expect.any(String))
     const savedData = JSON.parse(setItemSpy.mock.calls[0][1] as string)
     expect(savedData.history.index).toBe(0)
     expect(savedData.history.stack).toHaveLength(1)

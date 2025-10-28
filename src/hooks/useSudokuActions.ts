@@ -18,10 +18,7 @@
 
 import { useMemo } from 'react'
 import { toast } from 'sonner'
-import {
-  useSudokuState,
-  useSudokuDispatch,
-} from '@/context/sudoku.hooks'
+import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import * as actions from '@/context/sudoku.actions'
 import { isMoveValid, boardStateToString } from '@/lib/utils'
 import type { InputMode } from '@/context/sudoku.types'
@@ -58,13 +55,7 @@ export function useSudokuActions() {
             dispatch(actions.setActiveCell(state.ui.activeCellIndex + 1))
           }
         } else {
-          dispatch(
-            actions.togglePencilMark(
-              state.ui.activeCellIndex,
-              value,
-              state.ui.inputMode,
-            ),
-          )
+          dispatch(actions.togglePencilMark(state.ui.activeCellIndex, value, state.ui.inputMode))
         }
       },
 
@@ -127,11 +118,9 @@ export function useSudokuActions() {
       /** Changes the input mode. */
       setInputMode: (mode: InputMode) => dispatch(actions.setInputMode(mode)),
       /** Sets the globally highlighted number. */
-      setHighlightedValue: (value: number | null) =>
-        dispatch(actions.setHighlightedValue(value)),
+      setHighlightedValue: (value: number | null) => dispatch(actions.setHighlightedValue(value)),
       /** Jumps to a specific step in the solver visualization. */
-      viewSolverStep: (index: number) =>
-        dispatch(actions.viewSolverStep(index)),
+      viewSolverStep: (index: number) => dispatch(actions.viewSolverStep(index)),
     }),
     [state, dispatch],
   )

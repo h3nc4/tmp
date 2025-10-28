@@ -36,9 +36,7 @@ const TestConsumer = () => {
   return (
     <div>
       <span data-testid="cell-0-value">{String(state.board[0].value)}</span>
-      <button onClick={() => dispatch({ type: 'SET_ACTIVE_CELL', index: 5 })}>
-        Dispatch
-      </button>
+      <button onClick={() => dispatch({ type: 'SET_ACTIVE_CELL', index: 5 })}>Dispatch</button>
     </div>
   )
 }

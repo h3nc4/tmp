@@ -14,12 +14,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "wasudoku-wasm": [
-        "./src/wasudoku-wasm/pkg"
-      ]
+      "@/*": ["./src/*"],
+      "wasudoku-wasm": ["./src/wasudoku-wasm/pkg"]
     }
   }
 }

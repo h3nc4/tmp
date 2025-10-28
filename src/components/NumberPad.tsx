@@ -52,10 +52,7 @@ export const NumberPad = memo(function NumberPad() {
   )
 
   return (
-    <div
-      className="grid grid-cols-9 gap-1"
-      aria-label="On-screen number pad"
-    >
+    <div className="grid grid-cols-9 gap-1" aria-label="On-screen number pad">
       {NUMBERS.map((num) => {
         const remaining = 9 - numberCounts[num]
         const isComplete = remaining <= 0
@@ -74,7 +71,7 @@ export const NumberPad = memo(function NumberPad() {
             <div className="relative flex size-full items-center justify-center">
               <span className="text-lg font-medium">{num}</span>
               {!isComplete && (
-                <span className="absolute bottom-1 right-1.5 text-[0.6rem] text-muted-foreground">
+                <span className="text-muted-foreground absolute right-1.5 bottom-1 text-[0.6rem]">
                   {remaining}
                 </span>
               )}

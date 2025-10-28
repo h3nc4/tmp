@@ -19,14 +19,7 @@
 import React from 'react'
 import { render, fireEvent, act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { SudokuGrid } from './SudokuGrid'
 import { useSudokuState, useSudokuDispatch } from '@/context/sudoku.hooks'
 import { useSudokuActions } from '@/hooks/useSudokuActions'
@@ -52,18 +45,16 @@ interface MockSudokuCellProps {
 const mockSudokuCellRender = vi.fn()
 
 vi.mock('./SudokuCell', () => ({
-  default: React.forwardRef<HTMLInputElement, MockSudokuCellProps>(
-    (props, ref) => {
-      mockSudokuCellRender(props)
-      return (
-        <input
-          ref={ref}
-          aria-label={`cell-${props.index}`}
-          onFocus={() => props.onFocus(props.index)}
-        />
-      )
-    },
-  ),
+  default: React.forwardRef<HTMLInputElement, MockSudokuCellProps>((props, ref) => {
+    mockSudokuCellRender(props)
+    return (
+      <input
+        ref={ref}
+        aria-label={`cell-${props.index}`}
+        onFocus={() => props.onFocus(props.index)}
+      />
+    )
+  }),
 }))
 
 const mockUseSudokuState = useSudokuState as Mock
@@ -179,7 +170,7 @@ describe('SudokuGrid component', () => {
   it('passes isNumberHighlighted correctly', () => {
     const boardWithValues = initialState.board.map((cell, index) => ({
       ...cell,
-      value: index % 9 + 1,
+      value: (index % 9) + 1,
     }))
     mockUseSudokuState.mockReturnValue({
       ...defaultState,
@@ -256,18 +247,14 @@ describe('SudokuGrid component', () => {
       await act(async () => await Promise.resolve())
 
       expect(readTextSpy).toHaveBeenCalled()
-      expect(mockDispatch).toHaveBeenCalledWith(
-        sudokuActions.importBoard(validBoardString),
-      )
+      expect(mockDispatch).toHaveBeenCalledWith(sudokuActions.importBoard(validBoardString))
       expect(toast.success).toHaveBeenCalledWith('Board imported from clipboard.')
       readTextSpy.mockRestore()
     })
 
     it('shows an error toast for invalid paste string', async () => {
       const invalidString = 'abc'
-      const readTextSpy = vi
-        .spyOn(navigator.clipboard, 'readText')
-        .mockResolvedValue(invalidString)
+      const readTextSpy = vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue(invalidString)
 
       render(<SudokuGrid />)
       const grid = screen.getByRole('grid')
@@ -307,9 +294,7 @@ describe('SudokuGrid component', () => {
         solver: {
           ...defaultState.solver,
           gameMode: 'visualizing',
-          visualizationBoard: initialState.board.map((c, i) =>
-            i === 0 ? { ...c, value: 9 } : c,
-          ),
+          visualizationBoard: initialState.board.map((c, i) => (i === 0 ? { ...c, value: 9 } : c)),
           candidatesForViz: mockCandidates,
           eliminationsForViz: [mockElimination],
         },
@@ -431,7 +416,6 @@ describe('SudokuGrid component', () => {
       })
     })
   })
-
 
   it('focuses the correct cell when activeCellIndex changes', () => {
     const focusSpy = vi.spyOn(window.HTMLInputElement.prototype, 'focus')

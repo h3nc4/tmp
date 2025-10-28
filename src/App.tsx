@@ -37,25 +37,18 @@ function App() {
   const { ui, solver } = useSudokuState()
   const { eraseActiveCell, exportBoard } = useSudokuActions()
 
-  const { sourceRef, targetRef } = useSynchronizedHeight(
-    solver.gameMode === 'visualizing',
-  )
+  const { sourceRef, targetRef } = useSynchronizedHeight(solver.gameMode === 'visualizing')
 
   const handleErase = useCallback(() => {
     eraseActiveCell('delete')
   }, [eraseActiveCell])
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className="bg-background text-foreground flex min-h-screen flex-col">
       <header className="container mx-auto flex items-center justify-between p-4">
         <h1 className="text-2xl font-bold md:text-3xl">WASudoku</h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={exportBoard}
-            title="Export Board"
-          >
+          <Button variant="outline" size="icon" onClick={exportBoard} title="Export Board">
             <Share2 className="size-5" />
           </Button>
           <Button variant="outline" size="icon" asChild>
@@ -75,10 +68,7 @@ function App() {
       <main className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
         <div className="flex w-full max-w-4xl flex-col items-center gap-8 md:flex-row md:items-start md:justify-center">
           {/* Main content: Grid + Controls */}
-          <div
-            ref={sourceRef}
-            className="flex w-full max-w-md flex-col gap-4 md:order-2 md:gap-6"
-          >
+          <div ref={sourceRef} className="flex w-full max-w-md flex-col gap-4 md:order-2 md:gap-6">
             <SudokuGrid />
             <div className="flex flex-col gap-4">
               <div className="flex flex-row gap-2">
@@ -87,9 +77,7 @@ function App() {
                   variant="outline"
                   size="icon"
                   onClick={handleErase}
-                  disabled={
-                    ui.activeCellIndex === null || solver.gameMode === 'visualizing'
-                  }
+                  disabled={ui.activeCellIndex === null || solver.gameMode === 'visualizing'}
                   title="Erase selected cell"
                   onMouseDown={(e) => e.preventDefault()}
                 >
@@ -117,7 +105,7 @@ function App() {
         </div>
       </main>
 
-      <footer className="container mx-auto p-4 text-center text-sm text-muted-foreground">
+      <footer className="text-muted-foreground container mx-auto p-4 text-center text-sm">
         <a
           href="https://h3nc4.com"
           target="_blank"

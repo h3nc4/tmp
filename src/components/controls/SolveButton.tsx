@@ -44,15 +44,9 @@ export function SolveButton() {
     if (derived.conflicts.size > 0) return 'Cannot solve with conflicts.'
     if (derived.isBoardFull) return 'Board is already full.'
     if (derived.isBoardEmpty) return 'Board is empty.'
-    if (solver.solveFailed)
-      return 'Solving failed. Please change the board to try again.'
+    if (solver.solveFailed) return 'Solving failed. Please change the board to try again.'
     return 'Solve the puzzle'
-  }, [
-    derived.isBoardEmpty,
-    derived.isBoardFull,
-    derived.conflicts.size,
-    solver.solveFailed,
-  ])
+  }, [derived.isBoardEmpty, derived.isBoardFull, derived.conflicts.size, solver.solveFailed])
 
   useEffect(() => {
     if (solver.isSolving) {
@@ -82,12 +76,7 @@ export function SolveButton() {
   }
 
   return (
-    <Button
-      onClick={solve}
-      className="flex-1"
-      disabled={isSolveDisabled}
-      title={solveButtonTitle}
-    >
+    <Button onClick={solve} className="flex-1" disabled={isSolveDisabled} title={solveButtonTitle}>
       {isShowingSolvingState ? (
         <>
           <BrainCircuit className="mr-2 size-4 animate-pulse" />

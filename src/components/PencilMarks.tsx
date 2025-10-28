@@ -46,10 +46,7 @@ export const PencilMarks = memo(function PencilMarks({
     return (
       <div className="flex size-full items-center justify-center p-1">
         {sortedCenters.map((num) => (
-          <span
-            key={`center-${num}`}
-            className={`${baseClasses} ${fontSize} leading-none`}
-          >
+          <span key={`center-${num}`} className={`${baseClasses} ${fontSize} leading-none`}>
             {num}
           </span>
         ))}
@@ -67,11 +64,7 @@ export const PencilMarks = memo(function PencilMarks({
             className={`${baseClasses} flex items-center justify-center text-[0.5rem] leading-none md:text-[0.6rem]`}
           >
             {candidates.has(num) ? (
-              <span
-                className={cn(
-                  eliminations?.has(num) && 'text-destructive/80 line-through',
-                )}
-              >
+              <span className={cn(eliminations?.has(num) && 'text-destructive/80 line-through')}>
                 {num}
               </span>
             ) : (

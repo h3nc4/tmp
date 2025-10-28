@@ -21,11 +21,7 @@ import type { SudokuState } from './sudoku.types'
 import type { SudokuAction } from './sudoku.actions.types'
 
 /** Context to provide the Sudoku game state to consumer components. */
-export const SudokuStateContext = createContext<SudokuState | undefined>(
-  undefined,
-)
+export const SudokuStateContext = createContext<SudokuState | undefined>(undefined)
 
 /** Context to provide the dispatch function for Sudoku actions. */
-export const SudokuDispatchContext = createContext<
-  Dispatch<SudokuAction> | undefined
->(undefined)
+export const SudokuDispatchContext = createContext<Dispatch<SudokuAction> | undefined>(undefined)

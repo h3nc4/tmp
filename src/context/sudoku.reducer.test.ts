@@ -17,19 +17,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  sudokuReducer,
-  createEmptyBoard,
-  initialState,
-  loadInitialState,
-} from './sudoku.reducer'
+import { sudokuReducer, createEmptyBoard, initialState, loadInitialState } from './sudoku.reducer'
 import type { SudokuAction } from './sudoku.actions.types'
-import type {
-  BoardState,
-  SudokuState,
-  SolvingStep,
-  SavedGameState,
-} from './sudoku.types'
+import type { BoardState, SudokuState, SolvingStep, SavedGameState } from './sudoku.types'
 import { getRelatedCellIndices } from '@/lib/utils'
 
 describe('sudokuReducer', () => {
@@ -39,9 +29,7 @@ describe('sudokuReducer', () => {
         const stateWithPencilMarks: SudokuState = {
           ...initialState,
           board: initialState.board.map((cell, i) =>
-            i === 0
-              ? { ...cell, candidates: new Set([1, 2]), centers: new Set<number>() }
-              : cell,
+            i === 0 ? { ...cell, candidates: new Set([1, 2]), centers: new Set<number>() } : cell,
           ),
         }
         const action: SudokuAction = { type: 'SET_CELL_VALUE', index: 0, value: 5 }
@@ -210,9 +198,7 @@ describe('sudokuReducer', () => {
         const state: SudokuState = {
           ...stateWithValue,
           board: stateWithValue.board.map((cell, i) =>
-            i === 0
-              ? { ...cell, candidates: new Set([1]), centers: new Set([2]) }
-              : cell,
+            i === 0 ? { ...cell, candidates: new Set([1]), centers: new Set([2]) } : cell,
           ),
         }
         const action: SudokuAction = { type: 'ERASE_CELL', index: 0 }
@@ -279,7 +265,8 @@ describe('sudokuReducer', () => {
 
     describe('IMPORT_BOARD', () => {
       it('should correctly parse the board string and reset state', () => {
-        const boardString = '53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79'
+        const boardString =
+          '53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79'
         const action: SudokuAction = { type: 'IMPORT_BOARD', boardString }
         const newState = sudokuReducer(initialState, action)
 
@@ -350,7 +337,7 @@ describe('sudokuReducer', () => {
           state = sudokuReducer(state, {
             type: 'SET_CELL_VALUE',
             index: 0, // Always modify the same cell
-            value: ((state.board[0].value ?? 0) % 9) + 1 as 1, // Cycle through 1-9
+            value: (((state.board[0].value ?? 0) % 9) + 1) as 1, // Cycle through 1-9
           })
         }
         expect(state.history.stack.length).toBe(MAX_HISTORY_ENTRIES)
@@ -517,9 +504,7 @@ describe('sudokuReducer', () => {
           cause: [],
         },
       ]
-      const initialBoard = createEmptyBoard().map((c, i) =>
-        i === 80 ? { ...c, value: 9 } : c,
-      )
+      const initialBoard = createEmptyBoard().map((c, i) => (i === 80 ? { ...c, value: 9 } : c))
       // This represents the final solved board state.
       const solvedBoardForTest = createEmptyBoard().map((c, i) => {
         if (i === 0) return { ...c, value: 1 }
@@ -576,13 +561,15 @@ describe('sudokuReducer', () => {
 
       it('should correctly apply prior eliminations when viewing a later step', () => {
         const stepsWithElims: SolvingStep[] = [
-          { // Step 1: A pointing pair eliminates 5 from index 15, but places no number.
+          {
+            // Step 1: A pointing pair eliminates 5 from index 15, but places no number.
             technique: 'PointingPair',
             placements: [],
             eliminations: [{ index: 15, value: 5 }],
             cause: [],
           },
-          { // Step 2: Now that 5 is gone, index 15 is a naked single of 6.
+          {
+            // Step 2: Now that 5 is gone, index 15 is a naked single of 6.
             technique: 'NakedSingle',
             placements: [{ index: 15, value: 6 }],
             eliminations: [],
@@ -599,14 +586,14 @@ describe('sudokuReducer', () => {
         }
 
         // View step 2. We want to see the candidates *before* step 2 was applied.
-        const newState = sudokuReducer(state, { type: 'VIEW_SOLVER_STEP', index: 2 });
-        const candidatesForCell15 = newState.solver.candidatesForViz?.[15];
+        const newState = sudokuReducer(state, { type: 'VIEW_SOLVER_STEP', index: 2 })
+        const candidatesForCell15 = newState.solver.candidatesForViz?.[15]
 
         // Before the fix, this would fail. `calculateCandidates` would not know about
         // the elimination from step 1, and would include 5 as a candidate.
         // With the fix, the elimination from step 1 is applied, so 5 should be absent.
-        expect(candidatesForCell15?.has(5)).toBe(false);
-      });
+        expect(candidatesForCell15?.has(5)).toBe(false)
+      })
 
       it('should handle VIEW_SOLVER_STEP for the initial state (index 0)', () => {
         const state = sudokuReducer(visualizingState, {
@@ -669,7 +656,9 @@ describe('sudokuReducer', () => {
         })
 
         // The visualization board should now be the fully solved board
-        expect(stateAfterFinalStep.solver.visualizationBoard).toEqual(solvedBoard.map(c => ({ ...c, candidates: new Set(), centers: new Set() })))
+        expect(stateAfterFinalStep.solver.visualizationBoard).toEqual(
+          solvedBoard.map((c) => ({ ...c, candidates: new Set(), centers: new Set() })),
+        )
         expect(stateAfterFinalStep.solver.currentStepIndex).toBe(2)
       })
 
@@ -853,12 +842,14 @@ describe('loadInitialState', () => {
     expect(state.board[0].candidates).toEqual(new Set([1, 2, 3]))
     expect(state.board[1].candidates.size).toBe(0)
     expect(state.derived.isBoardEmpty).toBe(true) // no .value properties were set
-    expect(state.initialBoard).toEqual(state.board.map(cell => ({ ...cell, candidates: new Set(), centers: new Set() })))
+    expect(state.initialBoard).toEqual(
+      state.board.map((cell) => ({ ...cell, candidates: new Set(), centers: new Set() })),
+    )
   })
 
   it('should handle JSON parsing errors gracefully', () => {
     localStorageMock.getItem.mockReturnValue('not json')
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const state = loadInitialState()
     expect(state).toEqual(initialState)
     expect(consoleErrorSpy).toHaveBeenCalledWith(

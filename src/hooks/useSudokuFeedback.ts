@@ -29,10 +29,7 @@ import { clearError } from '@/context/sudoku.actions'
  * @param state - The current Sudoku state.
  * @param dispatch - The dispatch function from the Sudoku reducer.
  */
-export function useSudokuFeedback(
-  state: SudokuState,
-  dispatch: Dispatch<SudokuAction>,
-) {
+export function useSudokuFeedback(state: SudokuState, dispatch: Dispatch<SudokuAction>) {
   const { lastError } = state.ui
 
   useEffect(() => {

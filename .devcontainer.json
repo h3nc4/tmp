@@ -36,7 +36,8 @@
         "eamodio.gitlens",
         "foxundermoon.shell-format",
         "rust-lang.rust-analyzer",
-        "vadimcn.vscode-lldb"
+        "vadimcn.vscode-lldb",
+        "esbenp.prettier-vscode"
       ]
     }
   }

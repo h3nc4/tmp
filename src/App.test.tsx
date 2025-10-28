@@ -18,14 +18,7 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import App from './App'
 import { useSudokuState } from './context/sudoku.hooks'
 import { useSudokuActions } from './hooks/useSudokuActions'
@@ -98,21 +91,13 @@ describe('App component', () => {
 
   it('renders the main layout and all control components', () => {
     render(<App />)
-    expect(
-      screen.getByRole('heading', { name: /wasudoku/i }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /wasudoku/i })).toBeInTheDocument()
     expect(screen.getByTestId('sudoku-grid')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'NumberPad' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'New Puzzle' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New Puzzle' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Solve' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Export Board' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /github repository/i }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export Board' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /github repository/i })).toBeInTheDocument()
   })
 
   it('calls exportBoard when export button is clicked', async () => {
@@ -158,9 +143,7 @@ describe('App component', () => {
       ui: { ...initialState.ui, activeCellIndex: null },
     })
     render(<App />)
-    expect(
-      screen.getByRole('button', { name: 'Erase selected cell' }),
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Erase selected cell' })).toBeDisabled()
   })
 
   it('disables erase button when in visualizing mode', () => {
@@ -169,8 +152,6 @@ describe('App component', () => {
       solver: { ...defaultState.solver, gameMode: 'visualizing' },
     })
     render(<App />)
-    expect(
-      screen.getByRole('button', { name: 'Erase selected cell' }),
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Erase selected cell' })).toBeDisabled()
   })
 })

@@ -16,12 +16,7 @@
  * along with WASudoku.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, {
-  useMemo,
-  useEffect,
-  useCallback,
-  createRef,
-} from 'react'
+import React, { useMemo, useEffect, useCallback, createRef } from 'react'
 import { toast } from 'sonner'
 import SudokuCell from './SudokuCell'
 import { getRelatedCellIndices, isBoardStringValid } from '@/lib/utils'
@@ -39,8 +34,7 @@ export function SudokuGrid() {
   const dispatch = useSudokuDispatch()
   const actions = useSudokuActions()
 
-  const displayBoard =
-    solver.gameMode === 'visualizing' ? solver.visualizationBoard : board
+  const displayBoard = solver.gameMode === 'visualizing' ? solver.visualizationBoard : board
   const isReadOnly = solver.gameMode === 'visualizing' || solver.isSolving
 
   const cellRefs = useMemo(
@@ -162,7 +156,7 @@ export function SudokuGrid() {
       onKeyDown={handleKeyDown}
       onBlur={handleGridBlur}
       onPaste={handlePaste}
-      className="grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 border-primary shadow-lg"
+      className="border-primary grid aspect-square grid-cols-9 overflow-hidden rounded-lg border-2 shadow-lg"
     >
       {displayBoard.map((currentCell, index) => {
         const isInitial = initialBoard[index]?.value != null
@@ -170,18 +164,14 @@ export function SudokuGrid() {
 
         const displayCell: CellState = isVisualizing
           ? {
-            value: currentCell.value,
-            candidates: solver.candidatesForViz?.[index] ?? new Set(),
-            centers: new Set(),
-          }
+              value: currentCell.value,
+              candidates: solver.candidatesForViz?.[index] ?? new Set(),
+              centers: new Set(),
+            }
           : currentCell
 
         const eliminatedCandidates = isVisualizing
-          ? new Set(
-            solver.eliminationsForViz
-              ?.filter((e) => e.index === index)
-              .map((e) => e.value),
-          )
+          ? new Set(solver.eliminationsForViz?.filter((e) => e.index === index).map((e) => e.value))
           : undefined
 
         const row = Math.floor(index / 9)
@@ -201,8 +191,7 @@ export function SudokuGrid() {
             isActive={ui.activeCellIndex === index}
             isHighlighted={highlightedIndices.has(index)}
             isNumberHighlighted={
-              displayCell.value !== null &&
-              displayCell.value === ui.highlightedValue
+              displayCell.value !== null && displayCell.value === ui.highlightedValue
             }
             isCause={causeIndices.has(index)}
             onFocus={handleCellFocus}

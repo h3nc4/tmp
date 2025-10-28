@@ -38,10 +38,7 @@ const WORKER_UNAVAILABLE_ERROR = 'Solver functionality is unavailable.'
  * @param state - The current Sudoku state.
  * @param dispatch - The dispatch function from the Sudoku reducer.
  */
-export function useSudokuSolver(
-  state: SudokuState,
-  dispatch: Dispatch<SudokuAction>,
-) {
+export function useSudokuSolver(state: SudokuState, dispatch: Dispatch<SudokuAction>) {
   const workerRef = useRef<Worker | null>(null)
   const { isSolving, isGenerating, generationDifficulty } = state.solver
   const { board } = state

@@ -52,10 +52,9 @@ describe('useSudokuFeedback', () => {
       ...initialState,
       ui: { ...initialState.ui, lastError: errorMessage },
     }
-    const { rerender } = renderHook(
-      (props) => useSudokuFeedback(props.state, props.dispatch),
-      { initialProps: { state, dispatch: mockDispatch } },
-    )
+    const { rerender } = renderHook((props) => useSudokuFeedback(props.state, props.dispatch), {
+      initialProps: { state, dispatch: mockDispatch },
+    })
 
     expect(toast.error).toHaveBeenCalledWith(errorMessage)
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_ERROR' })
