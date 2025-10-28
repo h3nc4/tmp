@@ -23,5 +23,6 @@ DEBIAN/
 **/usr/share/
 
 node_modules/
+bin/
 out/
 *.vsix

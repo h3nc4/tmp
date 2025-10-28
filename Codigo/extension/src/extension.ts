@@ -2,16 +2,13 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fsPromises from 'fs/promises';
-import * as fs from 'fs';
-import * as https from 'https';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-const GITHUB_REPO = 'h3nc4/HookCI';
 const BINARY_NAME = 'hookci';
-const RELEASE_ASSET_NAME = 'hookci';
+const BUNDLED_BINARY_DIR = 'bin';
 const INSTALL_DIR = path.join(os.homedir(), '.local', 'bin');
 const BINARY_PATH = path.join(INSTALL_DIR, BINARY_NAME);
 
@@ -23,7 +20,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     console.log('Activating HookCI Installer extension.');
 
     try {
-        await ensureHookciInstalled();
+        await ensureHookciIsInstalled(context);
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`HookCI installation failed: ${message}`);
@@ -42,9 +39,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 /**
- * Checks if the hookci binary is installed globally, and if not, downloads it.
+ * Checks if the hookci binary is installed globally, and if not, copies it
+ * from the extension's bundle.
+ * @param context The extension context, used to find the bundled binary's path.
  */
-async function ensureHookciInstalled(): Promise<void> {
+async function ensureHookciIsInstalled(context: vscode.ExtensionContext): Promise<void> {
     if (os.platform() !== 'linux') {
         vscode.window.showWarningMessage('HookCI Installer extension only supports Linux.');
         return;
@@ -52,22 +51,22 @@ async function ensureHookciInstalled(): Promise<void> {
 
     try {
         await fsPromises.stat(BINARY_PATH);
-        console.log(`HookCI binary already found at ${BINARY_PATH}.`);
+        console.log(`HookCI binary already found at ${BINARY_PATH}. Skipping installation.`);
+        return;
     } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            console.log('HookCI binary not found. Proceeding with installation.');
-            await installHookci();
-        } else {
+        if (error.code !== 'ENOENT') {
             throw new Error(`Failed to check for hookci binary: ${error.message}`);
         }
+        console.log('HookCI binary not found. Proceeding with installation from bundle.');
     }
-}
 
-/**
- * Handles the full installation process including download and setting permissions.
- */
-async function installHookci(): Promise<void> {
-    const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/latest/download/${RELEASE_ASSET_NAME}`;
+    const bundledBinaryPath = path.join(context.extensionPath, BUNDLED_BINARY_DIR, BINARY_NAME);
+
+    try {
+        await fsPromises.stat(bundledBinaryPath);
+    } catch (error) {
+        throw new Error(`Bundled HookCI binary not found at ${bundledBinaryPath}. The extension package might be corrupted.`);
+    }
 
     await vscode.window.withProgress(
         {
@@ -79,56 +78,18 @@ async function installHookci(): Promise<void> {
             progress.report({ message: 'Creating installation directory...' });
             await fsPromises.mkdir(INSTALL_DIR, { recursive: true });
 
-            progress.report({ message: `Downloading from ${downloadUrl}...` });
-            await downloadFile(downloadUrl, BINARY_PATH);
+            progress.report({ message: `Copying binary to ${INSTALL_DIR}...` });
+            await fsPromises.copyFile(bundledBinaryPath, BINARY_PATH);
 
-            progress.report({ message: 'Setting permissions...' });
+            progress.report({ message: 'Setting file permissions...' });
             await fsPromises.chmod(BINARY_PATH, 0o755); // rwxr-xr-x
 
-            vscode.window.showInformationMessage('HookCI has been successfully installed.');
+            vscode.window.showInformationMessage(`HookCI has been successfully installed to ${BINARY_PATH}.`);
             console.log(`HookCI installed to ${BINARY_PATH}.`);
         }
     );
 }
 
-/**
- * Downloads a file from a URL to a destination path, handling HTTPS redirects.
- * @param url The URL to download from.
- * @param dest The local filesystem path to save the file to.
- */
-function downloadFile(url: string, dest: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const options: https.RequestOptions = {
-            headers: {
-                'User-Agent': 'vscode-hookci-installer-extension'
-            }
-        };
-
-        const request = https.get(url, options, (response) => {
-            if (response.statusCode === 301 || response.statusCode === 302) {
-                if (response.headers.location) {
-                    return downloadFile(response.headers.location, dest).then(resolve).catch(reject);
-                }
-                return reject(new Error('Download failed: Redirect location missing.'));
-            }
-
-            if (response.statusCode !== 200) {
-                return reject(new Error(`Download failed with status code: ${response.statusCode}`));
-            }
-
-            const fileStream = fs.createWriteStream(dest);
-            response.pipe(fileStream);
-
-            fileStream.on('finish', () => fileStream.close(() => resolve()));
-            fileStream.on('error', (err: NodeJS.ErrnoException) => {
-                fsPromises.unlink(dest).catch(() => { });
-                reject(err);
-            });
-        });
-
-        request.on('error', (err: Error) => reject(new Error(`Download request failed: ${err.message}`)));
-    });
-}
 
 /**
  * Configures the local git repository in all open workspace folders to use
