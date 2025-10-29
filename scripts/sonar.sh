@@ -23,7 +23,7 @@ SONAR_CONTAINER_NAME="sonarqube"
 SONAR_IMAGE="sonarqube:25.9.0.112764-community"
 SONAR_SCAN_IMAGE="sonarsource/sonar-scanner-cli:11"
 SONAR_URL="http://localhost:9000"
-PROJECT_KEY=$(grep 'sonar.projectKey' ./sonar-project.properties | cut -d'=' -f2)
+PROJECT_KEY="$(grep 'sonar.projectKey' ./sonar-project.properties | cut -d'=' -f2)"
 
 # Adjust paths in coverage reports
 if [ -f "coverage-wasm.xml" ]; then
@@ -34,18 +34,18 @@ fi
 docker pull "${SONAR_SCAN_IMAGE}" >/dev/null 2>&1 &
 PULL_PID=$!
 
-if [ ! "$(docker ps -q -f name=${SONAR_CONTAINER_NAME})" ]; then
-  if [ "$(docker ps -aq -f status=exited -f name=${SONAR_CONTAINER_NAME})" ]; then
-    docker start ${SONAR_CONTAINER_NAME} >/dev/null
+if ! docker ps -q -f "name=${SONAR_CONTAINER_NAME}"; then
+  if docker ps -aq -f status=exited -f "name=${SONAR_CONTAINER_NAME}"; then
+    docker start "${SONAR_CONTAINER_NAME}" >/dev/null
   else
     docker run -d \
-      --name ${SONAR_CONTAINER_NAME} \
+      --name "${SONAR_CONTAINER_NAME}" \
       -p 0.0.0.0:9000:9000 \
       -v sonarqube_data:/opt/sonarqube/data \
       -v sonarqube_extensions:/opt/sonarqube/extensions \
       -v sonarqube_logs:/opt/sonarqube/logs \
       -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true \
-      ${SONAR_IMAGE} >/dev/null
+      "${SONAR_IMAGE}" >/dev/null
   fi
 
   echo "Waiting for SonarQube to start..."
@@ -61,7 +61,7 @@ if [ ! "$(docker ps -q -f name=${SONAR_CONTAINER_NAME})" ]; then
 fi
 
 echo "Running SonarQube analysis..."
-wait $PULL_PID
+wait "${PULL_PID}"
 docker run \
   --rm \
   --network="host" \

@@ -168,6 +168,7 @@ RUN apt-get install --no-install-recommends -y -qq \
   opendoas \
   openssh-client \
   procps \
+  shellcheck \
   tree \
   wget \
   yq
