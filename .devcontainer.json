@@ -1,8 +1,6 @@
 {
   "name": "WASudoku",
-  "build": {
-    "dockerfile": "./Dockerfile"
-  },
+  "image": "h3nc4/wasudoku:latest",
   "runArgs": [
     "-v",
     "/etc/localtime:/etc/localtime:ro",

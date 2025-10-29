@@ -27,8 +27,8 @@ wasm-opt 0.116.1"
 while getopts "d" opt; do
   case "${opt}" in
   d)
-    tools="$tools
-$dev_tools"
+    tools="${tools}
+${dev_tools}"
     ;;
   *)
     echo "Usage: $0 [-d]
@@ -38,9 +38,9 @@ $dev_tools"
   esac
 done
 
-echo "$tools" | while read -r name ver; do
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "installing $name $ver"
-    cargo install "$name" --version "$ver" --locked
+echo "${tools}" | while read -r name ver; do
+  if ! command -v "${name}" >/dev/null 2>&1; then
+    echo "installing ${name} ${ver}"
+    cargo install "${name}" --version "${ver}" --locked
   fi
 done

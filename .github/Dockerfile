@@ -42,6 +42,7 @@ RUN apt-get install --no-install-recommends -y -qq \
   ca-certificates \
   pkg-config \
   libssl-dev \
+  shellcheck \
   zlib1g-dev
 
 ################################################################################
