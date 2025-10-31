@@ -1,0 +1,23 @@
+# Node
+dist/
+node_modules/
+
+# Rust
+bin/
+build/
+pkg/
+target/
+*.rs.bk
+
+# Coverage reports
+coverage-*.*
+
+# Android
+android.keystore
+licenses/
+
+# Docker
+.gitignore
+.github/
+Dockerfile*
+.dockerignore
