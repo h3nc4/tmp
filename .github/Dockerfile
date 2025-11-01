@@ -116,7 +116,7 @@ COPY --from=rust-stage /rootfs/ /
 # Install build dependencies
 COPY scripts/wasm-deps.sh /usr/local/bin/wasm-deps
 RUN chmod +x /usr/local/bin/wasm-deps
-RUN wasm-deps
+RUN wasm-deps -d
 
 ################################################################################
 # Node.js stage
@@ -154,7 +154,7 @@ RUN rm -rf /var/cache/* /var/log/* /tmp/*
 # Final squash-and-load image.
 FROM scratch AS final
 ARG CARGO_HOME
-ENV PATH="/wasudoku/node_modules/.bin:${CARGO_HOME}/bin:${PATH}"
+ENV PATH="/usr/src/node_modules/.bin:${CARGO_HOME}/bin:${PATH}"
 
 COPY --from=main / /
 COPY --from=node-stage /rootfs/ /

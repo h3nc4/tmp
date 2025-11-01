@@ -1,0 +1,58 @@
+name: Security Analysis
+
+on:
+  push:
+    branches:
+      - '**'
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  analyze:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript', 'rust']
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - if: matrix.language == 'rust'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src/wasudoku-wasm/target/
+          key: ${{ matrix.language }}-${{ runner.os }}-cargo-${{ hashFiles('src/wasudoku-wasm/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.language }}-${{ runner.os }}-cargo-
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: 'wasm32-unknown-unknown'
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install UI dependencies
+        run: npm ci
+      - name: Build project for analysis
+        run: |
+          npm run wasm:build:prod
+          npm run typecheck
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:${{matrix.language}}'

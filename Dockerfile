@@ -201,8 +201,8 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################################################################
-# Final squash-and-load image. Change to scratch once https://github.com/devcontainers/cli/issues/239 is resolved.
-FROM debian:trixie AS final
+# Final squash-and-load image.
+FROM scratch AS final
 ARG USER
 ARG RUST_VERSION
 ARG CARGO_HOME

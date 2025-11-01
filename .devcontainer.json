@@ -44,9 +44,7 @@
         "editor.formatOnSave": true,
         "files.insertFinalNewline": true,
         "files.trimFinalNewlines": true,
-        "rust-analyzer.linkedProjects": [
-          "./src/wasudoku-wasm/Cargo.toml"
-        ],
+        "rust-analyzer.linkedProjects": ["./src/wasudoku-wasm/Cargo.toml"],
         "prettier.enable": true,
         "[typescript]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode"
