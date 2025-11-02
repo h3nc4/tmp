@@ -165,8 +165,6 @@ RUN rm -rf /var/cache/* /var/log/* /tmp/*
 # Final squash image.
 FROM scratch AS final
 ARG CARGO_HOME
-ENV PATH="/usr/src/node_modules/.bin:${CARGO_HOME}/bin:${PATH}"
+ENV PATH="${CARGO_HOME}/bin:${PATH}"
 
 COPY --from=main / /
-
-WORKDIR /usr/src/
