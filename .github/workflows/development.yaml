@@ -156,6 +156,7 @@ jobs:
 
   build-container:
     name: Build Runtime Container
+    if: github.ref == 'refs/heads/main'
     needs: [wasm, ui, prepare]
     runs-on: ubuntu-latest
     steps:
@@ -176,6 +177,7 @@ jobs:
 
   test-container:
     name: Test Runtime Container
+    if: github.ref == 'refs/heads/main'
     needs: build-container
     runs-on: ubuntu-latest
     steps:
