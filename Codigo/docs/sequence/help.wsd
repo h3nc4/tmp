@@ -2,9 +2,9 @@
 skinparam sequenceMessageAlign center
 
 actor "Usuário" as User
-participant "<<Layer>>\nPresentation (CLI)" as CLI
+participant "<<Presentation>>\n:HookciCli" as CLI
 
-User -> CLI : hookci help
+User -> CLI : hookci --help
 activate CLI
 CLI --> User : Exibe texto de ajuda
 deactivate CLI

@@ -2,72 +2,79 @@
 skinparam sequenceMessageAlign center
 
 actor "Desenvolvedor" as User
-participant "<<Layer>>\nPresentation (CLI)" as CLI
-participant "<<Layer>>\nApplication" as App
-participant "<<Layer>>\nDomain" as Domain
-participant "<<Layer>>\nInfrastructure" as Infra
-boundary "config" as ConfigFile
-boundary "Docker" as DockerSystem
+participant "<<Presentation>>\n:HookciCli" as CLI
+participant "<<Presentation>>\n:PipelineUI" as UI
+participant "<<Application>>\n:CiExecutionService" as App
+participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
+participant "<<Infrastructure>>\n:GitService" as GitSvc
+participant "<<Infrastructure>>\n:DockerService" as DockerSvc
+boundary "FileSystem" as FS
+boundary "DockerSystem" as Docker
 
-User -> CLI : hookci run <params>
+User -> CLI : hookci run
 activate CLI
-CLI -> App : run()
+CLI -> App : run(hook_type=None, ...)
 activate App
-App -> Infra : load_conf()
-activate Infra
-Infra -> ConfigFile : read config
-activate ConfigFile
-ConfigFile --> Infra : config_data
-deactivate ConfigFile
-Infra --> App : config_data
-deactivate Infra
 
-App -> Domain : validate()
-activate Domain
-Domain --> App : validation_status
-deactivate Domain
+App -> GitSvc : git_root
+activate GitSvc
+GitSvc -> FS : find .git
+GitSvc --> App : git_root_path
+deactivate GitSvc
 
-App -> Domain : get_image_info()
-activate Domain
-Domain --> App : docker_info
-deactivate Domain
+App -> CfgHandler : load_config_data()
+activate CfgHandler
+CfgHandler -> FS : read config.yaml
+CfgHandler --> App : config_data
+deactivate CfgHandler
+App -> App : validate config
 
-opt docker_info refere-se a um Dockerfile
-    App -> Infra : build_dockerfile()
-    activate Infra
-    Infra -> DockerSystem : build image
-    activate DockerSystem
-    DockerSystem --> Infra : image ready
-    deactivate DockerSystem
-    Infra --> App : build_success
-    deactivate Infra
-end
+CLI -> UI : new()
+activate UI
+CLI -> CLI : loop events from App.run()
 
-App -> Domain : get_test_steps()
-activate Domain
-Domain --> App : test_steps_list
-deactivate Domain
+App --> CLI : yield PipelineStart
+CLI -> UI : handle_event(PipelineStart)
 
-loop Para cada //Step//
-    App -> Infra : run_container()
-    activate Infra
-    Infra -> DockerSystem : run container
-    activate DockerSystem
-    DockerSystem --> Infra : logs, exit_code
-    deactivate DockerSystem
-    Infra --> App : step_result
-    deactivate Infra
-    alt //Step// falhou
-        App --> CLI : execution_failed, logs
-        alt //Debug// on
-            CLI --> User : Depuração
-        end
+opt Dockerfile
+    App --> CLI : yield ImageBuildStart
+    CLI -> UI : handle_event(ImageBuildStart)
+    App -> DockerSvc : build_image()
+    activate DockerSvc
+    DockerSvc -> Docker : build image
+    loop build logs
+        DockerSvc --> App : yield log_line
+        App --> CLI : yield LogLine
+        CLI -> UI : handle_event(LogLine)
     end
+    deactivate DockerSvc
+    App --> CLI : yield ImageBuildEnd
+    CLI -> UI : handle_event(ImageBuildEnd)
 end
 
-App --> CLI : overall_result, logs
+loop Para cada Step
+    App --> CLI : yield StepStart
+    CLI -> UI : handle_event(StepStart)
+    App -> DockerSvc : run_command_in_container()
+    activate DockerSvc
+    DockerSvc -> Docker : run container
+    loop container logs
+        DockerSvc --> App : yield log_line
+        App --> CLI : yield LogLine
+        CLI -> UI : handle_event(LogLine)
+    end
+    DockerSvc --> App : return exit_code
+    deactivate DockerSvc
+    App --> CLI : yield StepEnd
+    CLI -> UI : handle_event(StepEnd)
+end
+
+App --> CLI : yield PipelineEnd
 deactivate App
-CLI -> User : Exibe resultados e //logs//
+CLI -> UI : handle_event(PipelineEnd)
+deactivate UI
+
+CLI --> User : Exibe resultado final
 deactivate CLI
 
 @enduml

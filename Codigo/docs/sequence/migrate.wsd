@@ -2,39 +2,38 @@
 skinparam sequenceMessageAlign center
 
 actor "Administrador" as User
-participant "<<Layer>>\nPresentation (CLI)" as CLI
-participant "<<Layer>>\nApplication" as App
-participant "<<Layer>>\nInfrastructure" as Infra
-boundary "config" as ConfigFile
+participant "<<Presentation>>\n:HookciCli" as CLI
+participant "<<Application>>\n:MigrationService" as App
+participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
+participant "<<Infrastructure>>\n:GitService" as GitSvc
+boundary "FileSystem" as FS
 
 User -> CLI : hookci migrate
 activate CLI
 CLI -> App : run()
 activate App
-App -> Infra : load_conf()
-activate Infra
-Infra -> ConfigFile : read config
-activate ConfigFile
-ConfigFile --> Infra : old_config_data
-deactivate ConfigFile
-Infra --> App : old_config_data
-deactivate Infra
+
+App -> GitSvc : git_root
+activate GitSvc
+GitSvc -> FS : find .git
+GitSvc --> App : git_root_path
+deactivate GitSvc
+
+App -> CfgHandler : load_config_data()
+activate CfgHandler
+CfgHandler -> FS : read config.yaml
+CfgHandler --> App : old_config_data
+deactivate CfgHandler
+
 App -> App : process_migration()
 
-alt Migração bem-sucedida
-    App -> Infra : write_conf()
-    activate Infra
-    Infra -> ConfigFile : write updated config
-    activate ConfigFile
-    ConfigFile --> Infra : success
-    deactivate ConfigFile
-    Infra --> App : write_success
-    deactivate Infra
-    App --> CLI : migration_success_message
-else Migração requer atenção manual
-    App --> CLI : migration_error
-    deactivate App
-end
+App -> CfgHandler : write_config_data()
+activate CfgHandler
+CfgHandler -> FS : write updated config.yaml
+deactivate CfgHandler
+
+App --> CLI : success_message
+deactivate App
 
 CLI --> User : Exibe resultado da migração
 deactivate CLI

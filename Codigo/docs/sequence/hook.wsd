@@ -2,89 +2,74 @@
 skinparam defaultFontName SansSerif
 
 boundary "Git" as GitSystem
-participant "<<Layer>>\nPresentation (CLI)" as CLI
-participant "<<Layer>>\nApplication" as App
-participant "<<Layer>>\nDomain" as Domain
-participant "<<Layer>>\nInfrastructure" as Infra
-boundary "config" as ConfigFile
-boundary "Docker" as DockerSystem
+participant "<<Presentation>>\n:HookciCli" as CLI
+participant "<<Presentation>>\n:PipelineUI" as UI
+participant "<<Application>>\n:CiExecutionService" as App
+participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
+participant "<<Infrastructure>>\n:GitService" as GitSvc
+participant "<<Infrastructure>>\n:DockerService" as DockerSvc
+boundary "FileSystem" as FS
+boundary "DockerSystem" as Docker
 
-GitSystem -> CLI : run hook
+GitSystem -> CLI : hookci run --hook-type pre-commit
 activate CLI
-CLI -> App : run()
+CLI -> App : run(hook_type='pre-commit', ...)
 activate App
-App -> Infra : load_conf()
-activate Infra
-Infra -> ConfigFile : read config
-activate ConfigFile
-ConfigFile --> Infra : config_data
-deactivate ConfigFile
-Infra --> App : config_data
-deactivate Infra
 
-App -> Domain : validate()
-activate Domain
-Domain --> App : validation_status
-deactivate Domain
+App -> GitSvc : git_root
+activate GitSvc
+GitSvc -> FS : find .git
+GitSvc --> App : git_root_path
+deactivate GitSvc
 
-alt Configuração Válida
-    App -> Domain : get_image_info()
-    activate Domain
-    Domain --> App : docker_info
-    deactivate Domain
+App -> CfgHandler : load_config_data()
+activate CfgHandler
+CfgHandler -> FS : read config.yaml
+CfgHandler --> App : config_data
+deactivate CfgHandler
+App -> App : validate config
 
-    opt Dockerfile especificado
-        App -> Infra : build_dockerfile()
-        activate Infra
-        Infra -> DockerSystem : build image
-        activate DockerSystem
-        DockerSystem --> Infra : image ready
-        deactivate DockerSystem
-        Infra --> App : build_success
-        deactivate Infra
-
-        alt Falha no build
-            App --> CLI : build_error_message
-            CLI --> GitSystem : exit code != 0
-            GitSystem -> GitSystem : Aborta operação Git
-        end
+group Filter Checks
+    App -> GitSvc : get_current_branch()
+    activate GitSvc
+    GitSvc --> App : branch_name
+    deactivate GitSvc
+    alt filters do not match
+        App --> CLI : (generator finishes)
+        CLI --> GitSystem : exit code 0
     end
-
-    App -> Domain : get_test_steps()
-    activate Domain
-    Domain --> App : test_steps_list
-    deactivate Domain
-
-    loop Para cada //Step//
-        App -> Infra : run_container()
-        activate Infra
-        Infra -> DockerSystem : run container
-        activate DockerSystem
-        DockerSystem --> Infra : logs, exit_code
-        deactivate DockerSystem
-        Infra --> App : step_result
-        deactivate Infra
-
-        alt //Step// falhou
-            alt //Step// é crítico
-                App --> CLI : execution_failed, logs
-                CLI --> GitSystem : exit code != 0
-                GitSystem -> GitSystem : Aborta operação Git
-            else //Step// não é crítico
-                App --> CLI : step_warning, logs
-            end
-        end
-    end
-
-    App --> CLI : execution_success, logs
-    CLI --> GitSystem : exit code 0
-    GitSystem -> GitSystem : Permite operação Git
-else
-    App --> CLI : config_error_message
-    deactivate App
-    CLI --> GitSystem : exit code != 0
-    deactivate CLI
-    GitSystem -> GitSystem : Aborta operação Git
 end
+
+CLI -> UI : new()
+activate UI
+CLI -> CLI : loop events from App.run()
+
+App --> CLI : yield PipelineStart
+CLI -> UI : handle_event(PipelineStart)
+
+loop Para cada Step
+    App --> CLI : yield StepStart
+    CLI -> UI : handle_event(StepStart)
+    App -> DockerSvc : run_command_in_container()
+    activate DockerSvc
+    DockerSvc -> Docker : run container
+    DockerSvc --> App : return exit_code
+    deactivate DockerSvc
+    App --> CLI : yield StepEnd
+    CLI -> UI : handle_event(StepEnd)
+
+    alt Step Crítico Falhou
+        App --> CLI : yield PipelineEnd(status="FAILURE")
+        CLI -> UI : handle_event(PipelineEnd)
+        CLI --> GitSystem : exit code 1
+    end
+end
+
+App --> CLI : yield PipelineEnd(status="SUCCESS")
+deactivate App
+CLI -> UI : handle_event(PipelineEnd)
+deactivate UI
+CLI --> GitSystem : exit code 0
+deactivate CLI
 
 @enduml

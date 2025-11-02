@@ -2,49 +2,50 @@
 skinparam sequenceMessageAlign center
 
 actor "Administrador" as User
-participant "<<Layer>>\nPresentation (CLI)" as CLI
-participant "<<Layer>>\nApplication" as App
-participant "<<Layer>>\nInfrastructure" as Infra
-boundary "config" as ConfigFile
-boundary "Git" as GitSystem
+participant "<<Presentation>>\n:HookciCli" as CLI
+participant "<<Application>>\n:ProjectInitService" as App
+participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
+participant "<<Infrastructure>>\n:GitService" as GitSvc
+participant "<<Infrastructure>>\n:LocalFileSystem" as FS
+boundary "GitSystem" as Git
 
 User -> CLI : hookci init
 activate CLI
 CLI -> App : run()
 activate App
-App -> Infra : find_git_root()
-activate Infra
-Infra -> GitSystem : locate .git
-activate GitSystem
-GitSystem --> Infra : git_root_path
-deactivate GitSystem
-Infra --> App : git_root_path
-deactivate Infra
+
+App -> GitSvc : git_root
+activate GitSvc
+GitSvc -> GitSystem : git rev-parse --show-toplevel
+GitSvc --> App : git_root_path
+deactivate GitSvc
+
+App -> FS : file_exists(config_path)
+activate FS
+FS --> App : false
+deactivate FS
 
 alt Projeto ainda não inicializado
-    App -> Infra : write_def_conf()
-    activate Infra
-    Infra -> ConfigFile : write default config
-    activate ConfigFile
-    ConfigFile --> Infra : success
-    deactivate ConfigFile
-    Infra --> App : success
-    deactivate Infra
+    App -> FS : create_dir(hooks_dir)
+    activate FS
+    deactivate FS
+    App -> CfgHandler : write_config_data()
+    activate CfgHandler
+    CfgHandler -> FS : write_file(config.yaml)
+    deactivate CfgHandler
+    App -> FS : write_file(pre-commit)
+    App -> FS : make_executable(pre-commit)
+    App -> FS : write_file(pre-push)
+    App -> FS : make_executable(pre-push)
 
-    App -> Infra : install_hooks()
-    activate Infra
-    Infra -> GitSystem : create/write hook files
-    activate GitSystem
-    GitSystem --> Infra : success
-    deactivate GitSystem
-    Infra --> App : success
-    deactivate Infra
-    App --> CLI : success
-else Projeto já inicializado
-    App --> CLI : warning
-    deactivate App
+    App -> GitSvc : set_hooks_path()
+    activate GitSvc
+    GitSvc -> GitSystem : git config core.hooksPath ...
+    deactivate GitSvc
 end
 
-CLI --> User : Exibe sucesso ou aviso
+App --> CLI : config_path
+deactivate App
+CLI --> User : Exibe sucesso
 deactivate CLI
 @enduml
