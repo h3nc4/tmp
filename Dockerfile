@@ -19,14 +19,14 @@
 
 ########################################
 # Rust versions
-ARG RUST_VERSION="1.90.0"
+ARG RUST_VERSION="1.91.0"
 ARG RUST_DISTRO="rust-${RUST_VERSION}-x86_64-unknown-linux-gnu"
 ARG RUST_DISTRO_WASM="rust-std-${RUST_VERSION}-wasm32-unknown-unknown"
 ARG RUST_DISTRO_SRC="rust-src-${RUST_VERSION}"
 
 ########################################
 # Node.js versions
-ARG NODE_VERSION="22.20.0"
+ARG NODE_VERSION="24.11.0"
 ARG NODE_DISTRO="node-v${NODE_VERSION}-linux-x64"
 
 ########################################
@@ -196,12 +196,21 @@ RUN printf "permit nopass nolog keepenv %s as root\n" "${USER}" >/etc/doas.conf 
   chmod a+rx /usr/local/bin/sudo
 
 ########################################
+# Copy features from other stages
+COPY --from=node-stage /rootfs/ /
+COPY --from=rust-stage /rootfs/ /
+
+########################################
+# Upgrade npm to the latest version
+RUN npm install -g npm@latest
+
+########################################
 # Clean cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /var/cache/* /var/log/* /tmp/*
 
 ################################################################################
-# Final squash-and-load image.
+# Final squash image.
 FROM scratch AS final
 ARG USER
 ARG RUST_VERSION
@@ -214,7 +223,5 @@ ENV USER="${USER}" \
   LC_ALL="en_US.UTF-8"
 
 COPY --from=main / /
-COPY --from=node-stage /rootfs/ /
-COPY --from=rust-stage /rootfs/ /
 
 USER "${USER}"

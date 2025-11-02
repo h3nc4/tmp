@@ -58,7 +58,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html/WASudoku
 
 ################################################################################
-# Final squash-and-load image.
+# Final squash image.
 FROM scratch AS final
 
 COPY --from=main / /
