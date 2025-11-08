@@ -1,54 +1,52 @@
 {
-    "name": "HookCI",
-    "build": {
-        "dockerfile": "Codigo/Dockerfile",
-        "args": {
-            "DEVCONTAINER": "base"
-        }
-    },
-    "remoteUser": "hookci",
-    "workspaceFolder": "/hookci",
-    "mounts": [
-        "source=${localWorkspaceFolder}/,target=/hookci,type=bind",
-        "source=${env:HOME},target=/home/hookci,type=bind",
-        "source=/etc/profile,target=/etc/profile,type=bind,readonly",
-        "source=/etc/bash.bashrc,target=/etc/bash.bashrc,type=bind,readonly"
-    ],
-    "containerEnv": {
-        "TERM": "${env:TERM}",
-        "TMUX": "${env:TMUX}"
-    },
-    "userEnvProbe": "interactiveShell",
-    "runArgs": [
-        "--privileged",
-        "-p=0.0.0.0:9000:9000",
-        "-v",
-        "/var/lib/hookci-docker:/var/lib/docker"
-    ],
-    "overrideCommand": true,
-    "postStartCommand": [
-        "sudo",
-        "dockerd"
-    ],
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "njpwerner.autodocstring",
-                "timonwong.shellcheck",
-                "DavidAnson.vscode-markdownlint",
-                "ms-vscode-remote.vscode-remote-extensionpack",
-                "ms-azuretools.vscode-docker",
-                "donjayamanne.githistory",
-                "eamodio.gitlens",
-                "foxundermoon.shell-format",
-                "docker.docker",
-                "ban.troff"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python3"
-            }
-        }
+  "name": "HookCI",
+  "build": {
+    "dockerfile": "Codigo/Dockerfile",
+    "args": {
+      "DEVCONTAINER": "base"
     }
+  },
+  "remoteUser": "hookci",
+  "workspaceFolder": "/hookci",
+  "mounts": [
+    "source=${localWorkspaceFolder}/,target=/hookci,type=bind",
+    "source=${env:HOME},target=/home/hookci,type=bind",
+    "source=/etc/profile,target=/etc/profile,type=bind,readonly",
+    "source=/etc/bash.bashrc,target=/etc/bash.bashrc,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "TERM": "${env:TERM}",
+    "TMUX": "${env:TMUX}"
+  },
+  "userEnvProbe": "interactiveShell",
+  "runArgs": [
+    "--privileged",
+    "--network=host",
+    "--name=hookci-devcontainer",
+    "-v",
+    "/var/lib/hookci-docker:/var/lib/docker"
+  ],
+  "overrideCommand": true,
+  "postStartCommand": ["sudo", "dockerd"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "njpwerner.autodocstring",
+        "timonwong.shellcheck",
+        "DavidAnson.vscode-markdownlint",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "ms-azuretools.vscode-docker",
+        "donjayamanne.githistory",
+        "eamodio.gitlens",
+        "foxundermoon.shell-format",
+        "docker.docker",
+        "ban.troff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
+      }
+    }
+  }
 }
