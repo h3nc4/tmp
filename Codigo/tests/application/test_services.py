@@ -34,6 +34,8 @@ from hookci.application.events import (
     DebugShellStarting,
     ImageBuildEnd,
     ImageBuildStart,
+    ImagePullEnd,
+    ImagePullStart,
     LogStream,
     PipelineEnd,
     PipelineStart,
@@ -87,14 +89,23 @@ def mock_docker_service() -> MagicMock:
 
     def mock_build_image_success(
         *args: Any, **kwargs: Any
-    ) -> Generator[str, None, None]:
-        yield "Build step 1"
-        yield "Successfully built"
+    ) -> Generator[Tuple[int, str], None, None]:
+        yield 1, "Build step 1"
+        yield 2, "Successfully built"
+
+    def mock_pull_image_success(
+        *args: Any, **kwargs: Any
+    ) -> Generator[None, None, None]:
+        yield
 
     mock.run_command_in_container.side_effect = mock_run_command_success
     mock.exec_in_container.side_effect = mock_run_command_success
     mock.build_image.side_effect = mock_build_image_success
+    mock.pull_image.side_effect = mock_pull_image_success
     mock.start_persistent_container.return_value = "container-123"
+    mock.image_exists.return_value = False
+    mock.calculate_dockerfile_hash.return_value = "hash123"
+    mock.count_dockerfile_steps.return_value = 5
     return mock
 
 
@@ -161,14 +172,14 @@ def test_init_service_already_initialized(
     mock_fs.create_dir.assert_not_called()
 
 
-def test_ci_manual_run_success(
+def test_ci_manual_run_success_with_image_pull(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """
-    Verify a manual CI run (no hook_type) executes and yields correct events.
+    Verify a manual CI run with an image config pulls the image and runs steps.
     """
     mock_config_handler.load_config_data.return_value = valid_config_dict
     service = CiExecutionService(
@@ -177,8 +188,30 @@ def test_ci_manual_run_success(
     events = list(service.run(hook_type=None))
     assert isinstance(events[0], PipelineStart)
     assert events[0].log_level == LogLevel.INFO
+    assert any(isinstance(e, ImagePullStart) for e in events)
+    assert any(isinstance(e, ImagePullEnd) for e in events)
     assert isinstance(events[-1], PipelineEnd)
     assert events[-1].status == "SUCCESS"
+    mock_docker_service.pull_image.assert_called_once_with("test:latest")
+    mock_docker_service.run_command_in_container.assert_called_once()
+
+
+def test_ci_run_uses_cached_pulled_image(
+    mock_git_service: MagicMock,
+    mock_config_handler: MagicMock,
+    mock_docker_service: MagicMock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """Verify that if a pulled image exists, it is not pulled again."""
+    mock_docker_service.image_exists.return_value = True
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+    events = list(service.run(hook_type=None))
+    assert not any(isinstance(e, ImagePullStart) for e in events)
+    mock_docker_service.image_exists.assert_called_once_with("test:latest")
+    mock_docker_service.pull_image.assert_not_called()
     mock_docker_service.run_command_in_container.assert_called_once()
 
 
@@ -295,7 +328,35 @@ def test_ci_run_with_dockerfile_build_success(
     assert any(isinstance(e, ImageBuildEnd) and e.status == "SUCCESS" for e in events)
     mock_docker_service.build_image.assert_called_once()
     mock_docker_service.run_command_in_container.assert_called_once_with(
-        image=f"hookci-project:{mock_git_service.git_root.name}",
+        image="hookci/repo:hash123",
+        command="pytest",
+        workdir=mock_git_service.git_root,
+        env={},
+    )
+
+
+def test_ci_run_uses_cached_dockerfile_image(
+    mock_git_service: MagicMock,
+    mock_config_handler: MagicMock,
+    mock_docker_service: MagicMock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """Verify that a Dockerfile build is skipped if a cached image exists."""
+    valid_config_dict["docker"] = {"dockerfile": "Dockerfile.test"}
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_docker_service.image_exists.return_value = True
+
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+    events = list(service.run(hook_type=None))
+
+    assert not any(isinstance(e, ImageBuildStart) for e in events)
+    mock_docker_service.calculate_dockerfile_hash.assert_called_once()
+    mock_docker_service.image_exists.assert_called_once_with("hookci/repo:hash123")
+    mock_docker_service.build_image.assert_not_called()
+    mock_docker_service.run_command_in_container.assert_called_once_with(
+        image="hookci/repo:hash123",
         command="pytest",
         workdir=mock_git_service.git_root,
         env={},

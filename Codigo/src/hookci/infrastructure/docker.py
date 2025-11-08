@@ -17,6 +17,8 @@
 """
 Docker interaction services.
 """
+import hashlib
+import re
 import struct
 from pathlib import Path
 from typing import Dict, Generator, Optional, Protocol, Tuple, runtime_checkable
@@ -37,6 +39,10 @@ logger = get_logger(__name__)
 class IDockerService(Protocol):
     """Interface for Docker operations."""
 
+    def image_exists(self, tag: str) -> bool: ...
+
+    def pull_image(self, image_name: str) -> Generator[None, None, None]: ...
+
     def run_command_in_container(
         self,
         image: str,
@@ -47,7 +53,11 @@ class IDockerService(Protocol):
 
     def build_image(
         self, dockerfile_path: Path, tag: str
-    ) -> Generator[str, None, None]: ...
+    ) -> Generator[Tuple[int, str], None, None]: ...
+
+    def count_dockerfile_steps(self, dockerfile_path: Path) -> int: ...
+
+    def calculate_dockerfile_hash(self, dockerfile_path: Path) -> str: ...
 
     def start_persistent_container(self, image: str, workdir: Path) -> str: ...
 
@@ -72,6 +82,27 @@ class DockerService(IDockerService):
             raise DockerError(
                 "Could not connect to the Docker daemon. Is it running?"
             ) from e
+
+    def image_exists(self, tag: str) -> bool:
+        """Checks if a Docker image with the given tag exists locally."""
+        try:
+            self.client.images.get(tag)
+            return True
+        except ImageNotFound:
+            return False
+        except APIError as e:
+            raise DockerError(f"Docker API error when checking for image: {e}") from e
+
+    def pull_image(self, image_name: str) -> Generator[None, None, None]:
+        """Pulls a Docker image, handling potential errors."""
+        logger.debug(f"Pulling Docker image: {image_name}")
+        try:
+            self.client.images.pull(image_name)
+            yield
+        except ImageNotFound:
+            raise DockerError(f"Docker image '{image_name}' not found in any registry.")
+        except APIError as e:
+            raise DockerError(f"Docker API error while pulling image: {e}") from e
 
     def _parse_one_frame(
         self, buffer: bytes
@@ -179,14 +210,15 @@ class DockerService(IDockerService):
 
     def build_image(
         self, dockerfile_path: Path, tag: str
-    ) -> Generator[str, None, None]:
+    ) -> Generator[Tuple[int, str], None, None]:
         """
-        Builds a Docker image from a Dockerfile, yielding logs in real-time.
+        Builds a Docker image from a Dockerfile, yielding step progress and logs in real-time.
         """
         logger.debug(
             f"Building Docker image from '{dockerfile_path.name}' with tag {tag}..."
         )
         dockerfile_dir = dockerfile_path.parent
+        current_step = 0
         try:
             _, build_logs = self.client.images.build(
                 path=str(dockerfile_dir),
@@ -196,7 +228,14 @@ class DockerService(IDockerService):
             )
             for chunk in build_logs:
                 if "stream" in chunk:
-                    yield chunk["stream"]
+                    line = chunk["stream"].strip()
+                    if not line:
+                        continue
+                    # Check if the line indicates a new build step
+                    match = re.match(r"^\s*Step (\d+)/\d+", line)
+                    if match:
+                        current_step = int(match.group(1))
+                    yield current_step, line
                 elif "error" in chunk:
                     raise DockerError(f"Failed to build Docker image: {chunk['error']}")
 
@@ -204,6 +243,26 @@ class DockerService(IDockerService):
             raise DockerError(f"Failed to build Docker image: {e.msg}") from e
         except APIError as e:
             raise DockerError(f"Docker API error during build: {e.explanation}") from e
+
+    def count_dockerfile_steps(self, dockerfile_path: Path) -> int:
+        """Counts the number of instruction lines in a Dockerfile."""
+        try:
+            with dockerfile_path.open("r", encoding="utf-8") as f:
+                return sum(
+                    1
+                    for line in f
+                    if line.strip() and not line.strip().startswith("#")
+                )
+        except (IOError, OSError) as e:
+            raise DockerError(f"Could not read Dockerfile at {dockerfile_path}: {e}")
+
+    def calculate_dockerfile_hash(self, dockerfile_path: Path) -> str:
+        """Calculates the SHA256 hash of a Dockerfile's content."""
+        try:
+            with dockerfile_path.open("rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()[:12]
+        except (IOError, OSError) as e:
+            raise DockerError(f"Could not read Dockerfile at {dockerfile_path}: {e}")
 
     def start_persistent_container(self, image: str, workdir: Path) -> str:
         """

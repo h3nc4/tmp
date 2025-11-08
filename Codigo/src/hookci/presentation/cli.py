@@ -43,6 +43,11 @@ from rich.text import Text
 from hookci.application.errors import ApplicationError, ConfigurationUpToDateError
 from hookci.application.events import (
     DebugShellStarting,
+    ImageBuildEnd,
+    ImageBuildProgress,
+    ImageBuildStart,
+    ImagePullEnd,
+    ImagePullStart,
     LogLine,
     PipelineEnd,
     PipelineEvent,
@@ -113,11 +118,13 @@ class PipelineUI:
         self.steps_progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
         )
         self.overall_task = self.overall_progress.add_task("[bold]Pipeline", total=1)
         self.step_tasks: Dict[str, TaskID] = {}
+        self.docker_task: Optional[TaskID] = None
         self.log_level: LogLevel = LogLevel.INFO
 
         # State for log panels
@@ -135,30 +142,64 @@ class PipelineUI:
         items.extend(self.error_panels)
         return Group(*items)
 
-    def handle_event(self, event: PipelineEvent, live: Live) -> None:
+    def handle_event(self, event: PipelineEvent, live: Live) -> None:  # noqa: C901
         """Updates the UI based on a pipeline event."""
         processed = False
         if isinstance(event, PipelineStart):
             self.log_level = event.log_level
             self.overall_progress.update(self.overall_task, total=event.total_steps)
             processed = True
-
+        elif isinstance(event, ImagePullStart):
+            self.docker_task = self.steps_progress.add_task(
+                f"  - Pulling image [cyan]{event.image_name}[/cyan]...", total=1
+            )
+            processed = True
+        elif isinstance(event, ImagePullEnd):
+            if self.docker_task is not None:
+                description = (
+                    "[green]✔[/] Pulled image"
+                    if event.status == "SUCCESS"
+                    else "[red]✖[/] Failed to pull image"
+                )
+                self.steps_progress.update(
+                    self.docker_task, completed=1, description=description
+                )
+            processed = True
+        elif isinstance(event, ImageBuildStart):
+            self.docker_task = self.steps_progress.add_task(
+                f"  - Building image [cyan]{event.tag}[/cyan]", total=event.total_steps
+            )
+            processed = True
+        elif isinstance(event, ImageBuildProgress):
+            if self.docker_task is not None:
+                self.steps_progress.update(self.docker_task, completed=event.step)
+            processed = True
+        elif isinstance(event, ImageBuildEnd):
+            if self.docker_task is not None:
+                description = (
+                    "[green]✔[/] Built image"
+                    if event.status == "SUCCESS"
+                    else "[red]✖[/] Failed to build image"
+                )
+                self.steps_progress.update(
+                    self.docker_task,
+                    completed=self.steps_progress.tasks[0].total,
+                    description=description,
+                )
+            processed = True
         elif isinstance(event, StepStart):
             task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
             self.step_tasks[event.step.name] = task_id
             if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
                 self._create_panel_for_step(event)
             processed = True
-
         elif isinstance(event, LogLine):
             self.all_logs[event.step_name].append(event)
             self._update_panel_with_log(event)
             processed = True
-
         elif isinstance(event, StepEnd):
             self._finalize_step(event)
             processed = True
-
         elif isinstance(event, PipelineEnd):
             self._finalize_pipeline(event)
             processed = True
@@ -306,6 +347,11 @@ class DebugUI:
             type[PipelineEvent], Callable[[PipelineEvent], None]
         ] = {
             PipelineStart: self._handle_pipeline_start,
+            ImagePullStart: self._handle_image_pull_start,
+            ImagePullEnd: self._handle_image_pull_end,
+            ImageBuildStart: self._handle_image_build_start,
+            ImageBuildProgress: self._handle_image_build_progress,
+            ImageBuildEnd: self._handle_image_build_end,
             StepStart: self._handle_step_start,
             LogLine: self._handle_log_line,
             StepEnd: self._handle_step_end,
@@ -322,6 +368,34 @@ class DebugUI:
     def _handle_pipeline_start(self, event: PipelineEvent) -> None:
         assert isinstance(event, PipelineStart)
         console.print("[bold]🚀 Pipeline Started[/]")
+
+    def _handle_image_pull_start(self, event: PipelineEvent) -> None:
+        assert isinstance(event, ImagePullStart)
+        console.print(f"  [bold]🐳 Pulling image:[/] {event.image_name}...")
+
+    def _handle_image_pull_end(self, event: PipelineEvent) -> None:
+        assert isinstance(event, ImagePullEnd)
+        if event.status == "SUCCESS":
+            console.print("  [bold green]✔ Image pulled successfully.[/]")
+        else:
+            console.print("  [bold red]✖ Image pull failed.[/]")
+
+    def _handle_image_build_start(self, event: PipelineEvent) -> None:
+        assert isinstance(event, ImageBuildStart)
+        console.print(
+            f"  [bold]🛠️ Building image from {event.dockerfile_path} ({event.total_steps} steps)...[/]"
+        )
+
+    def _handle_image_build_progress(self, event: PipelineEvent) -> None:
+        assert isinstance(event, ImageBuildProgress)
+        console.print(f"    [dim]{event.line}[/]")
+
+    def _handle_image_build_end(self, event: PipelineEvent) -> None:
+        assert isinstance(event, ImageBuildEnd)
+        if event.status == "SUCCESS":
+            console.print("  [bold green]✔ Image built successfully.[/]")
+        else:
+            console.print("  [bold red]✖ Image build failed.[/]")
 
     def _handle_step_start(self, event: PipelineEvent) -> None:
         assert isinstance(event, StepStart)

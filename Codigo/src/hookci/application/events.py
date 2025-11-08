@@ -34,11 +34,31 @@ class PipelineStart(BaseModel):
     log_level: LogLevel
 
 
+class ImagePullStart(BaseModel):
+    """Event indicating a Docker image pull has started."""
+
+    image_name: str
+
+
+class ImagePullEnd(BaseModel):
+    """Event indicating a Docker image pull has finished."""
+
+    status: EventStatus
+
+
 class ImageBuildStart(BaseModel):
     """Event indicating that a Docker image build has started."""
 
     dockerfile_path: str
     tag: str
+    total_steps: int
+
+
+class ImageBuildProgress(BaseModel):
+    """Event representing a single step of progress in a Docker image build."""
+
+    step: int
+    line: str
 
 
 class LogLine(BaseModel):
@@ -85,7 +105,10 @@ class PipelineEnd(BaseModel):
 # A type hint for any possible event that can be yielded by the service.
 PipelineEvent = Union[
     PipelineStart,
+    ImagePullStart,
+    ImagePullEnd,
     ImageBuildStart,
+    ImageBuildProgress,
     LogLine,
     ImageBuildEnd,
     StepStart,

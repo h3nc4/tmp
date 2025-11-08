@@ -32,7 +32,10 @@ from hookci.application.errors import (
 from hookci.application.events import (
     DebugShellStarting,
     ImageBuildEnd,
+    ImageBuildProgress,
     ImageBuildStart,
+    ImagePullEnd,
+    ImagePullStart,
     LogLine,
     LogStream,
     PipelineEnd,
@@ -326,32 +329,55 @@ class CiExecutionService:
         self, config: Configuration
     ) -> Generator[PipelineEvent, None, str | None]:
         """
-        Builds image from Dockerfile if specified, otherwise returns image name.
-        Yields build events and returns the final image name or None on failure.
+        Ensures the required Docker image is available, either by pulling,
+        building it, or using a cached version.
+        Yields events for real-time feedback and returns the final image name or None on failure.
         """
+        git_root = self._git_service.git_root
+
         if config.docker.dockerfile:
-            git_root = self._git_service.git_root
-            tag = f"hookci-project:{git_root.name}"
             dockerfile_path = git_root / config.docker.dockerfile
-            yield ImageBuildStart(dockerfile_path=str(dockerfile_path), tag=tag)
+            dockerfile_hash = self._docker_service.calculate_dockerfile_hash(
+                dockerfile_path
+            )
+            tag = f"hookci/{git_root.name}:{dockerfile_hash}"
+
+            if self._docker_service.image_exists(tag):
+                logger.debug(f"Using cached Docker image: {tag}")
+                return tag
+
+            total_steps = self._docker_service.count_dockerfile_steps(dockerfile_path)
+            yield ImageBuildStart(
+                dockerfile_path=str(dockerfile_path), tag=tag, total_steps=total_steps
+            )
             try:
                 build_generator = self._docker_service.build_image(dockerfile_path, tag)
-                for log_line in build_generator:
-                    # Docker build logs don't have a separate stream
-                    yield LogLine(
-                        line=log_line, stream="stdout", step_name="Image Build"
-                    )
+                for step, line in build_generator:
+                    yield ImageBuildProgress(step=step, line=line)
                 yield ImageBuildEnd(status="SUCCESS")
                 return tag
             except DockerError as e:
                 logger.error(f"Docker build failed: {e}")
-                yield LogLine(line=str(e), stream="stderr", step_name="Image Build")
                 yield ImageBuildEnd(status="FAILURE")
                 return None
 
-        # Ensure we have an image name to return
-        if config.docker.image:
-            return config.docker.image
+        elif config.docker.image:
+            image_name = config.docker.image
+            if self._docker_service.image_exists(image_name):
+                logger.debug(f"Using cached Docker image: {image_name}")
+                return image_name
+
+            yield ImagePullStart(image_name=image_name)
+            try:
+                # pull_image is a simple generator that we just need to consume
+                for _ in self._docker_service.pull_image(image_name):
+                    pass
+                yield ImagePullEnd(status="SUCCESS")
+                return image_name
+            except DockerError as e:
+                logger.error(f"Docker pull failed: {e}")
+                yield ImagePullEnd(status="FAILURE")
+                return None
 
         # This case should be prevented by pydantic model validation, but as a safeguard:
         raise ConfigurationParseError("No docker image or dockerfile was specified.")

@@ -53,6 +53,50 @@ def test_docker_service_init_failure() -> None:
             DockerService()
 
 
+def test_image_exists(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify image_exists returns True if image is found."""
+    mock_docker_client.images.get.return_value = MagicMock()
+    assert docker_service.image_exists("my-tag") is True
+    mock_docker_client.images.get.assert_called_once_with("my-tag")
+
+
+def test_image_does_not_exist(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify image_exists returns False if ImageNotFound is raised."""
+    mock_docker_client.images.get.side_effect = ImageNotFound("not found")  # type: ignore[no-untyped-call]
+    assert docker_service.image_exists("my-tag") is False
+
+
+def test_image_exists_api_error(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify DockerError is raised on API error when checking for an image."""
+    mock_docker_client.images.get.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
+    with pytest.raises(DockerError, match="API error"):
+        docker_service.image_exists("my-tag")
+
+
+def test_pull_image_success(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify pull_image calls the correct client method and completes."""
+    # The generator should be consumable without error.
+    list(docker_service.pull_image("my-image:latest"))
+    mock_docker_client.images.pull.assert_called_once_with("my-image:latest")
+
+
+def test_pull_image_not_found(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify DockerError is raised on ImageNotFound during pull."""
+    mock_docker_client.images.pull.side_effect = ImageNotFound("not found")  # type: ignore[no-untyped-call]
+    with pytest.raises(DockerError, match="not found in any registry"):
+        list(docker_service.pull_image("my-image:latest"))
+
+
 def test_build_image_success_streams_logs(
     docker_service: DockerService, mock_docker_client: MagicMock, tmp_path: Path
 ) -> None:
@@ -74,8 +118,8 @@ def test_build_image_success_streams_logs(
     logs = list(build_generator)
 
     assert isinstance(build_generator, Generator)
-    assert "Step 1/2" in logs[0]
-    assert "Step 2/2" in logs[2]
+    assert logs[0] == (1, "Step 1/2 : FROM python")
+    assert logs[2] == (2, "Step 2/2 : RUN echo 'hello'")
     mock_docker_client.images.build.assert_called_once_with(
         path=str(tmp_path),
         dockerfile="Dockerfile",
@@ -225,6 +269,34 @@ def test_run_command_image_not_found(
     mock_docker_client.containers.run.side_effect = ImageNotFound("not found")  # type: ignore[no-untyped-call]
     with pytest.raises(DockerError, match="Docker image 'my-image' not found"):
         list(docker_service.run_command_in_container("my-image", "cmd", tmp_path))
+
+
+def test_count_dockerfile_steps(docker_service: DockerService, tmp_path: Path) -> None:
+    """Verify Dockerfile steps are counted correctly, ignoring comments and empty lines."""
+    dockerfile_content = """
+# This is a comment
+FROM python:3.9
+
+RUN pip install poetry
+# Another comment
+
+COPY . .
+    # Indented comment
+RUN poetry install
+"""
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(dockerfile_content)
+    assert docker_service.count_dockerfile_steps(dockerfile) == 4
+
+
+def test_calculate_dockerfile_hash(
+    docker_service: DockerService, tmp_path: Path
+) -> None:
+    """Verify the Dockerfile hash is consistent and correct."""
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("FROM python:3.9\nRUN echo 'hello'")
+    expected_hash = "ea8729087122"  # sha256(...).hexdigest()[:12]
+    assert docker_service.calculate_dockerfile_hash(dockerfile) == expected_hash
 
 
 def test_start_persistent_container(

@@ -38,6 +38,11 @@ from hookci.application.errors import (
 from hookci.application.events import (
     DebugShellStarting,
     EventStatus,
+    ImageBuildEnd,
+    ImageBuildProgress,
+    ImageBuildStart,
+    ImagePullEnd,
+    ImagePullStart,
     LogLine,
     PipelineEnd,
     PipelineEvent,
@@ -442,6 +447,26 @@ class TestDebugUI:
             "[bold yellow]✖ Step 'Test Step' Failed (Status: WARNING)[/]"
         )
 
+    @patch("hookci.presentation.cli.console.print")
+    def test_debug_ui_handles_docker_events(self, mock_print: MagicMock) -> None:
+        """Verify the DebugUI prints messages for Docker pull and build events."""
+        handler = DebugUI()
+        handler.handle_event(ImagePullStart(image_name="python:3.9"))
+        assert "Pulling image" in mock_print.call_args[0][0]
+        handler.handle_event(ImagePullEnd(status="SUCCESS"))
+        assert "Image pulled successfully" in mock_print.call_args[0][0]
+
+        handler.handle_event(
+            ImageBuildStart(
+                dockerfile_path="df", tag="t", total_steps=5
+            )
+        )
+        assert "Building image" in mock_print.call_args[0][0]
+        handler.handle_event(ImageBuildProgress(step=1, line="Step 1/5"))
+        assert "Step 1/5" in mock_print.call_args[0][0]
+        handler.handle_event(ImageBuildEnd(status="FAILURE"))
+        assert "Image build failed" in mock_print.call_args[0][0]
+
 
 class TestPipelineUI:
     """Tests for the PipelineUI class state management."""
@@ -625,6 +650,31 @@ class TestPipelineUI:
         assert ui_info.active_info_panel is not None
         group = ui_info._get_display_group()
         assert len(group.renderables) == 2 + 1  # Progs + info_panel
+
+    def test_ui_handles_image_pull(self, ui: PipelineUI, live_mock: MagicMock) -> None:
+        """Verify UI correctly displays image pull progress."""
+        ui.handle_event(ImagePullStart(image_name="test:latest"), live_mock)
+        assert ui.docker_task is not None
+        assert "Pulling" in ui.steps_progress.tasks[0].description
+
+        ui.handle_event(ImagePullEnd(status="SUCCESS"), live_mock)
+        assert "Pulled" in ui.steps_progress.tasks[0].description
+        assert ui.steps_progress.tasks[0].completed == 1
+
+    def test_ui_handles_image_build(self, ui: PipelineUI, live_mock: MagicMock) -> None:
+        """Verify UI correctly displays image build progress."""
+        ui.handle_event(
+            ImageBuildStart(dockerfile_path="df", tag="t", total_steps=5),
+            live_mock,
+        )
+        assert ui.docker_task is not None
+        assert ui.steps_progress.tasks[0].total == 5
+
+        ui.handle_event(ImageBuildProgress(step=3, line="Step 3/5..."), live_mock)
+        assert ui.steps_progress.tasks[0].completed == 3
+
+        ui.handle_event(ImageBuildEnd(status="FAILURE"), live_mock)
+        assert "Failed" in ui.steps_progress.tasks[0].description
 
 
 def test_run_debug_mode_with_single_event(mock_container: MagicMock) -> None:
