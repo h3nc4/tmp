@@ -7,6 +7,7 @@ participant "<<Application>>\n:MigrationService" as App
 participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 boundary "FileSystem" as FS
+boundary "Git" as Git
 
 User -> CLI : hookci migrate
 activate CLI
@@ -15,13 +16,17 @@ activate App
 
 App -> GitSvc : git_root
 activate GitSvc
-GitSvc -> FS : find .git
+GitSvc -> Git : find .git
+activate Git
+deactivate Git
 GitSvc --> App : git_root_path
 deactivate GitSvc
 
 App -> CfgHandler : load_config_data()
 activate CfgHandler
 CfgHandler -> FS : read config.yaml
+activate FS
+deactivate FS
 CfgHandler --> App : old_config_data
 deactivate CfgHandler
 
@@ -30,6 +35,8 @@ App -> App : process_migration()
 App -> CfgHandler : write_config_data()
 activate CfgHandler
 CfgHandler -> FS : write updated config.yaml
+activate FS
+deactivate FS
 deactivate CfgHandler
 
 App --> CLI : success_message

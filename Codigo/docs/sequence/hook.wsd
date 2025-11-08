@@ -1,7 +1,7 @@
 @startuml hook
 skinparam defaultFontName SansSerif
 
-boundary "Git" as GitSystem
+boundary "Git" as Git
 participant "<<Presentation>>\n:HookciCli" as CLI
 participant "<<Presentation>>\n:PipelineUI" as UI
 participant "<<Application>>\n:CiExecutionService" as App
@@ -9,22 +9,27 @@ participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 participant "<<Infrastructure>>\n:DockerService" as DockerSvc
 boundary "FileSystem" as FS
-boundary "DockerSystem" as Docker
+boundary "Git" as Git
+boundary "Docker" as Docker
 
-GitSystem -> CLI : hookci run --hook-type pre-commit
+Git -> CLI : hookci run --hook-type pre-commit
 activate CLI
 CLI -> App : run(hook_type='pre-commit', ...)
 activate App
 
 App -> GitSvc : git_root
 activate GitSvc
-GitSvc -> FS : find .git
+GitSvc -> Git : find .git
+activate Git
+deactivate Git
 GitSvc --> App : git_root_path
 deactivate GitSvc
 
 App -> CfgHandler : load_config_data()
 activate CfgHandler
 CfgHandler -> FS : read config.yaml
+activate FS
+deactivate FS
 CfgHandler --> App : config_data
 deactivate CfgHandler
 App -> App : validate config
@@ -36,7 +41,9 @@ group Filter Checks
     deactivate GitSvc
     alt filters do not match
         App --> CLI : (generator finishes)
-        CLI --> GitSystem : exit code 0
+        CLI --> Git : exit code 0
+        activate Git
+        deactivate Git
     end
 end
 
@@ -53,6 +60,8 @@ loop Para cada Step
     App -> DockerSvc : run_command_in_container()
     activate DockerSvc
     DockerSvc -> Docker : run container
+    activate Docker
+    deactivate Docker
     DockerSvc --> App : return exit_code
     deactivate DockerSvc
     App --> CLI : yield StepEnd
@@ -61,7 +70,9 @@ loop Para cada Step
     alt Step Crítico Falhou
         App --> CLI : yield PipelineEnd(status="FAILURE")
         CLI -> UI : handle_event(PipelineEnd)
-        CLI --> GitSystem : exit code 1
+        CLI --> Git : exit code 1
+        activate Git
+        deactivate Git
     end
 end
 
@@ -69,7 +80,9 @@ App --> CLI : yield PipelineEnd(status="SUCCESS")
 deactivate App
 CLI -> UI : handle_event(PipelineEnd)
 deactivate UI
-CLI --> GitSystem : exit code 0
+CLI --> Git : exit code 0
+activate Git
+deactivate Git
 deactivate CLI
 
 @enduml

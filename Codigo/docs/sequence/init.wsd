@@ -7,7 +7,7 @@ participant "<<Application>>\n:ProjectInitService" as App
 participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 participant "<<Infrastructure>>\n:LocalFileSystem" as FS
-boundary "GitSystem" as Git
+boundary "Git" as Git
 
 User -> CLI : hookci init
 activate CLI
@@ -16,7 +16,9 @@ activate App
 
 App -> GitSvc : git_root
 activate GitSvc
-GitSvc -> GitSystem : git rev-parse --show-toplevel
+GitSvc -> Git : find .git
+activate Git
+deactivate Git
 GitSvc --> App : git_root_path
 deactivate GitSvc
 
@@ -40,7 +42,9 @@ alt Projeto ainda não inicializado
 
     App -> GitSvc : set_hooks_path()
     activate GitSvc
-    GitSvc -> GitSystem : git config core.hooksPath ...
+    GitSvc -> Git : git config core.hooksPath ...
+    activate Git
+    deactivate Git
     deactivate GitSvc
 end
 

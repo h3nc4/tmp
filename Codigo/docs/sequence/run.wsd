@@ -9,7 +9,8 @@ participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 participant "<<Infrastructure>>\n:DockerService" as DockerSvc
 boundary "FileSystem" as FS
-boundary "DockerSystem" as Docker
+boundary "Git" as Git
+boundary "Docker" as Docker
 
 User -> CLI : hookci run
 activate CLI
@@ -18,13 +19,17 @@ activate App
 
 App -> GitSvc : git_root
 activate GitSvc
-GitSvc -> FS : find .git
+GitSvc -> Git : find .git
+activate Git
+deactivate Git
 GitSvc --> App : git_root_path
 deactivate GitSvc
 
 App -> CfgHandler : load_config_data()
 activate CfgHandler
 CfgHandler -> FS : read config.yaml
+activate FS
+deactivate FS
 CfgHandler --> App : config_data
 deactivate CfgHandler
 App -> App : validate config
@@ -42,6 +47,8 @@ opt Dockerfile
     App -> DockerSvc : build_image()
     activate DockerSvc
     DockerSvc -> Docker : build image
+    activate Docker
+    deactivate Docker
     loop build logs
         DockerSvc --> App : yield log_line
         App --> CLI : yield LogLine
@@ -58,6 +65,8 @@ loop Para cada Step
     App -> DockerSvc : run_command_in_container()
     activate DockerSvc
     DockerSvc -> Docker : run container
+    activate Docker
+    deactivate Docker
     loop container logs
         DockerSvc --> App : yield log_line
         App --> CLI : yield LogLine
