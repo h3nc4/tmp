@@ -8,8 +8,8 @@ hooks:
   pre-commit: boolean
   pre-push: boolean
 filters:
-  branches: string
-  commits: string
+  branches: string | null
+  commits: string | null
 steps:
   name: string
   command: string

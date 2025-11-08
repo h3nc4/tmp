@@ -5,6 +5,7 @@ rectangle ":HookciCli" as CLI
 rectangle ":CiExecutionService" as App
 rectangle ":YamlConfigHandler" as CfgHandler
 rectangle ":Configuration" as Config
+rectangle ":GitService" as GitSvc
 rectangle ":DockerService" as DockerSvc
 boundary "config" as ConfigFile
 boundary "Docker" as DockerSystem
@@ -14,10 +15,12 @@ CLI -down-> App: 2: run()
 App -right-> CfgHandler: 3: load_conf()
 CfgHandler -right-> ConfigFile: 3.1: read config
 App -left-> Config: 4: validate()
-App -left-> Config: 5: get_image_info()
-App -down-> DockerSvc: 6: build_dockerfile()
-DockerSvc -down-> DockerSystem: 6.1: build image
-App -left-> Config: 7: get_test_steps()
-App -down-> DockerSvc: 8.*: run_container()
-DockerSvc -down-> DockerSystem: 8.*.1: run container
+App -> GitSvc: 5: get_current_branch()
+App -> GitSvc: 6: get_staged_commit_message()
+App -left-> Config: 7: get_image_info()
+App -down-> DockerSvc: 8: build_dockerfile()
+DockerSvc -down-> DockerSystem: 8.1: build image
+App -left-> Config: 9: get_test_steps()
+App -down-> DockerSvc: 10.*: run_container()
+DockerSvc -down-> DockerSystem: 10.*.1: run container
 @enduml

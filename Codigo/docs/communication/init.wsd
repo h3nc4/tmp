@@ -5,15 +5,20 @@ rectangle ":HookciCli" as CLI
 rectangle ":ProjectInitService" as App
 rectangle ":GitService" as GitSvc
 rectangle ":YamlConfigHandler" as CfgHandler
+rectangle ":LocalFileSystem" as FS
 boundary "Git" as GitSystem
 boundary "config" as ConfigFile
 
 Admin -down-> CLI: 1: hookci init
 CLI -down-> App: 2: run()
-App -right-> GitSvc: 3: find_git_root()
+App -right-> GitSvc: 3: git_root
 GitSvc -right-> GitSystem: 3.1: locate .git
-App -down-> CfgHandler: 4: write_def_conf()
-CfgHandler -down-> ConfigFile: 4.1: write default config
-App -right-> GitSvc: 5: install_hooks()
-GitSvc -right-> GitSystem: 5.1: create/write hook files
+App -left-> FS: 4: file_exists()
+App -left-> FS: 5: create_dir()
+App -down-> CfgHandler: 6: write_config_data()
+CfgHandler -down-> ConfigFile: 6.1: write default config
+App -left-> FS: 7: write_file(pre-commit)
+App -left-> FS: 8: write_file(pre-push)
+App -right-> GitSvc: 9: set_hooks_path()
+GitSvc -right-> GitSystem: 9.1: git config
 @enduml

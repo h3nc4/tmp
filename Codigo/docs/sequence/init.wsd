@@ -8,6 +8,7 @@ participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 participant "<<Infrastructure>>\n:LocalFileSystem" as FS
 boundary "Git" as Git
+boundary "FileSystem" as FsBoundary
 
 User -> CLI : hookci init
 activate CLI
@@ -33,13 +34,16 @@ alt Projeto ainda não inicializado
     deactivate FS
     App -> CfgHandler : write_config_data()
     activate CfgHandler
-    CfgHandler -> FS : write_file(config.yaml)
+    CfgHandler -> FsBoundary : write default hookci.yaml
+    activate FsBoundary
+    deactivate FsBoundary
     deactivate CfgHandler
-    App -> FS : write_file(pre-commit)
-    App -> FS : make_executable(pre-commit)
-    App -> FS : write_file(pre-push)
-    App -> FS : make_executable(pre-push)
-
+    App -> FS : write_file(pre-commit script)
+    activate FS
+    deactivate FS
+    App -> FS : write_file(pre-push script)
+    activate FS
+    deactivate FS
     App -> GitSvc : set_hooks_path()
     activate GitSvc
     GitSvc -> Git : git config core.hooksPath ...

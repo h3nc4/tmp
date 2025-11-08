@@ -1,49 +1,30 @@
 @startuml pacotes
 
-package "pkg" {
+package "hookci" {
     package "presentation" as PresentationLayer {
-        package "cli_handler" as CLI {
+        package "cli" as CLI {
         }
     }
     package "application" as ApplicationLayer {
-        package "use_case_services" as Services {
+        package "services" as Services {
         }
-        package "configuration_management" as AppConfig {
+        package "events" as Events {
         }
     }
     package "domain" as DomainLayer {
-        package "configuration_model" as DomainConfig {
-        }
-        package "ci_process_model" as DomainCI {
+        package "config" as DomainConfig {
         }
     }
     package "infrastructure" as InfrastructureLayer {
-        package "git_integration" as InfraGit {
+        package "fs" as InfraFs {
         }
-        package "docker_integration" as InfraDocker {
+        package "docker" as InfraDocker {
         }
-        package "file_system_access" as InfraFS {
-        }
-        package "yaml_parser" as InfraYAML {
+        package "yaml_handler" as InfraYAML {
         }
     }
 }
-
 PresentationLayer ..> ApplicationLayer
 ApplicationLayer .left.> DomainLayer
 ApplicationLayer ..> InfrastructureLayer
-
-' CLI ..> Services
-
-' Services .left.> DomainConfig
-' Services .left.> DomainCI
-' Services ..> AppConfig
-
-' Services ..> InfraGit
-' Services ..> InfraDocker
-
-' AppConfig .left.> DomainConfig
-' AppConfig ..> InfraFS
-' AppConfig ..> InfraYAML
-
 @enduml

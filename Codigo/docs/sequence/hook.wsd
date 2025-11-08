@@ -1,7 +1,7 @@
 @startuml hook
 skinparam defaultFontName SansSerif
 
-boundary "Git" as Git
+boundary "Git" as GitSystem
 participant "<<Presentation>>\n:HookciCli" as CLI
 participant "<<Presentation>>\n:PipelineUI" as UI
 participant "<<Application>>\n:CiExecutionService" as App
@@ -9,41 +9,33 @@ participant "<<Infrastructure>>\n:YamlConfigHandler" as CfgHandler
 participant "<<Infrastructure>>\n:GitService" as GitSvc
 participant "<<Infrastructure>>\n:DockerService" as DockerSvc
 boundary "FileSystem" as FS
-boundary "Git" as Git
 boundary "Docker" as Docker
 
-Git -> CLI : hookci run --hook-type pre-commit
+GitSystem -> CLI : hookci run --hook-type pre-commit
 activate CLI
 CLI -> App : run(hook_type='pre-commit', ...)
 activate App
 
 App -> GitSvc : git_root
 activate GitSvc
-GitSvc -> Git : find .git
-activate Git
-deactivate Git
-GitSvc --> App : git_root_path
 deactivate GitSvc
 
 App -> CfgHandler : load_config_data()
 activate CfgHandler
 CfgHandler -> FS : read config.yaml
-activate FS
-deactivate FS
-CfgHandler --> App : config_data
 deactivate CfgHandler
 App -> App : validate config
 
 group Filter Checks
     App -> GitSvc : get_current_branch()
     activate GitSvc
-    GitSvc --> App : branch_name
     deactivate GitSvc
     alt filters do not match
         App --> CLI : (generator finishes)
-        CLI --> Git : exit code 0
-        activate Git
-        deactivate Git
+        deactivate App
+        CLI --> GitSystem : exit code 0
+        deactivate CLI
+        return
     end
 end
 
@@ -54,14 +46,36 @@ CLI -> CLI : loop events from App.run()
 App --> CLI : yield PipelineStart
 CLI -> UI : handle_event(PipelineStart)
 
+group Prepare Docker Image
+    opt Dockerfile
+        App --> CLI : yield ImageBuildStart
+        CLI -> UI : handle_event(ImageBuildStart)
+        App -> DockerSvc : build_image()
+        activate DockerSvc
+        loop build logs
+            DockerSvc --> App : yield log_line
+            App --> CLI : yield LogLine
+            CLI -> UI : handle_event(LogLine)
+        end
+        deactivate DockerSvc
+        App --> CLI : yield ImageBuildEnd
+        CLI -> UI : handle_event(ImageBuildEnd)
+    else Image Name
+        App --> CLI : yield ImagePullStart
+        CLI -> UI : handle_event(ImagePullStart)
+        App -> DockerSvc : pull_image()
+        activate DockerSvc
+        deactivate DockerSvc
+        App --> CLI : yield ImagePullEnd
+        CLI -> UI : handle_event(ImagePullEnd)
+    end
+end
+
 loop Para cada Step
     App --> CLI : yield StepStart
     CLI -> UI : handle_event(StepStart)
     App -> DockerSvc : run_command_in_container()
     activate DockerSvc
-    DockerSvc -> Docker : run container
-    activate Docker
-    deactivate Docker
     DockerSvc --> App : return exit_code
     deactivate DockerSvc
     App --> CLI : yield StepEnd
@@ -70,9 +84,11 @@ loop Para cada Step
     alt Step Crítico Falhou
         App --> CLI : yield PipelineEnd(status="FAILURE")
         CLI -> UI : handle_event(PipelineEnd)
-        CLI --> Git : exit code 1
-        activate Git
-        deactivate Git
+        deactivate App
+        CLI --> GitSystem : exit code 1
+        deactivate UI
+        deactivate CLI
+        return
     end
 end
 
@@ -80,9 +96,6 @@ App --> CLI : yield PipelineEnd(status="SUCCESS")
 deactivate App
 CLI -> UI : handle_event(PipelineEnd)
 deactivate UI
-CLI --> Git : exit code 0
-activate Git
-deactivate Git
+CLI --> GitSystem : exit code 0
 deactivate CLI
-
 @enduml
