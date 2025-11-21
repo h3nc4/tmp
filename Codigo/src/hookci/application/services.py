@@ -18,6 +18,7 @@
 Application services that orchestrate use cases.
 """
 import re
+from collections import deque
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, Generator, Literal, Optional, Tuple
@@ -369,9 +370,8 @@ class CiExecutionService:
 
             yield ImagePullStart(image_name=image_name)
             try:
-                # pull_image is a simple generator that we just need to consume
-                for _ in self._docker_service.pull_image(image_name):
-                    pass
+                # Consume the generator
+                deque(self._docker_service.pull_image(image_name), maxlen=0)
                 yield ImagePullEnd(status="SUCCESS")
                 return image_name
             except DockerError as e:

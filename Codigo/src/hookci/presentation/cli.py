@@ -23,7 +23,15 @@ from __future__ import annotations
 import subprocess
 from collections import defaultdict
 from itertools import chain
-from typing import Callable, DefaultDict, Dict, Iterable, List, Optional
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+)
 
 import typer
 from rich.console import Console, Group
@@ -133,6 +141,20 @@ class PipelineUI:
         self.debug_panels: Dict[str, Panel] = {}
         self.error_panels: List[Panel] = []
 
+        # Event dispatch map
+        self._handlers: Dict[Any, Callable[[Any], None]] = {
+            PipelineStart: self._on_pipeline_start,
+            ImagePullStart: self._on_image_pull_start,
+            ImagePullEnd: self._on_image_pull_end,
+            ImageBuildStart: self._on_image_build_start,
+            ImageBuildProgress: self._on_image_build_progress,
+            ImageBuildEnd: self._on_image_build_end,
+            StepStart: self._on_step_start,
+            LogLine: self._on_log_line,
+            StepEnd: self._on_step_end,
+            PipelineEnd: self._on_pipeline_end,
+        }
+
     def _get_display_group(self) -> Group:
         """Constructs the renderable group based on the current UI state."""
         items: List[Panel | Progress] = [self.overall_progress, self.steps_progress]
@@ -142,70 +164,70 @@ class PipelineUI:
         items.extend(self.error_panels)
         return Group(*items)
 
-    def handle_event(self, event: PipelineEvent, live: Live) -> None:  # noqa: C901
+    def handle_event(self, event: PipelineEvent, live: Live) -> None:
         """Updates the UI based on a pipeline event."""
-        processed = False
-        if isinstance(event, PipelineStart):
-            self.log_level = event.log_level
-            self.overall_progress.update(self.overall_task, total=event.total_steps)
-            processed = True
-        elif isinstance(event, ImagePullStart):
-            self.docker_task = self.steps_progress.add_task(
-                f"  - Pulling image [cyan]{event.image_name}[/cyan]...", total=1
-            )
-            processed = True
-        elif isinstance(event, ImagePullEnd):
-            if self.docker_task is not None:
-                description = (
-                    "[green]✔[/] Pulled image"
-                    if event.status == "SUCCESS"
-                    else "[red]✖[/] Failed to pull image"
-                )
-                self.steps_progress.update(
-                    self.docker_task, completed=1, description=description
-                )
-            processed = True
-        elif isinstance(event, ImageBuildStart):
-            self.docker_task = self.steps_progress.add_task(
-                f"  - Building image [cyan]{event.tag}[/cyan]", total=event.total_steps
-            )
-            processed = True
-        elif isinstance(event, ImageBuildProgress):
-            if self.docker_task is not None:
-                self.steps_progress.update(self.docker_task, completed=event.step)
-            processed = True
-        elif isinstance(event, ImageBuildEnd):
-            if self.docker_task is not None:
-                description = (
-                    "[green]✔[/] Built image"
-                    if event.status == "SUCCESS"
-                    else "[red]✖[/] Failed to build image"
-                )
-                self.steps_progress.update(
-                    self.docker_task,
-                    completed=self.steps_progress.tasks[0].total,
-                    description=description,
-                )
-            processed = True
-        elif isinstance(event, StepStart):
-            task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
-            self.step_tasks[event.step.name] = task_id
-            if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
-                self._create_panel_for_step(event)
-            processed = True
-        elif isinstance(event, LogLine):
-            self.all_logs[event.step_name].append(event)
-            self._update_panel_with_log(event)
-            processed = True
-        elif isinstance(event, StepEnd):
-            self._finalize_step(event)
-            processed = True
-        elif isinstance(event, PipelineEnd):
-            self._finalize_pipeline(event)
-            processed = True
-
-        if processed:
+        handler = self._handlers.get(type(event))
+        if handler:
+            handler(event)
             live.update(self._get_display_group())
+
+    def _on_pipeline_start(self, event: PipelineStart) -> None:
+        self.log_level = event.log_level
+        self.overall_progress.update(self.overall_task, total=event.total_steps)
+
+    def _on_image_pull_start(self, event: ImagePullStart) -> None:
+        self.docker_task = self.steps_progress.add_task(
+            f"  - Pulling image [cyan]{event.image_name}[/cyan]...", total=1
+        )
+
+    def _on_image_pull_end(self, event: ImagePullEnd) -> None:
+        if self.docker_task is not None:
+            description = (
+                "[green]✔[/] Pulled image"
+                if event.status == "SUCCESS"
+                else "[red]✖[/] Failed to pull image"
+            )
+            self.steps_progress.update(
+                self.docker_task, completed=1, description=description
+            )
+
+    def _on_image_build_start(self, event: ImageBuildStart) -> None:
+        self.docker_task = self.steps_progress.add_task(
+            f"  - Building image [cyan]{event.tag}[/cyan]", total=event.total_steps
+        )
+
+    def _on_image_build_progress(self, event: ImageBuildProgress) -> None:
+        if self.docker_task is not None:
+            self.steps_progress.update(self.docker_task, completed=event.step)
+
+    def _on_image_build_end(self, event: ImageBuildEnd) -> None:
+        if self.docker_task is not None:
+            description = (
+                "[green]✔[/] Built image"
+                if event.status == "SUCCESS"
+                else "[red]✖[/] Failed to build image"
+            )
+            self.steps_progress.update(
+                self.docker_task,
+                completed=self.steps_progress.tasks[0].total,
+                description=description,
+            )
+
+    def _on_step_start(self, event: StepStart) -> None:
+        task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
+        self.step_tasks[event.step.name] = task_id
+        if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
+            self._create_panel_for_step(event)
+
+    def _on_log_line(self, event: LogLine) -> None:
+        self.all_logs[event.step_name].append(event)
+        self._update_panel_with_log(event)
+
+    def _on_step_end(self, event: StepEnd) -> None:
+        self._finalize_step(event)
+
+    def _on_pipeline_end(self, event: PipelineEnd) -> None:
+        self._finalize_pipeline(event)
 
     def _create_panel_for_step(self, event: StepStart) -> None:
         command_text = Text.from_markup(
