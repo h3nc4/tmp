@@ -467,6 +467,20 @@ class TestDebugUI:
         handler.handle_event(ImageBuildEnd(status="FAILURE"))
         assert "Image build failed" in mock_print.call_args[0][0]
 
+    @patch("hookci.presentation.cli.console.print")
+    def test_debug_ui_handles_image_pull_failure(self, mock_print: MagicMock) -> None:
+        """Verify DebugUI prints failure message for image pull."""
+        handler = DebugUI()
+        handler.handle_event(ImagePullEnd(status="FAILURE"))
+        assert "Image pull failed" in mock_print.call_args[0][0]
+
+    @patch("hookci.presentation.cli.console.print")
+    def test_debug_ui_handles_image_build_success(self, mock_print: MagicMock) -> None:
+        """Verify DebugUI prints success message for image build."""
+        handler = DebugUI()
+        handler.handle_event(ImageBuildEnd(status="SUCCESS"))
+        assert "Image built successfully" in mock_print.call_args[0][0]
+
 
 class TestPipelineUI:
     """Tests for the PipelineUI class state management."""

@@ -97,6 +97,15 @@ def test_pull_image_not_found(
         list(docker_service.pull_image("my-image:latest"))
 
 
+def test_pull_image_api_error(
+    docker_service: DockerService, mock_docker_client: MagicMock
+) -> None:
+    """Verify DockerError is raised on API error during pull."""
+    mock_docker_client.images.pull.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
+    with pytest.raises(DockerError, match="Docker API error while pulling image"):
+        list(docker_service.pull_image("my-image:latest"))
+
+
 def test_build_image_success_streams_logs(
     docker_service: DockerService, mock_docker_client: MagicMock, tmp_path: Path
 ) -> None:
@@ -126,6 +135,26 @@ def test_build_image_success_streams_logs(
         tag="test-tag",
         rm=True,
     )
+
+
+def test_build_image_skips_empty_lines(
+    docker_service: DockerService, mock_docker_client: MagicMock, tmp_path: Path
+) -> None:
+    """Verify that empty lines in the build stream are skipped."""
+    mock_logs = iter(
+        [
+            {"stream": "\n"},  # Empty line
+            {"stream": "  "},  # Whitespace line
+            {"stream": "Step 1/1 : FROM python"},
+        ]
+    )
+    mock_docker_client.images.build.return_value = (None, mock_logs)
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.touch()
+
+    logs = list(docker_service.build_image(dockerfile, "tag"))
+    assert len(logs) == 1
+    assert logs[0] == (1, "Step 1/1 : FROM python")
 
 
 def test_build_image_api_error(
@@ -289,6 +318,16 @@ RUN poetry install
     assert docker_service.count_dockerfile_steps(dockerfile) == 4
 
 
+def test_count_dockerfile_steps_read_error(
+    docker_service: DockerService, tmp_path: Path
+) -> None:
+    """Verify DockerError is raised if reading the Dockerfile fails."""
+    dockerfile = tmp_path / "Dockerfile"
+    with patch.object(Path, "open", side_effect=OSError("Read error")):
+        with pytest.raises(DockerError, match="Could not read Dockerfile"):
+            docker_service.count_dockerfile_steps(dockerfile)
+
+
 def test_calculate_dockerfile_hash(
     docker_service: DockerService, tmp_path: Path
 ) -> None:
@@ -297,6 +336,16 @@ def test_calculate_dockerfile_hash(
     dockerfile.write_text("FROM python:3.9\nRUN echo 'hello'")
     expected_hash = "ea8729087122"  # sha256(...).hexdigest()[:12]
     assert docker_service.calculate_dockerfile_hash(dockerfile) == expected_hash
+
+
+def test_calculate_dockerfile_hash_read_error(
+    docker_service: DockerService, tmp_path: Path
+) -> None:
+    """Verify DockerError is raised if reading the Dockerfile hash fails."""
+    dockerfile = tmp_path / "Dockerfile"
+    with patch.object(Path, "open", side_effect=OSError("Read error")):
+        with pytest.raises(DockerError, match="Could not read Dockerfile"):
+            docker_service.calculate_dockerfile_hash(dockerfile)
 
 
 def test_start_persistent_container(

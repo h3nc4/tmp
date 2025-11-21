@@ -879,3 +879,25 @@ def test_stream_logs_and_get_exit_code_for_empty_generator(
     # The outer generator catches this, and its logic dictates that if `e.value`
     # is None, the exit code defaults to 1.
     assert exit_code == 1
+
+
+def test_ci_run_image_pull_failure(
+    mock_git_service: MagicMock,
+    mock_config_handler: MagicMock,
+    mock_docker_service: MagicMock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """Verify that the pipeline fails if image pull fails."""
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_docker_service.pull_image.side_effect = DockerError("Network error")
+
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service
+    )
+    events = list(service.run(hook_type=None))
+
+    assert any(isinstance(e, ImagePullStart) for e in events)
+    assert any(isinstance(e, ImagePullEnd) and e.status == "FAILURE" for e in events)
+    # The pipeline should end with FAILURE
+    assert isinstance(events[-1], PipelineEnd)
+    assert events[-1].status == "FAILURE"
