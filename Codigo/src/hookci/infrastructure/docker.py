@@ -83,6 +83,12 @@ class DockerService(IDockerService):
                 "Could not connect to the Docker daemon. Is it running?"
             ) from e
 
+    def _format_error_msg(self, e: DockerException) -> str:
+        """Extracts a meaningful message from a DockerException."""
+        if isinstance(e, APIError) and e.explanation:
+            return str(e.explanation)
+        return str(e)
+
     def image_exists(self, tag: str) -> bool:
         """Checks if a Docker image with the given tag exists locally."""
         try:
@@ -90,8 +96,10 @@ class DockerService(IDockerService):
             return True
         except ImageNotFound:
             return False
-        except APIError as e:
-            raise DockerError(f"Docker API error when checking for image: {e}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error when checking for image: {self._format_error_msg(e)}"
+            ) from e
 
     def pull_image(self, image_name: str) -> Generator[None, None, None]:
         """Pulls a Docker image, handling potential errors."""
@@ -101,8 +109,10 @@ class DockerService(IDockerService):
             yield
         except ImageNotFound:
             raise DockerError(f"Docker image '{image_name}' not found in any registry.")
-        except APIError as e:
-            raise DockerError(f"Docker API error while pulling image: {e}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error while pulling image: {self._format_error_msg(e)}"
+            ) from e
 
     def _parse_one_frame(
         self, buffer: bytes
@@ -202,11 +212,16 @@ class DockerService(IDockerService):
 
         except ImageNotFound:
             raise DockerError(f"Docker image '{image}' not found.")
-        except APIError as e:
-            raise DockerError(f"Docker API error: {e.explanation}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error: {self._format_error_msg(e)}"
+            ) from e
         finally:
             if container:
-                container.remove(force=True)  # type: ignore[no-untyped-call]
+                try:
+                    container.remove(force=True)  # type: ignore[no-untyped-call]
+                except DockerException as e:
+                    logger.warning(f"Failed to remove transient container: {e}")
 
     def build_image(
         self, dockerfile_path: Path, tag: str
@@ -241,8 +256,10 @@ class DockerService(IDockerService):
 
         except BuildError as e:
             raise DockerError(f"Failed to build Docker image: {e.msg}") from e
-        except APIError as e:
-            raise DockerError(f"Docker API error during build: {e.explanation}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error during build: {self._format_error_msg(e)}"
+            ) from e
 
     def count_dockerfile_steps(self, dockerfile_path: Path) -> int:
         """Counts the number of instruction lines in a Dockerfile."""
@@ -285,8 +302,10 @@ class DockerService(IDockerService):
             return str(container.id)
         except ImageNotFound:
             raise DockerError(f"Docker image '{image}' not found.")
-        except APIError as e:
-            raise DockerError(f"Docker API error: {e.explanation}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error: {self._format_error_msg(e)}"
+            ) from e
 
     def exec_in_container(
         self,
@@ -323,8 +342,10 @@ class DockerService(IDockerService):
                 )
             return int(exit_code)
 
-        except APIError as e:
-            raise DockerError(f"Docker API error during exec: {e.explanation}") from e
+        except DockerException as e:
+            raise DockerError(
+                f"Docker error during exec: {self._format_error_msg(e)}"
+            ) from e
 
     def stop_and_remove_container(self, container_id: str) -> None:
         """Stops and removes a container."""
@@ -332,7 +353,7 @@ class DockerService(IDockerService):
             container = self.client.containers.get(container_id)
             container.stop(timeout=1)
             container.remove()
-        except APIError as e:
+        except DockerException as e:
             logger.warning(
-                f"Could not stop or remove container {container_id}: {e.explanation}"
+                f"Could not stop or remove container {container_id}: {self._format_error_msg(e)}"
             )

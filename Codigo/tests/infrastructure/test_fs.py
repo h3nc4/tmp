@@ -25,7 +25,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
+from hookci.infrastructure.errors import (
+    FileSystemError,
+    GitCommandError,
+    NotInGitRepositoryError,
+)
 from hookci.infrastructure.fs import GitService, IFileSystem, LocalFileSystem
 
 
@@ -77,8 +81,37 @@ def test_local_fs_make_executable(tmp_path: Path) -> None:
     assert file_path.stat().st_mode & stat.S_IEXEC
 
 
+def test_local_fs_error_handling(tmp_path: Path) -> None:
+    """Verify LocalFileSystem raises FileSystemError on failure."""
+    fs = LocalFileSystem()
+    # Try to read a non-existent file, should raise FileSystemError
+    with pytest.raises(FileSystemError):
+        fs.read_file(tmp_path / "nonexistent")
+
+    # Try to check existence of a file with invalid path (simulated)
+    with patch.object(Path, "exists", side_effect=OSError("Error")):
+        with pytest.raises(FileSystemError):
+            fs.file_exists(tmp_path / "somefile")
+
+    # Try to create dir where file exists
+    file_as_dir = tmp_path / "file_as_dir"
+    file_as_dir.touch()
+    with pytest.raises(FileSystemError):
+        fs.create_dir(file_as_dir)
+
+    # Try to write to a directory path
+    with pytest.raises(FileSystemError):
+        fs.write_file(tmp_path, "content")
+
+    # Try to make non-existent file executable
+    with pytest.raises(FileSystemError):
+        fs.make_executable(tmp_path / "nonexistent")
+
+
 @patch("subprocess.run")
-def test_git_root_property_success(mock_subprocess_run: Mock, mock_fs: Mock) -> None:
+def test_git_root_property_success(
+    mock_subprocess_run: Mock, mock_fs: Mock
+) -> None:
     """Verify that the git_root property correctly parses the output."""
     expected_path = "/path/to/git/root"
     mock_subprocess_run.return_value = subprocess.CompletedProcess(
@@ -211,6 +244,6 @@ def test_get_staged_commit_message_read_error(
     service = GitService(fs=mock_fs)
     service.git_root = tmp_path
     mock_fs.file_exists.return_value = True
-    mock_fs.read_file.side_effect = OSError("Permission denied")
+    mock_fs.read_file.side_effect = FileSystemError("Permission denied")
     with pytest.raises(GitCommandError, match="Could not read or parse"):
         service.get_staged_commit_message()

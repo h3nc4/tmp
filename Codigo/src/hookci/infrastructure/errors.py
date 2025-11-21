@@ -53,3 +53,9 @@ class DockerError(InfrastructureError):
     """Raised for errors related to Docker operations."""
 
     pass
+
+
+class FileSystemError(InfrastructureError):
+    """Raised when a filesystem operation fails."""
+
+    pass

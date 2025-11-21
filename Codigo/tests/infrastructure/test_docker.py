@@ -73,9 +73,9 @@ def test_image_does_not_exist(
 def test_image_exists_api_error(
     docker_service: DockerService, mock_docker_client: MagicMock
 ) -> None:
-    """Verify DockerError is raised on API error when checking for an image."""
+    """Verify DockerError is raised on API error when checking for image."""
     mock_docker_client.images.get.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="API error"):
+    with pytest.raises(DockerError, match="Docker error when checking for image"):
         docker_service.image_exists("my-tag")
 
 
@@ -102,7 +102,7 @@ def test_pull_image_api_error(
 ) -> None:
     """Verify DockerError is raised on API error during pull."""
     mock_docker_client.images.pull.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="Docker API error while pulling image"):
+    with pytest.raises(DockerError, match="Docker error while pulling image"):
         list(docker_service.pull_image("my-image:latest"))
 
 
@@ -162,7 +162,7 @@ def test_build_image_api_error(
 ) -> None:
     """Verify DockerError is raised on a build API failure."""
     mock_docker_client.images.build.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="Docker API error during build"):
+    with pytest.raises(DockerError, match="Docker error during build"):
         list(docker_service.build_image(tmp_path / "Dockerfile", "test-tag"))
 
 
@@ -282,12 +282,29 @@ def test_run_command_no_cleanup_if_container_fails_to_create(
     mock_container.remove.assert_not_called()
 
 
+def test_run_command_cleanup_failure_is_logged(
+    docker_service: DockerService, mock_docker_client: MagicMock, tmp_path: Path
+) -> None:
+    """Verify that exceptions during container cleanup are logged and do not crash."""
+    mock_container = MagicMock()
+    mock_docker_client.containers.run.return_value = mock_container
+    # Set up the container to fail on remove
+    mock_container.remove.side_effect = DockerException("Cleanup failure")
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = iter([])
+
+    with patch("hookci.infrastructure.docker.logger") as mock_logger:
+        list(docker_service.run_command_in_container("img", "cmd", tmp_path))
+        mock_logger.warning.assert_called_once()
+        assert "Failed to remove transient container" in mock_logger.warning.call_args[0][0]
+
+
 def test_run_command_api_error(
     docker_service: DockerService, mock_docker_client: MagicMock, tmp_path: Path
 ) -> None:
     """Verify DockerError is raised on a container run API error."""
     mock_docker_client.containers.run.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="Docker API error"):
+    with pytest.raises(DockerError, match="Docker error:"):
         list(docker_service.run_command_in_container("my-image", "cmd", tmp_path))
 
 
@@ -402,7 +419,7 @@ def test_exec_in_container_api_error(
 ) -> None:
     """Verify DockerError on API error during exec."""
     mock_docker_client.containers.get.side_effect = APIError("not found")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="Docker API error during exec"):
+    with pytest.raises(DockerError, match="Docker error during exec"):
         list(docker_service.exec_in_container("container_id_abc", "echo 'hello'"))
 
 
@@ -487,5 +504,20 @@ def test_start_persistent_container_api_error(
 ) -> None:
     """Verify DockerError for APIError on starting a persistent container."""
     mock_docker_client.containers.run.side_effect = APIError("server error")  # type: ignore[no-untyped-call]
-    with pytest.raises(DockerError, match="Docker API error"):
+    with pytest.raises(DockerError, match="Docker error:"):
         docker_service.start_persistent_container(image="my-image", workdir=tmp_path)
+
+
+def test_format_error_msg_uses_explanation(docker_service: DockerService) -> None:
+    """Verify _format_error_msg uses explanation if available on APIError."""
+    api_error = APIError("Some generic message")  # type: ignore[no-untyped-call]
+    api_error.explanation = "Detailed explanation of the error"
+    msg = docker_service._format_error_msg(api_error)
+    assert msg == "Detailed explanation of the error"
+
+
+def test_format_error_msg_falls_back_to_str(docker_service: DockerService) -> None:
+    """Verify _format_error_msg falls back to str(e) for other exceptions."""
+    generic_error = DockerException("Generic docker error")
+    msg = docker_service._format_error_msg(generic_error)
+    assert msg == "Generic docker error"

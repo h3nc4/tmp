@@ -23,7 +23,11 @@ from functools import cached_property
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from hookci.infrastructure.errors import GitCommandError, NotInGitRepositoryError
+from hookci.infrastructure.errors import (
+    FileSystemError,
+    GitCommandError,
+    NotInGitRepositoryError,
+)
 
 
 @runtime_checkable
@@ -52,21 +56,38 @@ class LocalFileSystem(IFileSystem):
     """Concrete implementation of IFileSystem using local disk."""
 
     def file_exists(self, path: Path) -> bool:
-        return path.exists()
+        try:
+            return path.exists()
+        except OSError as e:
+            raise FileSystemError(f"Failed to check if file exists: {path}") from e
 
     def create_dir(self, path: Path) -> None:
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise FileSystemError(f"Failed to create directory: {path}") from e
 
     def write_file(self, path: Path, content: str) -> None:
-        path.write_text(content, encoding="utf-8")
+        try:
+            path.write_text(content, encoding="utf-8")
+        except OSError as e:
+            raise FileSystemError(f"Failed to write to file: {path}") from e
 
     def read_file(self, path: Path) -> str:
-        return path.read_text(encoding="utf-8")
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise FileSystemError(f"Failed to read file: {path}") from e
 
     def make_executable(self, path: Path) -> None:
         """Makes a file executable, similar to `chmod +x`."""
-        current_permissions = path.stat().st_mode
-        path.chmod(current_permissions | stat.S_IEXEC)
+        try:
+            current_permissions = path.stat().st_mode
+            path.chmod(current_permissions | stat.S_IEXEC)
+        except OSError as e:
+            raise FileSystemError(
+                f"Failed to change permissions for file: {path}"
+            ) from e
 
 
 class GitService(IScmService):
@@ -128,9 +149,9 @@ class GitService(IScmService):
         This method reads that file to allow filtering based on its content.
         """
         commit_msg_path = self.git_root / ".git" / "COMMIT_EDITMSG"
-        if not self._fs.file_exists(commit_msg_path):
-            return ""
         try:
+            if not self._fs.file_exists(commit_msg_path):
+                return ""
             content = self._fs.read_file(commit_msg_path)
             # Filter out comment lines (starting with '#') and strip whitespace
             lines = [
@@ -140,7 +161,8 @@ class GitService(IScmService):
             ]
             return "\n".join(lines).strip()
         except Exception as e:
-            # Catching a generic exception is broad, but file read errors are varied.
+            # We catch Exception here because file ops might fail with FileSystemError
+            # or other unforeseen issues, and we want to wrap it in GitCommandError.
             raise GitCommandError(
                 f"Could not read or parse commit message file: {e}"
             ) from e

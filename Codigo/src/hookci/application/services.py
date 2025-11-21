@@ -181,9 +181,15 @@ class CiExecutionService:
         for step in config.steps:
             yield StepStart(step=step)
 
-            exit_code = yield from self._execute_step(
-                step, docker_image, self._git_service.git_root
-            )
+            try:
+                exit_code = yield from self._execute_step(
+                    step, docker_image, self._git_service.git_root
+                )
+            except DockerError as e:
+                logger.error(f"Infrastructure error during step '{step.name}': {e}")
+                yield StepEnd(step=step, status="FAILURE", exit_code=1)
+                yield PipelineEnd(status="FAILURE")
+                return
 
             if exit_code == 0:
                 yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
@@ -209,9 +215,15 @@ class CiExecutionService:
             yield PipelineEnd(status="FAILURE")
             return
 
-        container_id = self._docker_service.start_persistent_container(
-            image=docker_image, workdir=self._git_service.git_root
-        )
+        try:
+            container_id = self._docker_service.start_persistent_container(
+                image=docker_image, workdir=self._git_service.git_root
+            )
+        except DockerError as e:
+            logger.error(f"Failed to start debug container: {e}")
+            yield PipelineEnd(status="FAILURE")
+            return
+
         logger.debug(f"Started persistent container: {container_id}")
 
         final_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
@@ -219,12 +231,20 @@ class CiExecutionService:
             for step in config.steps:
                 yield StepStart(step=step)
 
-                exit_code = yield from self._stream_logs_and_get_exit_code(
-                    self._docker_service.exec_in_container(
-                        container_id, command=step.command, env=step.env
-                    ),
-                    step.name,
-                )
+                try:
+                    exit_code = yield from self._stream_logs_and_get_exit_code(
+                        self._docker_service.exec_in_container(
+                            container_id, command=step.command, env=step.env
+                        ),
+                        step.name,
+                    )
+                except DockerError as e:
+                    logger.error(
+                        f"Infrastructure error during debug step '{step.name}': {e}"
+                    )
+                    yield StepEnd(step=step, status="FAILURE", exit_code=1)
+                    final_status = "FAILURE"
+                    break
 
                 if exit_code == 0:
                     yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
@@ -332,12 +352,24 @@ class CiExecutionService:
         """
         Ensures the required Docker image is available, either by pulling,
         building it, or using a cached version.
-        Yields events for real-time feedback and returns the final image name or None on failure.
         """
-        git_root = self._git_service.git_root
-
         if config.docker.dockerfile:
-            dockerfile_path = git_root / config.docker.dockerfile
+            return (yield from self._prepare_from_dockerfile(config.docker.dockerfile))
+
+        if config.docker.image:
+            return (yield from self._prepare_from_registry(config.docker.image))
+
+        # This case should be prevented by pydantic model validation, but as a safeguard:
+        raise ConfigurationParseError("No docker image or dockerfile was specified.")
+
+    def _prepare_from_dockerfile(
+        self, dockerfile_rel_path: str
+    ) -> Generator[PipelineEvent, None, str | None]:
+        """Handles building a Docker image from a Dockerfile."""
+        git_root = self._git_service.git_root
+        dockerfile_path = git_root / dockerfile_rel_path
+
+        try:
             dockerfile_hash = self._docker_service.calculate_dockerfile_hash(
                 dockerfile_path
             )
@@ -348,39 +380,45 @@ class CiExecutionService:
                 return tag
 
             total_steps = self._docker_service.count_dockerfile_steps(dockerfile_path)
-            yield ImageBuildStart(
-                dockerfile_path=str(dockerfile_path), tag=tag, total_steps=total_steps
-            )
-            try:
-                build_generator = self._docker_service.build_image(dockerfile_path, tag)
-                for step, line in build_generator:
-                    yield ImageBuildProgress(step=step, line=line)
-                yield ImageBuildEnd(status="SUCCESS")
-                return tag
-            except DockerError as e:
-                logger.error(f"Docker build failed: {e}")
-                yield ImageBuildEnd(status="FAILURE")
-                return None
+        except DockerError as e:
+            logger.error(f"Docker build preparation failed: {e}")
+            return None
 
-        elif config.docker.image:
-            image_name = config.docker.image
+        yield ImageBuildStart(
+            dockerfile_path=str(dockerfile_path), tag=tag, total_steps=total_steps
+        )
+        try:
+            build_generator = self._docker_service.build_image(dockerfile_path, tag)
+            for step, line in build_generator:
+                yield ImageBuildProgress(step=step, line=line)
+            yield ImageBuildEnd(status="SUCCESS")
+            return tag
+        except DockerError as e:
+            logger.error(f"Docker build failed: {e}")
+            yield ImageBuildEnd(status="FAILURE")
+            return None
+
+    def _prepare_from_registry(
+        self, image_name: str
+    ) -> Generator[PipelineEvent, None, str | None]:
+        """Handles pulling a Docker image from a registry."""
+        try:
             if self._docker_service.image_exists(image_name):
                 logger.debug(f"Using cached Docker image: {image_name}")
                 return image_name
+        except DockerError as e:
+            logger.warning(f"Could not check if image exists locally: {e}")
 
-            yield ImagePullStart(image_name=image_name)
-            try:
-                # Consume the generator
-                deque(self._docker_service.pull_image(image_name), maxlen=0)
-                yield ImagePullEnd(status="SUCCESS")
-                return image_name
-            except DockerError as e:
-                logger.error(f"Docker pull failed: {e}")
-                yield ImagePullEnd(status="FAILURE")
-                return None
-
-        # This case should be prevented by pydantic model validation, but as a safeguard:
-        raise ConfigurationParseError("No docker image or dockerfile was specified.")
+        yield ImagePullStart(image_name=image_name)
+        try:
+            # Consume the generator
+            deque(self._docker_service.pull_image(image_name), maxlen=0)
+            yield ImagePullEnd(status="SUCCESS")
+            return image_name
+        except DockerError as e:
+            logger.error(f"Docker pull failed: {e}")
+            yield ImagePullEnd(status="FAILURE")
+            return None
 
     def _load_and_validate_configuration(self) -> Configuration:
         """
