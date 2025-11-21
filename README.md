@@ -24,7 +24,7 @@ HookCI pode ser instalado de várias maneiras, dependendo das suas necessidades.
 
 ### Extensão do VSCode
 
-Está é a maneira mais simples de instalar e usar HookCI, especialmente se você já usa o Visual Studio Code como seu editor de código.
+Esta é a maneira mais simples de instalar e usar HookCI, especialmente se você já usa o Visual Studio Code como seu editor de código.
 
 1. Abra o Visual Studio Code.
 2. Navegue até a aba de Extensões.
