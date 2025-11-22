@@ -15,11 +15,21 @@ jobs:
         uses: actions/checkout@v5
       - name: Build .deb package
         run: Codigo/scripts/dist deb
+      - name: Import gpg key
+        run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      - name: Sign debian package
+        run: gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign --armor -o Codigo/hookci.deb.asc Codigo/hookci.deb
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: hookci-deb
-          path: Codigo/hookci.deb
+          path: |
+            Codigo/hookci.deb
+            Codigo/hookci.deb.asc
           compression-level: 0
           retention-days: 1
 
@@ -31,11 +41,21 @@ jobs:
         uses: actions/checkout@v5
       - name: Build executable
         run: Codigo/scripts/dist
+      - name: Import gpg key
+        run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      - name: Sign binary
+        run: gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign --armor -o Codigo/hookci.asc Codigo/hookci
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: hookci-bin
-          path: Codigo/hookci
+          path: |
+            Codigo/hookci
+            Codigo/hookci.asc
           compression-level: 0
           retention-days: 1
 
@@ -64,5 +84,7 @@ jobs:
           files: |
             ./hookci
             ./hookci.deb
+            ./hookci.asc
+            ./hookci.deb.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
