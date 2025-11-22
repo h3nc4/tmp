@@ -176,14 +176,16 @@ def test_ci_manual_run_success_with_image_pull(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """
     Verify a manual CI run with an image config pulls the image and runs steps.
     """
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
     assert isinstance(events[0], PipelineStart)
@@ -200,13 +202,15 @@ def test_ci_run_uses_cached_pulled_image(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify that if a pulled image exists, it is not pulled again."""
     mock_docker_service.image_exists.return_value = True
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
     assert not any(isinstance(e, ImagePullStart) for e in events)
@@ -219,11 +223,13 @@ def test_ci_run_stops_on_critical_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify the pipeline stops on a critical step failure."""
     valid_config_dict["steps"].append({"name": "Second", "command": "echo"})
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
 
     def mock_run_fail(
         *args: Any, **kwargs: Any
@@ -233,7 +239,7 @@ def test_ci_run_stops_on_critical_failure(
 
     mock_docker_service.run_command_in_container.side_effect = mock_run_fail
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
     assert any(isinstance(e, StepEnd) and e.status == "FAILURE" for e in events)
@@ -245,6 +251,7 @@ def test_ci_run_warns_on_non_critical_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a non-critical failure allows the pipeline to continue and sets status to WARNING."""
@@ -253,6 +260,7 @@ def test_ci_run_warns_on_non_critical_failure(
         {"name": "Critical", "command": "test"},
     ]
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     exit_codes = [1, 0]
 
     def mock_run_commands(
@@ -263,7 +271,7 @@ def test_ci_run_warns_on_non_critical_failure(
 
     mock_docker_service.run_command_in_container.side_effect = mock_run_commands
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -281,6 +289,7 @@ def test_ci_run_multiple_non_critical_failures_results_in_warning(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify multiple non-critical failures still result in a WARNING, not FAILURE."""
@@ -290,6 +299,7 @@ def test_ci_run_multiple_non_critical_failures_results_in_warning(
         {"name": "Critical", "command": "test"},
     ]
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     # First two fail, last one succeeds
     exit_codes = [1, 1, 0]
 
@@ -301,7 +311,7 @@ def test_ci_run_multiple_non_critical_failures_results_in_warning(
 
     mock_docker_service.run_command_in_container.side_effect = mock_run_commands
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -314,13 +324,15 @@ def test_ci_run_with_dockerfile_build_success(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a pipeline with a Dockerfile builds the image and then runs the step."""
     valid_config_dict["docker"] = {"dockerfile": "Dockerfile.test"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -339,15 +351,17 @@ def test_ci_run_uses_cached_dockerfile_image(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify that a Dockerfile build is skipped if a cached image exists."""
     valid_config_dict["docker"] = {"dockerfile": "Dockerfile.test"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
     mock_docker_service.image_exists.return_value = True
+    mock_fs.file_exists.return_value = False  # No .env
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -367,14 +381,16 @@ def test_ci_run_with_dockerfile_build_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a failed Dockerfile build stops the pipeline."""
     valid_config_dict["docker"] = {"dockerfile": "Dockerfile.test"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_docker_service.build_image.side_effect = DockerError("Build failed")
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
     assert any(isinstance(e, ImageBuildStart) for e in events)
@@ -388,14 +404,16 @@ def test_ci_debug_run_build_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a failed Dockerfile build stops the pipeline in debug mode."""
     valid_config_dict["docker"] = {"dockerfile": "Dockerfile.test"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_docker_service.build_image.side_effect = DockerError("Build failed")
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
     assert any(isinstance(e, ImageBuildStart) for e in events)
@@ -410,13 +428,15 @@ def test_ci_hook_run_is_skipped_if_disabled(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a hook-triggered run is skipped if disabled in the config."""
     valid_config_dict["hooks"]["pre_commit"] = False
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert not events
@@ -427,13 +447,15 @@ def test_ci_pre_push_hook_run_is_skipped_if_disabled(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a pre-push hook is skipped if disabled."""
     valid_config_dict["hooks"]["pre_push"] = False
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-push"))
     assert not events
@@ -443,14 +465,16 @@ def test_ci_hook_run_is_skipped_by_branch_filter(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a hook-triggered run is skipped if the branch doesn't match the filter."""
     valid_config_dict["filters"] = {"branches": "feature/.*"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_git_service.get_current_branch.return_value = "main"
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert not events
@@ -461,14 +485,16 @@ def test_ci_hook_run_proceeds_with_matching_branch_filter(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a hook-triggered run proceeds if the branch matches the filter."""
     valid_config_dict["filters"] = {"branches": "feature/.*"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_git_service.get_current_branch.return_value = "feature/new-login"
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert any(isinstance(e, PipelineEnd) for e in events)
@@ -479,12 +505,14 @@ def test_ci_hook_run_proceeds_with_no_filters(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     config_dict_no_filters: Dict[str, Any],
 ) -> None:
     """Verify a hook-triggered run proceeds if no filters are defined."""
     mock_config_handler.load_config_data.return_value = config_dict_no_filters
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert any(isinstance(e, PipelineEnd) for e in events)
@@ -494,14 +522,16 @@ def test_ci_pre_commit_run_is_skipped_by_commit_filter(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a pre-commit run is skipped if the commit message doesn't match."""
     valid_config_dict["filters"] = {"commits": r"^(feat|fix):"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_git_service.get_staged_commit_message.return_value = "docs: update README"
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert not events
@@ -513,14 +543,16 @@ def test_ci_pre_commit_run_proceeds_with_matching_commit_filter(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a pre-commit run proceeds if the commit message matches."""
     valid_config_dict["filters"] = {"commits": r"^(feat|fix):"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_git_service.get_staged_commit_message.return_value = "feat: add new button"
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type="pre-commit"))
     assert any(isinstance(e, PipelineEnd) for e in events)
@@ -532,12 +564,14 @@ def test_ci_execution_service_invalid_config(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
 ) -> None:
     """Verify a ConfigurationParseError is raised for invalid config structure."""
     invalid_config_data = {"version": "1.0", "steps": "not-a-list"}
     mock_config_handler.load_config_data.return_value = invalid_config_data
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     with pytest.raises(ConfigurationParseError):
         list(service.run(hook_type=None))
@@ -547,14 +581,16 @@ def test_ci_execution_service_validation_error_in_config(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify ConfigurationParseError is raised when Pydantic validation fails."""
     # 'command' is missing, which is a required field for a Step
     valid_config_dict["steps"] = [{"name": "Invalid Step"}]
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     with pytest.raises(ConfigurationParseError) as exc_info:
         list(service.run(hook_type=None))
@@ -566,12 +602,14 @@ def test_ci_debug_and_hook_type_logs_warning(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a warning is logged when --debug is used with a git hook."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     with patch("hookci.application.services.logger") as mock_logger:
         list(service.run(hook_type="pre-commit", debug=True))
@@ -585,6 +623,7 @@ def test_prepare_docker_image_raises_for_no_image_or_dockerfile(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
 ) -> None:
     """Verify _prepare_docker_image raises an error if config is invalid."""
     # This state should be prevented by Pydantic, but we test the safeguard.
@@ -594,7 +633,7 @@ def test_prepare_docker_image_raises_for_no_image_or_dockerfile(
     bad_config.docker.dockerfile = None
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     with pytest.raises(ConfigurationParseError):
         list(service._prepare_docker_image(bad_config))
@@ -604,19 +643,25 @@ def test_stream_logs_and_get_exit_code_no_return_value(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
 ) -> None:
     """
     Verify that if the generator behind StopIteration has no value, it defaults to 1.
     """
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
 
     def log_generator_no_return() -> Generator[Tuple[LogStream, str], None, int]:  # type: ignore[return]
         yield "stdout", "line"
         # No explicit return, so StopIteration will have value=None
 
-    gen = service._stream_logs_and_get_exit_code(log_generator_no_return(), "test_step")
+    # _stream_logs_and_get_exit_code is a generator itself.
+    # We need to consume it to get its return value from the StopIteration exception.
+    gen = service._stream_logs_and_get_exit_code(
+        log_generator_no_return(),
+        "test_step",
+    )
     exit_code = -1
     try:
         while True:
@@ -631,10 +676,11 @@ def test_stream_logs_and_get_exit_code_with_return_value(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
 ) -> None:
     """Verify that if the generator returns a value, it is propagated."""
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
 
     def log_generator_with_return() -> Generator[Tuple[LogStream, str], None, int]:
@@ -658,12 +704,14 @@ def test_ci_debug_run_success(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a debug run succeeds and cleans up the container."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
     assert any(isinstance(e, PipelineEnd) and e.status == "SUCCESS" for e in events)
@@ -679,10 +727,12 @@ def test_ci_debug_run_critical_failure_triggers_debug_shell(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a critical failure in debug mode yields a DebugShellStarting event."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
 
     def mock_exec_fail(
         *args: Any, **kwargs: Any
@@ -692,7 +742,7 @@ def test_ci_debug_run_critical_failure_triggers_debug_shell(
 
     mock_docker_service.exec_in_container.side_effect = mock_exec_fail
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
 
@@ -709,6 +759,7 @@ def test_ci_debug_run_warns_on_non_critical_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify a non-critical failure in debug mode warns and continues."""
@@ -717,6 +768,7 @@ def test_ci_debug_run_warns_on_non_critical_failure(
         {"name": "Critical", "command": "test"},
     ]
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     exit_codes = [1, 0]
 
     def mock_exec_commands(
@@ -727,7 +779,7 @@ def test_ci_debug_run_warns_on_non_critical_failure(
 
     mock_docker_service.exec_in_container.side_effect = mock_exec_commands
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
 
@@ -850,10 +902,11 @@ def test_stream_logs_and_get_exit_code_for_empty_generator(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
 ) -> None:
     """Verify that an empty log generator correctly returns the default exit code of 1."""
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
 
     def empty_log_generator() -> Generator[Tuple[LogStream, str], None, None]:
@@ -885,14 +938,16 @@ def test_ci_run_image_pull_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify that the pipeline fails if image pull fails."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_docker_service.pull_image.side_effect = DockerError("Network error")
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -907,17 +962,19 @@ def test_ci_run_infrastructure_error_during_step(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify correct handling of DockerError during step execution."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     # Raise DockerError during command execution
     mock_docker_service.run_command_in_container.side_effect = DockerError(
         "Container crashed"
     )
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None))
 
@@ -937,16 +994,18 @@ def test_ci_debug_run_start_container_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify failure to start debug container ends pipeline with FAILURE."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_docker_service.start_persistent_container.side_effect = DockerError(
         "Startup failed"
     )
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
 
@@ -958,15 +1017,17 @@ def test_ci_debug_run_exec_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify exec failure in debug mode triggers failure status."""
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     # Raise DockerError during exec
     mock_docker_service.exec_in_container.side_effect = DockerError("Exec failed")
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     events = list(service.run(hook_type=None, debug=True))
 
@@ -983,21 +1044,25 @@ def test_prepare_docker_image_build_prep_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify DockerError during build preparation (hash/count) returns None."""
     valid_config_dict["docker"] = {"dockerfile": "Dockerfile"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     # Fail during hash calculation
     mock_docker_service.calculate_dockerfile_hash.side_effect = DockerError(
         "Read error"
     )
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     # _prepare_docker_image is a generator, consume it
-    results = list(service._prepare_docker_image(service._load_and_validate_configuration()))
+    results = list(
+        service._prepare_docker_image(service._load_and_validate_configuration())
+    )
     # The method should yield events (potentially) and return None.
     # Since it fails early, it might not yield events, but it definitely returns None
     # (which we can't see directly from list(), but we know it didn't raise).
@@ -1011,17 +1076,77 @@ def test_prepare_docker_image_check_exists_failure(
     mock_git_service: MagicMock,
     mock_config_handler: MagicMock,
     mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
     valid_config_dict: Dict[str, Any],
 ) -> None:
     """Verify DockerError during image existence check logs warning and continues."""
     valid_config_dict["docker"] = {"image": "my-image"}
     mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = False  # No .env
     mock_docker_service.image_exists.side_effect = DockerError("Daemon unresponsive")
 
     service = CiExecutionService(
-        mock_git_service, mock_config_handler, mock_docker_service
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
     )
     # Should continue to attempt pull
-    events = list(service._prepare_docker_image(service._load_and_validate_configuration()))
+    events = list(
+        service._prepare_docker_image(service._load_and_validate_configuration())
+    )
     assert any(isinstance(e, ImagePullStart) for e in events)
     mock_docker_service.pull_image.assert_called_once()
+
+
+def test_ci_run_loads_dotenv_vars(
+    mock_git_service: MagicMock,
+    mock_config_handler: MagicMock,
+    mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """Verify that environment variables from .env are loaded and passed to docker."""
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    
+    # Setup .env content
+    mock_fs.file_exists.return_value = True
+    mock_fs.read_file.return_value = 'API_KEY=12345\nDEBUG="true"'
+    
+    # Setup mock git root
+    mock_git_service.git_root = Path("/repo")
+
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
+    )
+    list(service.run(hook_type=None))
+    
+    # Verify that run_command_in_container was called with combined env
+    mock_docker_service.run_command_in_container.assert_called_once()
+    call_args = mock_docker_service.run_command_in_container.call_args
+    env_arg = call_args[1]["env"]
+    
+    assert env_arg["API_KEY"] == "12345"
+    assert env_arg["DEBUG"] == "true"
+
+
+def test_ci_run_dotenv_read_failure_is_logged(
+    mock_git_service: MagicMock,
+    mock_config_handler: MagicMock,
+    mock_docker_service: MagicMock,
+    mock_fs: MagicMock,
+    valid_config_dict: Dict[str, Any],
+) -> None:
+    """Verify that failure to read .env logs a warning but continues."""
+    mock_config_handler.load_config_data.return_value = valid_config_dict
+    mock_fs.file_exists.return_value = True
+    mock_fs.read_file.side_effect = Exception("Permission denied")
+
+    service = CiExecutionService(
+        mock_git_service, mock_config_handler, mock_docker_service, mock_fs
+    )
+    
+    with patch("hookci.application.services.logger") as mock_logger:
+        list(service.run(hook_type=None))
+        mock_logger.warning.assert_called()
+        assert "Failed to read .env file" in mock_logger.warning.call_args[0][0]
+        
+    # Should still proceed
+    mock_docker_service.run_command_in_container.assert_called_once()

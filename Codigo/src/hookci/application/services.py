@@ -138,10 +138,12 @@ class CiExecutionService:
         git_service: IScmService,
         config_handler: IConfigHandler,
         docker_service: IDockerService,
+        fs: IFileSystem,
     ):
         self._git_service = git_service
         self._config_handler = config_handler
         self._docker_service = docker_service
+        self._fs = fs
 
     def run(
         self, hook_type: Optional[str], debug: bool = False
@@ -162,13 +164,45 @@ class CiExecutionService:
             )
             debug = False
 
+        base_env = self._load_dotenv()
+
         if debug:
-            yield from self._run_pipeline_debug(config)
+            yield from self._run_pipeline_debug(config, base_env)
         else:
-            yield from self._run_pipeline_standard(config)
+            yield from self._run_pipeline_standard(config, base_env)
+
+    def _load_dotenv(self) -> Dict[str, str]:
+        """Loads environment variables from a .env file in the git root."""
+        dotenv_path = self._git_service.git_root / ".env"
+        if not self._fs.file_exists(dotenv_path):
+            return {}
+
+        try:
+            content = self._fs.read_file(dotenv_path)
+        except Exception as e:
+            logger.warning(f"Failed to read .env file: {e}")
+            return {}
+
+        env_vars = {}
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                # Handle simple quotes around the value
+                if len(value) >= 2 and (
+                    (value.startswith('"') and value.endswith('"'))
+                    or (value.startswith("'") and value.endswith("'"))
+                ):
+                    value = value[1:-1]
+                env_vars[key] = value
+        return env_vars
 
     def _run_pipeline_standard(
-        self, config: Configuration
+        self, config: Configuration, base_env: Dict[str, str]
     ) -> Generator[PipelineEvent, None, None]:
         yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
 
@@ -183,7 +217,7 @@ class CiExecutionService:
 
             try:
                 exit_code = yield from self._execute_step(
-                    step, docker_image, self._git_service.git_root
+                    step, docker_image, self._git_service.git_root, base_env
                 )
             except DockerError as e:
                 logger.error(f"Infrastructure error during step '{step.name}': {e}")
@@ -206,7 +240,7 @@ class CiExecutionService:
         yield PipelineEnd(status=final_status)
 
     def _run_pipeline_debug(
-        self, config: Configuration
+        self, config: Configuration, base_env: Dict[str, str]
     ) -> Generator[PipelineEvent, None, None]:
         yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
 
@@ -231,10 +265,12 @@ class CiExecutionService:
             for step in config.steps:
                 yield StepStart(step=step)
 
+                combined_env = {**base_env, **step.env}
+
                 try:
                     exit_code = yield from self._stream_logs_and_get_exit_code(
                         self._docker_service.exec_in_container(
-                            container_id, command=step.command, env=step.env
+                            container_id, command=step.command, env=combined_env
                         ),
                         step.name,
                     )
@@ -280,14 +316,15 @@ class CiExecutionService:
         return int(exit_code)
 
     def _execute_step(
-        self, step: Step, image: str, workdir: Path
+        self, step: Step, image: str, workdir: Path, base_env: Dict[str, str]
     ) -> Generator[PipelineEvent, None, int]:
         """Runs a single step in a transient container and returns the exit code."""
+        combined_env = {**base_env, **step.env}
         command_gen = self._docker_service.run_command_in_container(
             image=image,
             command=step.command,
             workdir=workdir,
-            env=step.env,
+            env=combined_env,
         )
         exit_code = yield from self._stream_logs_and_get_exit_code(
             command_gen, step.name

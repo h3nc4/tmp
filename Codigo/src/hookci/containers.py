@@ -78,6 +78,7 @@ class Container:
             git_service=self.git_service,
             config_handler=self.config_handler,
             docker_service=self.docker_service,
+            fs=self.file_system,
         )
 
     @cached_property
