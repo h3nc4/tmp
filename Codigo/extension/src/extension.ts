@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as fsPromises from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
@@ -39,8 +40,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 /**
- * Checks if the hookci binary is installed globally, and if not, copies it
- * from the extension's bundle.
+ * Calculates the SHA-256 checksum of a file.
+ */
+async function calculateChecksum(filePath: string): Promise<string> {
+    const fileBuffer = await fsPromises.readFile(filePath);
+    const hashSum = crypto.createHash('sha256');
+    hashSum.update(fileBuffer);
+    return hashSum.digest('hex');
+}
+
+/**
+ * Checks if the hookci binary is installed globally and up-to-date.
+ * If missing or checksum mismatch, copies it from the extension's bundle.
  * @param context The extension context, used to find the bundled binary's path.
  */
 async function ensureHookciIsInstalled(context: vscode.ExtensionContext): Promise<void> {
@@ -49,23 +60,40 @@ async function ensureHookciIsInstalled(context: vscode.ExtensionContext): Promis
         return;
     }
 
-    try {
-        await fsPromises.stat(BINARY_PATH);
-        console.log(`HookCI binary already found at ${BINARY_PATH}. Skipping installation.`);
-        return;
-    } catch (error: any) {
-        if (error.code !== 'ENOENT') {
-            throw new Error(`Failed to check for hookci binary: ${error.message}`);
-        }
-        console.log('HookCI binary not found. Proceeding with installation from bundle.');
-    }
-
     const bundledBinaryPath = path.join(context.extensionPath, BUNDLED_BINARY_DIR, BINARY_NAME);
 
     try {
         await fsPromises.stat(bundledBinaryPath);
     } catch (error) {
         throw new Error(`Bundled HookCI binary not found at ${bundledBinaryPath}. The extension package might be corrupted.`);
+    }
+
+    let shouldInstall = true;
+
+    try {
+        await fsPromises.stat(BINARY_PATH);
+
+        // File exists, check integrity
+        const currentChecksum = await calculateChecksum(BINARY_PATH);
+        const bundledChecksum = await calculateChecksum(bundledBinaryPath);
+
+        if (currentChecksum === bundledChecksum) {
+            console.log(`HookCI binary at ${BINARY_PATH} is up to date. Skipping installation.`);
+            shouldInstall = false;
+        } else {
+            console.log(`HookCI binary checksum mismatch (Installed: ${currentChecksum} vs Bundled: ${bundledChecksum}). Updating...`);
+        }
+
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            console.log('HookCI binary not found. Proceeding with installation from bundle.');
+        } else {
+            console.warn(`Failed to check status of ${BINARY_PATH}: ${error.message}. Proceeding with installation attempt.`);
+        }
+    }
+
+    if (!shouldInstall) {
+        return;
     }
 
     await vscode.window.withProgress(
@@ -84,8 +112,9 @@ async function ensureHookciIsInstalled(context: vscode.ExtensionContext): Promis
             progress.report({ message: 'Setting file permissions...' });
             await fsPromises.chmod(BINARY_PATH, 0o755); // rwxr-xr-x
 
-            vscode.window.showInformationMessage(`HookCI has been successfully installed to ${BINARY_PATH}.`);
-            console.log(`HookCI installed to ${BINARY_PATH}.`);
+            const action = 'installed/updated';
+            vscode.window.showInformationMessage(`HookCI has been successfully ${action} to ${BINARY_PATH}.`);
+            console.log(`HookCI ${action} to ${BINARY_PATH}.`);
         }
     );
 }
