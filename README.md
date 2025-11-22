@@ -32,6 +32,19 @@ Esta é a maneira mais simples de instalar e usar HookCI, especialmente se você
 4. Clique em "Instalar" na extensão HookCI.
 5. Após a instalação, HookCI estará disponível no sistema e a extensão configurará automaticamente os hooks necessários.
 
+Caso encontre o erro abaixo ao tentar executar o comando `hookci`, certifique-se de que o diretório `~/.local/bin` está incluído na variável de ambiente `PATH`.
+
+```bash
+bash: hookci: command not found
+```
+
+Para adicionar `~/.local/bin` ao seu `PATH`, você pode executar o seguinte comando no terminal:
+
+```bash
+echo 'export PATH="/home/${USER}/.local/bin:${PATH}"' >>~/.bashrc
+source ~/.bashrc
+```
+
 ### Executável (PyInstaller)
 
 Se você prefere usar HookCI diretamente do terminal, você pode baixar o executável gerado pelo PyInstaller.

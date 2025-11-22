@@ -8,6 +8,19 @@ O objetivo principal é fornecer feedback rápido aos desenvolvedores, executand
 
 A configuração é gerenciada por meio de um simples arquivo YAML, e a ferramenta é operada por meio de uma Interface de Linha de Comando (CLI) dedicada.
 
+Caso encontre o erro abaixo ao tentar executar o comando `hookci`, certifique-se de que o diretório `~/.local/bin` está incluído na variável de ambiente `PATH`.
+
+```bash
+bash: hookci: command not found
+```
+
+Para adicionar `~/.local/bin` ao seu `PATH`, você pode executar o seguinte comando no terminal:
+
+```bash
+echo 'export PATH="/home/${USER}/.local/bin:${PATH}"' >>~/.bashrc
+source ~/.bashrc
+```
+
 ## Comandos
 
 ```bash
