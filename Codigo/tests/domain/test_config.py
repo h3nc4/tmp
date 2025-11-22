@@ -55,6 +55,7 @@ def test_create_default_config() -> None:
     assert config.steps[0].command == "echo 'Linting...'"
     assert config.steps[1].name == "Testing"
     assert config.steps[1].command == "echo 'Testing...'"
+    assert config.steps[1].depends_on == ["Linting"]
 
 
 def test_configuration_with_default_docker() -> None:
@@ -100,3 +101,42 @@ def test_log_level_validation() -> None:
     # Check that WARNING is no longer a valid level
     with pytest.raises(ValidationError):
         Configuration(version="1.0", log_level="WARNING")  # type: ignore[arg-type]
+
+
+def test_dag_validation_self_dependency() -> None:
+    """Verify self-dependency triggers a validation error."""
+    steps = [Step(name="A", command="cmd", depends_on=["A"])]
+    with pytest.raises(ValidationError) as excinfo:
+        Configuration(version="1.0", steps=steps)
+    assert "Step 'A' cannot depend on itself" in str(excinfo.value)
+
+
+def test_dag_validation_missing_dependency() -> None:
+    """Verify dependency on a non-existent step triggers an error."""
+    steps = [Step(name="A", command="cmd", depends_on=["Missing"])]
+    with pytest.raises(ValidationError) as excinfo:
+        Configuration(version="1.0", steps=steps)
+    assert "Step 'A' depends on unknown step 'Missing'" in str(excinfo.value)
+
+
+def test_dag_validation_circular_dependency() -> None:
+    """Verify circular dependencies are detected."""
+    steps = [
+        Step(name="A", command="cmd", depends_on=["B"]),
+        Step(name="B", command="cmd", depends_on=["A"]),
+    ]
+    with pytest.raises(ValidationError) as excinfo:
+        Configuration(version="1.0", steps=steps)
+    assert "Circular dependency detected" in str(excinfo.value)
+
+
+def test_dag_validation_valid_diamond() -> None:
+    """Verify a valid DAG (Diamond shape) passes validation."""
+    steps = [
+        Step(name="Start", command="cmd"),
+        Step(name="A", command="cmd", depends_on=["Start"]),
+        Step(name="B", command="cmd", depends_on=["Start"]),
+        Step(name="End", command="cmd", depends_on=["A", "B"]),
+    ]
+    config = Configuration(version="1.0", steps=steps)
+    assert len(config.steps) == 4

@@ -21,7 +21,7 @@ handling all command-line interface interactions.
 from __future__ import annotations
 
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, deque
 from itertools import chain
 from typing import (
     Any,
@@ -31,6 +31,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Tuple,
 )
 
 import typer
@@ -138,6 +139,11 @@ class PipelineUI:
         # State for log panels
         self.all_logs: DefaultDict[str, List[LogLine]] = defaultdict(list)
         self.active_info_panel: Optional[Panel] = None
+        
+        # Use a deque to store the last N log lines for the INFO panel.
+        # Each entry is a tuple of (prefix_text, message_text) to preserve style.
+        self.info_log_buffer: deque[Tuple[Text, Text]] = deque(maxlen=5)
+        
         self.debug_panels: Dict[str, Panel] = {}
         self.error_panels: List[Panel] = []
 
@@ -174,6 +180,14 @@ class PipelineUI:
     def _on_pipeline_start(self, event: PipelineStart) -> None:
         self.log_level = event.log_level
         self.overall_progress.update(self.overall_task, total=event.total_steps)
+        
+        # Initialize panel for interleaved logs if in INFO mode
+        if self.log_level == LogLevel.INFO:
+             self.active_info_panel = Panel(
+                Text("Waiting for steps...", style="dim"),
+                border_style="dim",
+                title="Execution Logs"
+            )
 
     def _on_image_pull_start(self, event: ImagePullStart) -> None:
         self.docker_task = self.steps_progress.add_task(
@@ -214,10 +228,14 @@ class PipelineUI:
             )
 
     def _on_step_start(self, event: StepStart) -> None:
-        task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
-        self.step_tasks[event.step.name] = task_id
-        if self.log_level in (LogLevel.INFO, LogLevel.DEBUG):
-            self._create_panel_for_step(event)
+        if event.step.name not in self.step_tasks:
+            task_id = self.steps_progress.add_task(f"  - {event.step.name}", total=1)
+            self.step_tasks[event.step.name] = task_id
+        
+        self.steps_progress.update(self.step_tasks[event.step.name], description=f"  [bold cyan]>[/] {event.step.name}")
+
+        if self.log_level == LogLevel.DEBUG:
+            self._create_debug_panel_for_step(event)
 
     def _on_log_line(self, event: LogLine) -> None:
         self.all_logs[event.step_name].append(event)
@@ -229,28 +247,31 @@ class PipelineUI:
     def _on_pipeline_end(self, event: PipelineEnd) -> None:
         self._finalize_pipeline(event)
 
-    def _create_panel_for_step(self, event: StepStart) -> None:
+    def _create_debug_panel_for_step(self, event: StepStart) -> None:
         command_text = Text.from_markup(
             f"[bold]Command:[/] [cyan]{event.step.command}[/]\n"
         )
         panel = Panel(
             command_text, border_style="dim", title=f"Output: {event.step.name}"
         )
-
-        if self.log_level == LogLevel.INFO:
-            self.active_info_panel = panel
-        elif self.log_level == LogLevel.DEBUG:
-            self.debug_panels[event.step.name] = panel
+        self.debug_panels[event.step.name] = panel
 
     def _update_panel_with_log(self, event: LogLine) -> None:
         if self.log_level == LogLevel.INFO and self.active_info_panel:
-            step_logs = "".join(log.line for log in self.all_logs[event.step_name])
-            syntax = Syntax(step_logs, "bash", theme="monokai", word_wrap=True)
-            renderable = self.active_info_panel.renderable
-            if isinstance(renderable, Group):
-                renderable.renderables[1] = syntax
-            else:
-                self.active_info_panel.renderable = Group(renderable, syntax)
+            # Create structured parts
+            prefix = Text(f"[{event.step_name}] ", style="cyan")
+            line = Text(event.line)
+            
+            # Add to circular buffer
+            self.info_log_buffer.append((prefix, line))
+            
+            # Reconstruct the panel content
+            new_content = Text()
+            for prefix_text, line_text in self.info_log_buffer:
+                new_content.append_text(prefix_text)
+                new_content.append_text(line_text)
+                
+            self.active_info_panel.renderable = new_content
 
         elif self.log_level == LogLevel.DEBUG and event.step_name in self.debug_panels:
             panel = self.debug_panels[event.step_name]
@@ -276,15 +297,14 @@ class PipelineUI:
                 description = f"[yellow]⚠[/] {description}"
             self.steps_progress.update(task_id, completed=1, description=description)
 
-        # Clear active info panel for INFO level
-        if self.log_level == LogLevel.INFO:
-            self.active_info_panel = None
+        # Unconditionally remove debug panel on completion.
+        # Failure logs are moved to the error panel.
+        # Success logs are hidden to reduce clutter.
+        if self.log_level == LogLevel.DEBUG and step.name in self.debug_panels:
+            del self.debug_panels[step.name]
 
-        # For failures, remove any existing debug panel and create a dedicated error panel
+        # For failures, create a dedicated error panel
         if event.status == "FAILURE":
-            if self.log_level == LogLevel.DEBUG and step.name in self.debug_panels:
-                del self.debug_panels[step.name]
-
             log_content = "".join(log.line for log in self.all_logs[step.name])
             command_text = Text.from_markup(
                 f"[bold]Command:[/] [cyan]{step.command}[/]\n"
@@ -308,9 +328,10 @@ class PipelineUI:
         elif event.status == "WARNING":
             description = "[bold yellow]🔶 Pipeline Finished with Warnings[/]"
 
-        # Update the overall task description without forcing completion to 100%.
-        # The 'completed' count now accurately reflects successful steps.
         self.overall_progress.update(self.overall_task, description=description)
+        
+        # Remove info panel at end
+        self.active_info_panel = None
 
 
 def _handle_error(e: Exception) -> None:

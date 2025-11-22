@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from rich.console import Console, Group
 from rich.live import Live
 from rich.syntax import Syntax
+from rich.text import Text
 from typer.testing import CliRunner
 
 from hookci.application.errors import (
@@ -543,19 +544,25 @@ class TestPipelineUI:
 
         ui.handle_event(LogLine(line=".", stream="stdout", step_name="Test"), live_mock)
 
-        panel = (
-            ui.active_info_panel if level == LogLevel.INFO else ui.debug_panels["Test"]
-        )
-        assert panel is not None
-        renderable = panel.renderable
-        assert isinstance(renderable, Group)
-        assert len(renderable.renderables) == 2
-        assert isinstance(renderable.renderables[1], Syntax)
+        if level == LogLevel.INFO:
+            # For INFO, it should be a Panel wrapping Text
+            assert ui.active_info_panel is not None
+            assert isinstance(ui.active_info_panel.renderable, Text)
+            assert "[Test]" in str(ui.active_info_panel.renderable)
+        else:  # DEBUG
+            panel = ui.debug_panels["Test"]
+            assert panel is not None
+            renderable = panel.renderable
+            assert isinstance(renderable, Group)
+            assert len(renderable.renderables) == 2
+            assert isinstance(renderable.renderables[1], Syntax)
 
-        # A second log line should replace the syntax object
-        ui.handle_event(LogLine(line="F", stream="stdout", step_name="Test"), live_mock)
-        assert len(renderable.renderables) == 2
-        assert live_mock.update.call_count == 4
+            # A second log line should replace the syntax object
+            ui.handle_event(
+                LogLine(line="F", stream="stdout", step_name="Test"), live_mock
+            )
+            assert len(renderable.renderables) == 2
+            assert live_mock.update.call_count == 4
 
     @pytest.mark.parametrize(
         "status, color",
@@ -580,18 +587,19 @@ class TestPipelineUI:
         assert color in str(task.description)
         assert task.completed == 1
 
+        # In all cases, the debug panel for the step should be removed
+        # to clean up the display (or replaced by an error panel for failures)
+        assert "Test" not in ui.debug_panels
+
         if status == "SUCCESS":
             assert ui.overall_progress.tasks[0].completed == 1
             assert not ui.error_panels
-            assert "Test" in ui.debug_panels
         elif status == "FAILURE":
             assert ui.overall_progress.tasks[0].completed == 0
             assert len(ui.error_panels) == 1
-            assert "Test" not in ui.debug_panels
         elif status == "WARNING":
             assert ui.overall_progress.tasks[0].completed == 0
             assert not ui.error_panels  # No error panel for warnings
-            assert "Test" in ui.debug_panels  # Debug panel remains
 
     def test_finalize_step_ignores_missing_task_id(
         self, ui: PipelineUI, live_mock: MagicMock
@@ -639,7 +647,8 @@ class TestPipelineUI:
         step1 = Step(name="SuccessStep", command="ok")
         ui.handle_event(StepStart(step=step1), live_mock)
         ui.handle_event(StepEnd(step=step1, status="SUCCESS", exit_code=0), live_mock)
-        assert "SuccessStep" in ui.debug_panels
+        # Debug panel should be removed on success to clean up
+        assert "SuccessStep" not in ui.debug_panels
         assert not ui.error_panels
 
         # Second step fails critically
@@ -650,9 +659,10 @@ class TestPipelineUI:
         assert len(ui.error_panels) == 1
         assert "FailStep" in str(ui.error_panels[0].title)
 
-        # At this point, we have debug and error panels. Check the display group.
+        # At this point, we have error panels but no active debug panels.
         group = ui._get_display_group()
-        assert len(group.renderables) == 2 + 1 + 1  # Progs + debug_panel + error_panel
+        # Progs (2) + 0 debug + 1 error = 3
+        assert len(group.renderables) == 3
 
         # Now, let's test the info panel separately as it's exclusive of debug panels
         ui_info = PipelineUI(Console())

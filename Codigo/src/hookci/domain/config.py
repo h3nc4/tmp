@@ -20,7 +20,7 @@ Domain models for HookCI configuration.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -42,6 +42,7 @@ class Step(BaseModel):
     command: str
     critical: bool = True
     env: Dict[str, str] = Field(default_factory=dict)
+    depends_on: List[str] = Field(default_factory=list)
 
 
 class Docker(BaseModel):
@@ -93,6 +94,57 @@ class Configuration(BaseModel):
     filters: Optional[Filters] = None
     steps: List[Step] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_dag(self) -> Configuration:
+        """
+        Validates that the steps form a Directed Acyclic Graph (DAG).
+        Checks for:
+        1. Dependencies pointing to non-existent steps.
+        2. Self-dependencies.
+        3. Circular dependencies.
+        """
+        step_names = {s.name for s in self.steps}
+        self._validate_dependencies_exist(step_names)
+        self._detect_circular_dependencies(step_names)
+        return self
+
+    def _validate_dependencies_exist(self, step_names: Set[str]) -> None:
+        """Ensures all dependencies point to existing steps and are not self-referential."""
+        for step in self.steps:
+            for dep in step.depends_on:
+                if dep not in step_names:
+                    raise ValueError(
+                        f"Step '{step.name}' depends on unknown step '{dep}'."
+                    )
+                if dep == step.name:
+                    raise ValueError(f"Step '{step.name}' cannot depend on itself.")
+
+    def _detect_circular_dependencies(self, step_names: Set[str]) -> None:
+        """Runs DFS to detect cycles in the dependency graph."""
+        adjacency_list: Dict[str, List[str]] = {
+            s.name: s.depends_on for s in self.steps
+        }
+        visited: Set[str] = set()
+        recursion_stack: Set[str] = set()
+
+        def is_cyclic(node: str) -> bool:
+            visited.add(node)
+            recursion_stack.add(node)
+
+            for neighbor in adjacency_list[node]:
+                if neighbor not in visited:
+                    if is_cyclic(neighbor):
+                        return True
+                elif neighbor in recursion_stack:
+                    return True
+
+            recursion_stack.remove(node)
+            return False
+
+        for name in step_names:
+            if name not in visited and is_cyclic(name):
+                raise ValueError("Circular dependency detected in steps.")
+
 
 def create_default_config() -> Configuration:
     """
@@ -105,6 +157,6 @@ def create_default_config() -> Configuration:
         hooks=Hooks(pre_commit=True, pre_push=True),
         steps=[
             Step(name="Linting", command="echo 'Linting...'"),
-            Step(name="Testing", command="echo 'Testing...'"),
+            Step(name="Testing", command="echo 'Testing...'", depends_on=["Linting"]),
         ],
     )

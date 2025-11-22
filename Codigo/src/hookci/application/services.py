@@ -17,11 +17,13 @@
 """
 Application services that orchestrate use cases.
 """
+import queue
 import re
 from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Generator, Literal, Optional, Tuple
+from typing import Any, Dict, Generator, List, Literal, Optional, Set, Tuple
 
 from pydantic import ValidationError
 
@@ -167,8 +169,10 @@ class CiExecutionService:
         base_env = self._load_dotenv()
 
         if debug:
+            # Debug mode remains sequential for simplicity in attaching shells
             yield from self._run_pipeline_debug(config, base_env)
         else:
+            # Standard mode now supports parallel execution
             yield from self._run_pipeline_standard(config, base_env)
 
     def _load_dotenv(self) -> Dict[str, str]:
@@ -204,6 +208,9 @@ class CiExecutionService:
     def _run_pipeline_standard(
         self, config: Configuration, base_env: Dict[str, str]
     ) -> Generator[PipelineEvent, None, None]:
+        """
+        Runs the pipeline using a DAG scheduler to allow concurrent execution of independent steps.
+        """
         yield PipelineStart(total_steps=len(config.steps), log_level=config.log_level)
 
         docker_image = yield from self._prepare_docker_image(config)
@@ -211,33 +218,223 @@ class CiExecutionService:
             yield PipelineEnd(status="FAILURE")
             return
 
-        final_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
-        for step in config.steps:
-            yield StepStart(step=step)
+        steps_by_name, incoming_edges, outgoing_edges = self._initialize_dag_structures(
+            config
+        )
 
-            try:
-                exit_code = yield from self._execute_step(
-                    step, docker_image, self._git_service.git_root, base_env
-                )
-            except DockerError as e:
-                logger.error(f"Infrastructure error during step '{step.name}': {e}")
-                yield StepEnd(step=step, status="FAILURE", exit_code=1)
-                yield PipelineEnd(status="FAILURE")
-                return
+        event_queue: "queue.Queue[PipelineEvent]" = queue.Queue()
+        completed_steps: Set[str] = set()
+        failed_critical = False
+        pipeline_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
 
-            if exit_code == 0:
-                yield StepEnd(step=step, status="SUCCESS", exit_code=exit_code)
-            else:
-                if step.critical:
-                    yield StepEnd(step=step, status="FAILURE", exit_code=exit_code)
-                    final_status = "FAILURE"
+        with ThreadPoolExecutor() as executor:
+            active_futures: List[Future[None]] = []
+
+            while len(completed_steps) < len(config.steps):
+                if not failed_critical:
+                    self._submit_ready_steps(
+                        incoming_edges=incoming_edges,
+                        steps_by_name=steps_by_name,
+                        completed_steps=completed_steps,
+                        executor=executor,
+                        active_futures=active_futures,
+                        docker_image=docker_image,
+                        base_env=base_env,
+                        event_queue=event_queue,
+                    )
+
+                if not active_futures:
+                    if not failed_critical:
+                        logger.error(
+                            "Deadlock detected or no reachable steps remaining."
+                        )
+                        pipeline_status = "FAILURE"
                     break
-                else:
-                    if final_status != "FAILURE":
-                        final_status = "WARNING"
-                    yield StepEnd(step=step, status="WARNING", exit_code=exit_code)
 
-        yield PipelineEnd(status=final_status)
+                event, pipeline_status, critical = self._process_next_event(
+                    event_queue,
+                    active_futures,
+                    completed_steps,
+                    outgoing_edges,
+                    incoming_edges,
+                    pipeline_status,
+                )
+
+                if event:
+                    yield event
+
+                if critical:
+                    failed_critical = True
+
+            wait(active_futures)
+            while not event_queue.empty():
+                yield event_queue.get()
+
+        yield PipelineEnd(status=pipeline_status)
+
+    def _initialize_dag_structures(
+        self, config: Configuration
+    ) -> Tuple[Dict[str, Step], Dict[str, int], Dict[str, List[str]]]:
+        """Initializes the necessary structures for the DAG scheduler."""
+        steps_by_name = {s.name: s for s in config.steps}
+        incoming_edges = {
+            s.name: len([d for d in s.depends_on if d in steps_by_name])
+            for s in config.steps
+        }
+        outgoing_edges: Dict[str, List[str]] = {s.name: [] for s in config.steps}
+        for s in config.steps:
+            for dep in s.depends_on:
+                if dep in outgoing_edges:
+                    outgoing_edges[dep].append(s.name)
+        return steps_by_name, incoming_edges, outgoing_edges
+
+    def _submit_ready_steps(
+        self,
+        incoming_edges: Dict[str, int],
+        steps_by_name: Dict[str, Step],
+        completed_steps: Set[str],
+        executor: ThreadPoolExecutor,
+        active_futures: List[Future[None]],
+        docker_image: str,
+        base_env: Dict[str, str],
+        event_queue: "queue.Queue[PipelineEvent]",
+    ) -> None:
+        """Identifies steps with satisfied dependencies and submits them to the executor."""
+        ready_steps = [
+            name
+            for name, degree in incoming_edges.items()
+            if degree == 0 and name not in completed_steps
+        ]
+
+        for name in ready_steps:
+            incoming_edges[name] = -1  # Mark as submitted
+            step = steps_by_name[name]
+            future = executor.submit(
+                self._threaded_step_wrapper,
+                step,
+                docker_image,
+                self._git_service.git_root,
+                base_env,
+                event_queue,
+            )
+            active_futures.append(future)
+
+    def _process_next_event(
+        self,
+        event_queue: "queue.Queue[PipelineEvent]",
+        active_futures: List[Future[None]],
+        completed_steps: Set[str],
+        outgoing_edges: Dict[str, List[str]],
+        incoming_edges: Dict[str, int],
+        current_status: Literal["SUCCESS", "FAILURE", "WARNING"],
+    ) -> Tuple[Optional[PipelineEvent], Literal["SUCCESS", "FAILURE", "WARNING"], bool]:
+        """Retrieves and processes the next event from the queue, updating pipeline state."""
+        try:
+            event = event_queue.get(timeout=0.1)
+        except queue.Empty:
+            return None, current_status, False
+
+        is_critical = False
+        if isinstance(event, StepEnd):
+            # Remove finished futures from the active list
+            active_futures[:] = [f for f in active_futures if not f.done()]
+            completed_steps.add(event.step.name)
+
+            current_status, is_critical = self._process_step_end(
+                event, outgoing_edges, incoming_edges, current_status
+            )
+
+        return event, current_status, is_critical
+
+    def _process_step_end(
+        self,
+        event: StepEnd,
+        outgoing_edges: Dict[str, List[str]],
+        incoming_edges: Dict[str, int],
+        current_status: Literal["SUCCESS", "FAILURE", "WARNING"],
+    ) -> Tuple[Literal["SUCCESS", "FAILURE", "WARNING"], bool]:
+        """
+        Updates DAG state and determines new pipeline status based on step completion.
+        Returns (new_status, is_critical_failure).
+        """
+        new_status = current_status
+        is_critical = False
+
+        if event.status == "FAILURE":
+            new_status = "FAILURE"
+            if event.step.critical:
+                is_critical = True
+            return new_status, is_critical
+
+        # Unlock downstream if SUCCESS or (WARNING and non-critical)
+        should_unlock = event.status == "SUCCESS" or (
+            event.status == "WARNING" and not event.step.critical
+        )
+
+        if should_unlock:
+            self._unlock_downstream_steps(
+                event.step.name, outgoing_edges, incoming_edges
+            )
+
+        if event.status == "WARNING" and new_status != "FAILURE":
+            new_status = "WARNING"
+
+        return new_status, is_critical
+
+    def _unlock_downstream_steps(
+        self,
+        completed_step_name: str,
+        outgoing_edges: Dict[str, List[str]],
+        incoming_edges: Dict[str, int],
+    ) -> None:
+        """Decrements the dependency count for children of a completed step."""
+        for child in outgoing_edges[completed_step_name]:
+            if incoming_edges[child] > 0:
+                incoming_edges[child] -= 1
+
+    def _threaded_step_wrapper(
+        self,
+        step: Step,
+        image: str,
+        workdir: Path,
+        base_env: Dict[str, str],
+        event_queue: "queue.Queue[PipelineEvent]",
+    ) -> None:
+        """
+        Wrapper to run a step in a separate thread and push events to a queue.
+        """
+        event_queue.put(StepStart(step=step))
+        try:
+            combined_env = {**base_env, **step.env}
+            command_gen = self._docker_service.run_command_in_container(
+                image=image,
+                command=step.command,
+                workdir=workdir,
+                env=combined_env,
+            )
+
+            exit_code = 1
+            try:
+                while True:
+                    stream, line = next(command_gen)
+                    event_queue.put(
+                        LogLine(line=line, stream=stream, step_name=step.name)
+                    )
+            except StopIteration as e:
+                exit_code = int(e.value) if e.value is not None else 1
+            except Exception as e:
+                logger.error(f"Error in step '{step.name}': {e}")
+                exit_code = 1
+
+            status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
+            if exit_code != 0:
+                status = "FAILURE" if step.critical else "WARNING"
+
+            event_queue.put(StepEnd(step=step, status=status, exit_code=exit_code))
+
+        except Exception as e:
+            logger.error(f"Thread wrapper failed for step '{step.name}': {e}")
+            event_queue.put(StepEnd(step=step, status="FAILURE", exit_code=1))
 
     def _run_pipeline_debug(
         self, config: Configuration, base_env: Dict[str, str]
@@ -262,6 +459,7 @@ class CiExecutionService:
 
         final_status: Literal["SUCCESS", "FAILURE", "WARNING"] = "SUCCESS"
         try:
+            # Debug mode runs sequentially ignoring dependencies for simplicity in user interaction
             for step in config.steps:
                 yield StepStart(step=step)
 
@@ -314,22 +512,6 @@ class CiExecutionService:
         except StopIteration as e:
             exit_code = e.value if e.value is not None else 1
         return int(exit_code)
-
-    def _execute_step(
-        self, step: Step, image: str, workdir: Path, base_env: Dict[str, str]
-    ) -> Generator[PipelineEvent, None, int]:
-        """Runs a single step in a transient container and returns the exit code."""
-        combined_env = {**base_env, **step.env}
-        command_gen = self._docker_service.run_command_in_container(
-            image=image,
-            command=step.command,
-            workdir=workdir,
-            env=combined_env,
-        )
-        exit_code = yield from self._stream_logs_and_get_exit_code(
-            command_gen, step.name
-        )
-        return exit_code
 
     def _is_hook_enabled(self, hook_type: str, config: Configuration) -> bool:
         """Checks if the specific Git hook is enabled in the configuration."""
