@@ -4,17 +4,17 @@ skinparam packageStyle rectangle
 package "Presentation" <<Rectangle>> {
     class HookciCli <<CLI>> {
         + init()
-        + run()
+        + run(str, bool)
         + migrate()
         + main()
     }
 
     class PipelineUI <<UI>> {
-        + handle_event()
+        + handle_event(PipelineEvent, Live)
     }
 
     class DebugUI <<UI>> {
-        + handle_event()
+        + handle_event(PipelineEvent)
     }
 }
 
@@ -24,7 +24,7 @@ package "Application" <<Rectangle>> {
     }
 
     class CiExecutionService <<Service>> {
-        + run()
+        + run(str, bool)
     }
 
     class MigrationService <<Service>> {
@@ -38,75 +38,75 @@ package "Application" <<Rectangle>> {
 
 package "Domain" <<Rectangle>> {
     class Configuration <<Model>> {
-        + version
-        + log_level
-        + docker
-        + hooks
-        + filters
-        + steps
+        + version: str
+        + log_level: LogLevel
+        + docker: Docker
+        + hooks: Hooks
+        + filters: Filters
+        + steps: List<Step>
         + validate_dag()
     }
 }
 
 package "Infrastructure" <<Rectangle>> {
     interface IFileSystem <<Interface>> {
-        + file_exists()
-        + create_dir()
-        + write_file()
-        + read_file()
-        + make_executable()
+        + file_exists(Path)
+        + create_dir(Path)
+        + write_file(Path, str)
+        + read_file(Path)
+        + make_executable(Path)
     }
     class LocalFileSystem <<Implementation>> {
-        + file_exists()
-        + create_dir()
-        + write_file()
-        + read_file()
-        + make_executable()
+        + file_exists(Path)
+        + create_dir(Path)
+        + write_file(Path, str)
+        + read_file(Path)
+        + make_executable(Path)
     }
 
     interface IScmService <<Interface>> {
         + git_root
-        + set_hooks_path()
+        + set_hooks_path(hooks_Path)
         + get_current_branch()
         + get_staged_commit_message()
     }
     class GitService <<Implementation>> {
         + git_root
-        + set_hooks_path()
+        + set_hooks_path(hooks_Path)
         + get_current_branch()
         + get_staged_commit_message()
     }
 
     interface IDockerService <<Interface>> {
-        + image_exists()
-        + pull_image()
-        + run_command_in_container()
-        + build_image()
-        + count_dockerfile_steps()
-        + calculate_dockerfile_hash()
-        + start_persistent_container()
-        + exec_in_container()
-        + stop_and_remove_container()
+        + image_exists(str)
+        + pull_image(str)
+        + run_cmd(str, str, Path, Dict)
+        + build_image(Path, str)
+        + count_dockerfile_steps(Path)
+        + calculate_dockerfile_hash(Path)
+        + start_container(str, Path)
+        + exec(str, str, Dict)
+        + remove_container(str)
     }
     class DockerService <<Implementation>> {
-        + image_exists()
-        + pull_image()
-        + run_command_in_container()
-        + build_image()
-        + count_dockerfile_steps()
-        + calculate_dockerfile_hash()
-        + start_persistent_container()
-        + exec_in_container()
-        + stop_and_remove_container()
+        + image_exists(str)
+        + pull_image(str)
+        + run_cmd(str, str, Path, Dict)
+        + build_image(Path, str)
+        + count_dockerfile_steps(Path)
+        + calculate_dockerfile_hash(Path)
+        + start_container(str, Path)
+        + exec(str, str, Dict)
+        + remove_container(str)
     }
 
     interface IConfigHandler <<Interface>> {
-        + load_config_data()
-        + write_config_data()
+        + load_config_data(Path)
+        + write_config_data(Path, Dict)
     }
     class YamlConfigHandler <<Implementation>> {
-        + load_config_data()
-        + write_config_data()
+        + load_config_data(Path)
+        + write_config_data(Path, Dict)
     }
 
     LocalFileSystem .up.|> IFileSystem
@@ -115,15 +115,15 @@ package "Infrastructure" <<Rectangle>> {
     YamlConfigHandler .up.|> IConfigHandler
 }
 
-HookciCli .down.> ProjectInitService
-HookciCli .down.> CiExecutionService
-HookciCli .down.> MigrationService
-PipelineUI ..> PipelineEvent
-DebugUI ..> PipelineEvent
+HookciCli -down-> ProjectInitService
+HookciCli -down-> CiExecutionService
+HookciCli -down-> MigrationService
+PipelineUI --> PipelineEvent
+DebugUI --> PipelineEvent
 
-ProjectInitService ..> Configuration
-CiExecutionService ..> Configuration
-MigrationService ..> Configuration
+ProjectInitService --> Configuration
+CiExecutionService --> Configuration
+MigrationService --> Configuration
 
 ProjectInitService --> IScmService
 ProjectInitService --> IFileSystem
