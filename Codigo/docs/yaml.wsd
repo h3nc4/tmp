@@ -12,6 +12,8 @@ filters:
   commits: string | null
 steps:
   name: string
+  depends_on: 
+    - string
   command: string
   critical: boolean | null
   env:
